@@ -9,6 +9,9 @@ export default {
   ],
   theme: {
   	extend: {
+      fontFamily: {
+        sans: ['var(--font-comic-neue)', 'sans-serif'], // Add Comic Neue as primary sans-serif
+      },
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
