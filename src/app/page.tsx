@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { FileTextIcon, LayoutGridIcon, ListIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 type LayoutMode = "grid" | "list";
 
