@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -8,32 +9,55 @@ import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
 import { Button } from '@/components/ui/button';
 import { FileTextIcon, LayoutGridIcon, ListIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 type LayoutMode = "grid" | "list";
 
 export default function HomePage() {
-  const [tasks, setTasks] = useState<Task[]>(() => {
-     if (typeof window !== 'undefined') {
-      const savedTasks = localStorage.getItem('toondoTasks');
-      return savedTasks ? JSON.parse(savedTasks) : [];
-    }
-    return [];
-  });
+  const [tasks, setTasks] = useState<Task[]>([]); // Initialize with empty array
   const [taskToPrint, setTaskToPrint] = useState<Task | null>(null);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid");
   const { toast } = useToast();
   const printableAreaRef = useRef<HTMLDivElement>(null);
 
+  // Load tasks from localStorage on client-side after initial hydration
   useEffect(() => {
+    const savedTasks = localStorage.getItem('toondoTasks');
+    if (savedTasks) {
+      try {
+        const parsedTasks: Task[] = JSON.parse(savedTasks);
+        if (Array.isArray(parsedTasks)) {
+          // Ensure tasks are sorted consistently (e.g., by creation time)
+          setTasks(parsedTasks.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+        } else {
+          // Clear invalid data if it's not an array
+          localStorage.removeItem('toondoTasks');
+        }
+      } catch (e) {
+        console.error("Failed to parse tasks from localStorage", e);
+        // Clear invalid data on parsing error
+        localStorage.removeItem('toondoTasks');
+      }
+    }
+  }, []); // Empty dependency array ensures this runs once on mount
+
+  // Save tasks to localStorage whenever they change
+  useEffect(() => {
+    // This effect runs after the initial load and whenever tasks are modified.
+    // Avoids running on initial server render or initial empty client render before hydration.
+    // Only run on client where localStorage is available.
     if (typeof window !== 'undefined') {
-      localStorage.setItem('toondoTasks', JSON.stringify(tasks));
+        // Check if tasks is not the initial empty array to avoid overwriting potentially loaded tasks with an empty array immediately
+        // This check is a bit nuanced. If tasks is empty because it was loaded as empty, it's fine.
+        // If tasks is empty because it's the very first render cycle of this effect, it's also fine.
+        // The main goal is to ensure we don't save an empty array if tasks haven't been loaded yet.
+        // However, since loading happens in a separate effect that runs first, this should be safe.
+        localStorage.setItem('toondoTasks', JSON.stringify(tasks));
     }
   }, [tasks]);
 
   const handleAddTask = (newTask: Task) => {
-    setTasks(prevTasks => [newTask, ...prevTasks].sort((a,b) => b.createdAt - a.createdAt));
+    setTasks(prevTasks => [newTask, ...prevTasks].sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0)));
     toast({
       title: "ToonDo Added!",
       description: `"${newTask.title}" is ready to be tackled!`,
