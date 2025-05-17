@@ -37,16 +37,18 @@ export default function HomePage() {
         if (Array.isArray(parsedTasks)) {
           setTasks(parsedTasks);
         } else {
-          localStorage.removeItem('toondoTasks');
+          localStorage.removeItem('toondoTasks'); // Clear if not an array
         }
       } catch (e) {
         console.error("Failed to parse tasks from localStorage", e);
-        localStorage.removeItem('toondoTasks');
+        localStorage.removeItem('toondoTasks'); // Clear on error
       }
     }
   }, []);
 
   useEffect(() => {
+    // Only save to localStorage if tasks is not empty,
+    // or if it was non-empty before (to allow clearing all tasks)
     if (typeof window !== 'undefined') {
       if (tasks.length > 0 || localStorage.getItem('toondoTasks') !== null) {
          localStorage.setItem('toondoTasks', JSON.stringify(tasks));
@@ -72,20 +74,41 @@ export default function HomePage() {
     setEditingTask(null);
   };
 
-  const handleUpdateTask = (updatedTask: Task) => {
-    setTasks(prevTasks =>
-      prevTasks.map(task =>
+  const handleUpdateTask = (updatedTask: Task, newSubTasksToCreate?: Task[]) => {
+    let mainTaskUpdated = false;
+    let subTasksAddedCount = 0;
+
+    setTasks(prevTasks => {
+      let newTasks = prevTasks.map(task =>
         task.id === updatedTask.id ? { ...task, ...updatedTask } : task
-      )
-    );
-    toast({
-      title: "ToonDo Updated!",
-      description: `"${updatedTask.title}" has been saved.`,
+      );
+      mainTaskUpdated = true;
+
+      if (newSubTasksToCreate && newSubTasksToCreate.length > 0) {
+        newTasks = [...newTasks, ...newSubTasksToCreate];
+        subTasksAddedCount = newSubTasksToCreate.length;
+      }
+      return newTasks;
     });
+    
+    let toastDescription = `"${updatedTask.title}" has been saved.`;
+    if (subTasksAddedCount > 0) {
+      toastDescription += ` ${subTasksAddedCount} new sub-task${subTasksAddedCount > 1 ? 's were' : ' was'} added.`;
+    }
+
+    if (mainTaskUpdated || subTasksAddedCount > 0) {
+      toast({
+        title: "ToonDo Updated!",
+        description: toastDescription,
+      });
+    }
     handleCloseEditDialog();
   };
 
   const handleToggleComplete = (id: string) => {
+    const taskToToggle = tasks.find(t => t.id === id);
+    if (!taskToToggle) return;
+
     setTasks(prevTasks =>
       prevTasks.map(task =>
         task.id === id ? { ...task, completed: !task.completed } : task
@@ -99,7 +122,7 @@ export default function HomePage() {
 
     let numRemoved = 0;
     const tasksToRemoveBasedOnCurrentState = new Set<string>([id]);
-    if (!taskToDelete.parentId) {
+    if (!taskToDelete.parentId) { // If it's a main task, also mark its children for removal
       tasks.forEach(t => {
         if (t.parentId === id) {
           tasksToRemoveBasedOnCurrentState.add(t.id);
@@ -109,9 +132,10 @@ export default function HomePage() {
     numRemoved = tasksToRemoveBasedOnCurrentState.size;
     
     setTasks(prevTasks => {
+       // Re-calculate tasks to remove based on the prevTasks state inside updater to avoid race conditions
        const finalTasksToRemove = new Set<string>([id]);
        const taskToDeleteInUpdater = prevTasks.find(t => t.id === id);
-        if (taskToDeleteInUpdater && !taskToDeleteInUpdater.parentId) {
+        if (taskToDeleteInUpdater && !taskToDeleteInUpdater.parentId) { // If it's a main task
             prevTasks.forEach(pt => {
                 if (pt.parentId === id) {
                     finalTasksToRemove.add(pt.id);
@@ -135,6 +159,7 @@ export default function HomePage() {
     }
     window.print();
     if (printableAreaRef.current) {
+       // Ensure it's hidden again after print dialog might close
        printableAreaRef.current.classList.add('hidden');
        printableAreaRef.current.classList.remove('print:block');
     }
@@ -144,23 +169,26 @@ export default function HomePage() {
     setTaskToPrint(task);
   };
   
+  // Effect to trigger actual print after state is set
   useEffect(() => {
     if (taskToPrint) {
+      // Timeout helps ensure the DOM is updated before printing
       const timer = setTimeout(() => {
         actualPrint();
-        setTaskToPrint(null);
+        setTaskToPrint(null); // Reset after initiating print
       }, 100); 
       return () => clearTimeout(timer);
     }
   }, [taskToPrint, actualPrint]);
 
+  // Cleanup after print
   useEffect(() => {
     const afterPrintHandler = () => {
       if (printableAreaRef.current) {
         printableAreaRef.current.classList.add('hidden');
         printableAreaRef.current.classList.remove('print:block');
       }
-      setTaskToPrint(null);
+      setTaskToPrint(null); // Ensure reset if print was cancelled or finished
     };
 
     window.addEventListener('afterprint', afterPrintHandler);
@@ -180,11 +208,14 @@ export default function HomePage() {
   };
   
   const handleDragLeave = () => {
+    // Only clear if leaving a different item than the one being dragged over,
+    // or if the drag target is not the dragged item itself.
+    // This handles nested drags a bit better.
     setDragOverItemId(null);
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault(); 
+    event.preventDefault(); // Necessary to allow dropping
   };
 
   const handleDrop = (droppedOnMainTaskId: string) => {
@@ -195,6 +226,7 @@ export default function HomePage() {
     }
 
     setTasks(prevTasks => {
+      // Create a list of main tasks in their current order
       const allMainTasksOriginal = prevTasks.filter(task => !task.parentId);
       const mainTaskIds = allMainTasksOriginal.map(t => t.id);
 
@@ -202,23 +234,28 @@ export default function HomePage() {
       let targetIdx = mainTaskIds.indexOf(droppedOnMainTaskId);
 
       if (draggedIdx === -1 || targetIdx === -1) {
+        // Should not happen if logic is correct, but a good safeguard
         return prevTasks; 
       }
 
-      mainTaskIds.splice(draggedIdx, 1); 
-      mainTaskIds.splice(targetIdx, 0, draggedItemId); 
+      // Reorder main task IDs
+      mainTaskIds.splice(draggedIdx, 1); // Remove dragged item
+      mainTaskIds.splice(targetIdx, 0, draggedItemId); // Insert at new position
 
+      // Reconstruct the full tasks array based on the new order of main tasks
       const newFullTasksArray: Task[] = [];
       mainTaskIds.forEach(id => {
         const mainTask = prevTasks.find(t => t.id === id && !t.parentId);
         if (mainTask) {
           newFullTasksArray.push(mainTask);
+          // Add its sub-tasks, maintaining their original relative order (by createdAt)
           const subTasksOfThisParent = prevTasks.filter(st => st.parentId === id)
                                     .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
           newFullTasksArray.push(...subTasksOfThisParent);
         }
       });
       
+      // Ensure any tasks not processed (e.g., orphaned subtasks, though ideally none) are appended
       const processedIds = new Set(newFullTasksArray.map(t => t.id));
       prevTasks.forEach(t => {
         if (!processedIds.has(t.id)) {
@@ -234,42 +271,44 @@ export default function HomePage() {
   };
   
   const handleDragEnd = () => {
+    // Reset drag states
     setDraggedItemId(null);
     setDragOverItemId(null);
   };
   
+  // Prepare tasks for display (grouping main tasks with their sub-tasks)
   const taskGroups: TaskGroup[] = [];
   if (tasks.length > 0) {
+    // Sort all tasks: main tasks first (by their current order in `tasks` array), then sub-tasks by creation time.
+    // This relies on the `tasks` array itself being the source of truth for main task order.
     const sortedInitialTasks = [...tasks].sort((a, b) => {
-      if (a.parentId && !b.parentId) return 1; 
-      if (!a.parentId && b.parentId) return -1; 
-      if (a.parentId && b.parentId) { 
-        if (a.parentId === b.parentId) return (a.createdAt || 0) - (b.createdAt || 0); 
-        const parentAOrder = tasks.findIndex(t => t.id === a.parentId);
-        const parentBOrder = tasks.findIndex(t => t.id === b.parentId);
-        return parentAOrder - parentBOrder;
+      // If 'a' is a main task and 'b' is a sub-task, 'a' comes first
+      if (!a.parentId && b.parentId) return -1;
+      // If 'b' is a main task and 'a' is a sub-task, 'b' comes first
+      if (a.parentId && !b.parentId) return 1;
+      // If both are sub-tasks, sort by parent ID first, then by creation time
+      if (a.parentId && b.parentId) {
+        if (a.parentId !== b.parentId) {
+          // Find order of their parents
+          const parentAOrder = tasks.findIndex(t => t.id === a.parentId && !t.parentId);
+          const parentBOrder = tasks.findIndex(t => t.id === b.parentId && !t.parentId);
+          return parentAOrder - parentBOrder;
+        }
+        return (a.createdAt || 0) - (b.createdAt || 0); // Sort sub-tasks by creation time
       }
-      if (a.completed === b.completed) {
-        const indexA = tasks.findIndex(t => t.id === a.id); 
-        const indexB = tasks.findIndex(t => t.id === b.id);
-        return indexA - indexB;
-      }
-      return a.completed ? 1 : -1; 
+      // If both are main tasks, maintain their order from the `tasks` array
+      const indexA = tasks.findIndex(t => t.id === a.id);
+      const indexB = tasks.findIndex(t => t.id === b.id);
+      return indexA - indexB;
     });
 
-    const displayableTasks = sortedInitialTasks.filter(task => {
-      if (!task.parentId) return true; 
-      const parent = sortedInitialTasks.find(p => p.id === task.parentId);
-      return parent && !parent.completed; 
-    });
-
-    const mainDisplayTasks = displayableTasks.filter(task => !task.parentId);
+    const mainDisplayTasks = sortedInitialTasks.filter(task => !task.parentId);
     
     mainDisplayTasks.forEach(pt => {
       const group: TaskGroup = {
         mainTask: pt,
-        subTasks: displayableTasks.filter(st => st.parentId === pt.id)
-                      .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0)) 
+        subTasks: sortedInitialTasks.filter(st => st.parentId === pt.id)
+                      .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0)) // ensure sub-tasks are ordered
       };
       taskGroups.push(group);
     });
@@ -296,23 +335,24 @@ export default function HomePage() {
         <div
           className={cn(
             'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8 items-start'
+            // 'items-start' ensures cards don't stretch to fill row height
           )}
         >
           {taskGroups.map(({ mainTask, subTasks }) => (
             <div
               key={mainTask.id}
-              className="flex flex-col gap-2" 
+              className="flex flex-col gap-2" // Stack main task and its sub-tasks vertically
               draggable={true}
               onDragStart={(e) => { e.stopPropagation(); handleDragStart(mainTask.id);}}
               onDragEnter={(e) => { e.stopPropagation(); handleDragEnter(mainTask.id);}}
               onDragLeave={(e) => { e.stopPropagation(); handleDragLeave();}}
               onDrop={(e) => { e.stopPropagation(); handleDrop(mainTask.id);}}
-              onDragOver={(e) => { e.stopPropagation(); handleDragOver(e);}}
+              onDragOver={(e) => { e.stopPropagation(); handleDragOver(e);}} // Needs stopPropagation if nested
               onDragEnd={(e) => { e.stopPropagation(); handleDragEnd();}}
             >
               <TaskCard
                 task={mainTask}
-                allTasks={tasks} 
+                allTasks={tasks} // Pass all tasks for context
                 onToggleComplete={handleToggleComplete}
                 onDelete={handleDeleteTask}
                 onPrint={handleInitiatePrint}
@@ -329,8 +369,8 @@ export default function HomePage() {
                   onDelete={handleDeleteTask}
                   onPrint={handleInitiatePrint}
                   onEdit={handleOpenEditDialog}
-                  isDraggingSelf={false} 
-                  isDragOverSelf={false} 
+                  isDraggingSelf={false} // Sub-tasks themselves are not directly dragged in this model
+                  isDragOverSelf={false} // Sub-tasks are not direct drop targets in this model
                 />
               ))}
             </div>
@@ -359,3 +399,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    

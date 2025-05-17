@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Task } from "@/types/task";
+import type { Task, TaskBreakdownStep } from "@/types/task";
 import { useEffect, useState } from 'react';
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,9 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, SparklesIcon, InfoIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, generateId } from "@/lib/utils";
 import { suggestDueDate } from "@/ai/flows/suggest-due-date";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -32,6 +32,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
+import { getRandomColor } from "@/lib/colors";
+
 
 const editTaskFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(100, "Title too long"),
@@ -45,13 +48,14 @@ interface EditTaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
   taskToEdit: Task | null;
-  onSaveTask: (updatedTask: Task) => void;
+  onSaveTask: (updatedTask: Task, newSubTasksToCreate?: Task[]) => void; // Updated signature
 }
 
 export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: EditTaskDialogProps) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSuggestingDate, setIsSuggestingDate] = useState(false);
   const [suggestedDateReasoning, setSuggestedDateReasoning] = useState<string | null>(null);
+  const [newSubTaskSteps, setNewSubTaskSteps] = useState<TaskBreakdownStep[]>([]);
   const { toast } = useToast();
 
   const { register, handleSubmit, setValue, watch, formState: { errors }, reset } = useForm<EditTaskFormData>({
@@ -70,11 +74,13 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
         dueDate: taskToEdit.dueDate ? parseISO(taskToEdit.dueDate) : null,
       });
       setSuggestedDateReasoning(null);
+      setNewSubTaskSteps([]); // Clear any pending new sub-tasks
     } else {
       reset({ title: "", description: "", dueDate: null });
        setSuggestedDateReasoning(null);
+       setNewSubTaskSteps([]);
     }
-  }, [taskToEdit, reset, isOpen]); // Also reset on isOpen to handle re-opening for same task
+  }, [taskToEdit, reset, isOpen]);
 
   const handleSuggestDueDate = async () => {
     if (!taskTitleForAISuggestion && !taskDescriptionForAISuggestion) {
@@ -119,6 +125,20 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
     }
   };
 
+  const handleAddSubTaskStep = () => {
+    setNewSubTaskSteps(prev => [...prev, { step: '', details: '', requiredRole: '' }]);
+  };
+
+  const handleRemoveSubTaskStep = (index: number) => {
+    setNewSubTaskSteps(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubTaskStepChange = (index: number, field: keyof TaskBreakdownStep, value: string) => {
+    setNewSubTaskSteps(prev => 
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    );
+  };
+
   const onSubmit: SubmitHandler<EditTaskFormData> = (data) => {
     if (!taskToEdit) return;
 
@@ -128,12 +148,29 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
       description: data.description || "",
       dueDate: data.dueDate ? data.dueDate.toISOString() : null,
     };
-    onSaveTask(updatedTask);
+
+    const subTasksToCreate: Task[] = newSubTaskSteps.map(step => {
+      if (step.step.trim() === "") return null; // Skip empty steps
+      return {
+        id: generateId(),
+        title: step.step,
+        description: `${step.details || ""}${step.requiredRole ? ` (Role: ${step.requiredRole})` : ""}`.trim(),
+        completed: false,
+        dueDate: null, 
+        color: getRandomColor(),
+        createdAt: Date.now() + 1, 
+        parentId: taskToEdit.id,
+      };
+    }).filter(task => task !== null) as Task[];
+    
+    onSaveTask(updatedTask, subTasksToCreate.length > 0 ? subTasksToCreate : undefined);
+    setNewSubTaskSteps([]); // Clear after saving
   };
   
   const handleDialogClose = () => {
-    reset({ title: "", description: "", dueDate: null }); // Reset form on close
+    reset({ title: "", description: "", dueDate: null }); 
     setSuggestedDateReasoning(null);
+    setNewSubTaskSteps([]);
     onClose();
   };
 
@@ -148,11 +185,11 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
             <DialogHeader className="pt-2 pb-4">
               <DialogTitle className="text-2xl font-semibold">Edit ToonDo Task</DialogTitle>
               <DialogDescription>
-                Make changes to your task details below. Click save when you're done.
+                Make changes to your task details below. You can also add new sub-tasks.
               </DialogDescription>
             </DialogHeader>
             
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-3">
               <div className="space-y-2">
                 <Label htmlFor="edit-title" className="text-lg font-semibold">Task Title</Label>
                 <Input
@@ -234,9 +271,70 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
                 </div>
                 {errors.dueDate && <p className="text-sm text-destructive">{errors.dueDate.message}</p>}
               </div>
+
+              {!taskToEdit.parentId && ( // Only show for main tasks
+                <Card className="border-dashed border-primary/50 mt-4">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Add New Sub-Tasks</CardTitle>
+                    <CardDescription className="text-sm">Break this main task into smaller new sub-tasks. Each step will become its own ToonDo card linked to this one.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                      {newSubTaskSteps.map((step, index) => (
+                        <div key={index} className="p-3 border rounded-md space-y-2 relative bg-background/50">
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute top-1 right-1 h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleRemoveSubTaskStep(index)}
+                            aria-label="Remove step"
+                          >
+                            <XCircleIcon className="h-4 w-4" />
+                          </Button>
+                          <div>
+                            <Label htmlFor={`new-sub-step-title-${index}`} className="text-xs">New Sub-Task Title (Step {index + 1})</Label>
+                            <Input
+                              id={`new-sub-step-title-${index}`}
+                              value={step.step}
+                              onChange={(e) => handleSubTaskStepChange(index, 'step', e.target.value)}
+                              placeholder="Title for this new sub-task"
+                              className="text-sm mt-0.5"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`new-sub-step-details-${index}`} className="text-xs">New Sub-Task Details (Optional)</Label>
+                            <Textarea
+                              id={`new-sub-step-details-${index}`}
+                              value={step.details || ""}
+                              onChange={(e) => handleSubTaskStepChange(index, 'details', e.target.value)}
+                              placeholder="Further details for this new sub-task"
+                              className="text-sm mt-0.5 min-h-[40px]"
+                              rows={2}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`new-sub-step-role-${index}`} className="text-xs">Assigned Role for New Sub-Task (Optional)</Label>
+                            <Input
+                              id={`new-sub-step-role-${index}`}
+                              value={step.requiredRole || ""}
+                              onChange={(e) => handleSubTaskStepChange(index, 'requiredRole', e.target.value)}
+                              placeholder="e.g., Designer, Developer"
+                              className="text-sm mt-0.5"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <Button type="button" variant="outline" size="sm" onClick={handleAddSubTaskStep} className="mt-2">
+                        <PlusCircleIcon className="mr-2 h-4 w-4" /> Add New Sub-Task Step
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
             
-            <DialogFooter className="pt-4">
+            <DialogFooter className="pt-4 mt-2 border-t">
               <DialogClose asChild>
                 <Button type="button" variant="outline" onClick={handleDialogClose}>
                   Cancel
@@ -250,3 +348,5 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
     </Dialog>
   );
 }
+
+    
