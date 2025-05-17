@@ -5,7 +5,7 @@ import type { Task } from "@/types/task";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getContrastingTextColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -56,28 +56,22 @@ export function TaskCard({
   const mutedTextStyle = { color: textColor, opacity: 0.8 };
   const veryMutedTextStyle = { color: textColor, opacity: 0.6 };
 
-  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Only trigger edit if the click is directly on the card, not on buttons/checkboxes
-    if ((e.target as HTMLElement).closest('button, [role="checkbox"], a')) {
-      return;
-    }
-    onEdit(task);
-  };
+  // Removed handleCardClick as general card click no longer triggers edit
 
   return (
     <Card
       className={cn(
-        "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative cursor-pointer",
+        "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative", // Removed cursor-pointer as general edit is gone
         task.completed && "opacity-60 ring-2 ring-green-500",
         isSubTask && "ml-8 max-w-sm", 
         isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2",
         isDragOverSelf && "ring-2 ring-primary ring-offset-1 scale-102 shadow-2xl z-10",
-        !isDraggingSelf && !isSubTask && "group-hover:cursor-grab" 
+        !isDraggingSelf && !isSubTask && "group-hover:cursor-grab" // Drag cursor for main tasks
       )}
       style={cardStyle}
-      onClick={handleCardClick}
+      // onClick removed from here
     >
-      {isSubTask && (
+      {isSubTask && parentTask && (
          <GitForkIcon
             className="absolute top-2 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90"
             stroke={polylineColor} 
@@ -95,7 +89,7 @@ export function TaskCard({
           )} style={textStyle}>
             {task.title}
           </CardTitle>
-          {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0", isSubTask ? "h-3 w-3 mt-0.5": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
+          {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0", isSubTask ? "h-3.5 w-3.5 mt-0.5": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
         </div>
         {parentTask && isSubTask && ( 
           <Badge variant="outline" className="mt-0.5 text-sm py-0 px-0.5 w-fit leading-tight" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}> 
@@ -109,7 +103,7 @@ export function TaskCard({
           </CardDescription>
         )}
          {task.description && isSubTask && ( 
-          <CardDescription className={cn("mt-0.5 break-words text-sm leading-snug max-h-8 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}> 
+          <CardDescription className={cn("mt-0.5 break-words text-sm leading-snug max-h-10 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}> 
              {task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
           </CardDescription>
         )}
@@ -120,7 +114,7 @@ export function TaskCard({
       )}>
         {task.dueDate && (
           <div className={cn("flex items-center", isSubTask ? "text-sm" : "text-sm")} style={{color: textColor, opacity: 0.9}}> 
-            <CalendarDaysIcon className={cn("mr-0.5", isSubTask ? "h-3 w-3" : "h-3.5 w-3.5")} style={textStyle} /> 
+            <CalendarDaysIcon className={cn("mr-0.5", isSubTask ? "h-3.5 w-3.5" : "h-3.5 w-3.5")} style={textStyle} /> 
             Due: {format(new Date(task.dueDate), "PP")}
           </div>
         )}
@@ -157,10 +151,9 @@ export function TaskCard({
             id={`complete-${task.id}`}
             checked={task.completed}
             onCheckedChange={(e) => {
-                // Stop propagation handled by Radix UI for Checkbox by default in this setup
                 onToggleComplete(task.id);
             }}
-            onClick={(e) => e.stopPropagation()} // Explicitly stop propagation for the Checkbox wrapper div if any
+            onClick={(e) => e.stopPropagation()} 
             className={cn(
               "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
               isSubTask ? "h-3.5 w-3.5" : "h-5 w-5", 
@@ -178,7 +171,7 @@ export function TaskCard({
               task.completed && "line-through"
             )}
             style={textStyle}
-            onClick={(e) => e.stopPropagation()} // Prevent triggering card edit when label is clicked
+            onClick={(e) => e.stopPropagation()} 
           >
             {task.completed ? "Mark Incomplete" : "Mark Complete"}
           </label>
@@ -188,6 +181,16 @@ export function TaskCard({
         "flex justify-end space-x-0.5",
         isSubTask ? "p-1 pt-0.5 pb-0.5" : "p-6 pt-0 space-x-2" 
       )}>
+        <Button
+          variant="ghost"
+          size={isSubTask ? "icon" : "icon"}
+          onClick={(e) => { e.stopPropagation(); onEdit(task);}}
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")} 
+          style={{color: textColor}}
+          aria-label="Edit task"
+        >
+          <PencilIcon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} /> 
+        </Button>
         <Button
           variant="ghost"
           size={isSubTask ? "icon" : "icon"}
