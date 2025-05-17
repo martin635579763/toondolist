@@ -26,23 +26,21 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
   const parentTask = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
   const childTasks = allTasks.filter(t => t.parentId === task.id);
 
-  let polylineColor: string;
-  if (isSubTask) {
-    polylineColor = '#000000'; // Hardcoded to black
-  } else {
-    polylineColor = 'transparent'; // Not used for main tasks' direct border/icon styling
-  }
-
+  // Polyline color is consistently black for all parts of the visual connection
+  const polylineColor = "#000000";
 
   const cardStyle: React.CSSProperties = {
     backgroundColor: task.color,
     color: textColor,
     borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
-    marginLeft: isSubTask ? '2rem' : '0',
-    borderLeftWidth: isSubTask ? '4px' : undefined,
-    borderLeftColor: isSubTask ? polylineColor : undefined,
-    borderLeftStyle: isSubTask ? 'solid' : undefined,
+    marginLeft: isSubTask ? '2rem' : '0', // Indentation for sub-tasks
   };
+
+  if (isSubTask) {
+    cardStyle.borderLeftWidth = '4px';
+    cardStyle.borderLeftColor = polylineColor; // Black border for polyline end
+    cardStyle.borderLeftStyle = 'solid';
+  }
   
   const textStyle = { color: textColor };
   const mutedTextStyle = { color: textColor, opacity: 0.8 };
@@ -54,25 +52,25 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        isSubTask && "min-w-[180px]" 
+        isSubTask && "min-w-[180px]" // Ensure sub-tasks have a minimum width if needed
       )}
       style={cardStyle}
     >
       {isSubTask && (
          <GitForkIcon 
             className="absolute top-2 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90" 
-            stroke={polylineColor} // Explicitly set stroke color
+            stroke={polylineColor} // Black stroke for polyline end
             strokeWidth={2.5}
             aria-hidden="true"
           />
       )}
       <CardHeader className={cn(
-        isSubTask ? "p-2 pb-1" : "p-6 pb-3"
+        isSubTask ? "p-2 pb-1" : "p-6 pb-3" // Reduced padding for sub-tasks
       )}>
         <div className="flex items-start justify-between">
           <CardTitle className={cn(
             "font-bold break-words", 
-            isSubTask ? "text-xs" : "text-2xl" 
+            isSubTask ? "text-xs" : "text-2xl" // Smaller title for sub-tasks
           )} style={textStyle}>
             {task.title}
           </CardTitle>
@@ -87,7 +85,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
         {task.description && (
           <CardDescription className={cn(
             "mt-1 break-words", 
-            isSubTask ? "text-[10px] leading-tight max-h-8 overflow-y-auto" : "text-sm" 
+            isSubTask ? "text-[10px] leading-tight max-h-8 overflow-y-auto" : "text-sm" // Smaller description for sub-tasks
           )} style={{color: textColor, opacity: 0.85}}>
             {isSubTask && task.description.length > 30 ? task.description.substring(0, 27) + "..." : task.description}
             {!isSubTask && task.description}
@@ -96,7 +94,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       </CardHeader>
       <CardContent className={cn(
         "flex-grow space-y-0.5 pt-0 pb-1", 
-        isSubTask ? "p-2 pt-0.5 pb-1 space-y-0" : "p-6 pt-0 space-y-2" 
+        isSubTask ? "p-2 pt-0.5 pb-1 space-y-0" : "p-6 pt-0 space-y-2" // Reduced padding
       )}>
         {task.dueDate && (
           <div className={cn("flex items-center", isSubTask ? "text-[10px]" : "text-sm")} style={{color: textColor, opacity: 0.9}}>
@@ -120,7 +118,10 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
                       {subTaskFull?.completed ? <CheckCircle2 className="mr-1.5 h-3 w-3 text-green-400 opacity-90" /> : <CircleDot className="mr-1.5 h-3 w-3 opacity-70" />}
                       <span className={cn(subTaskFull?.completed && "line-through", "truncate max-w-[150px] sm:max-w-[200px]")}>{st.title}</span>
                     </div>
-                    <ArrowRightIcon className="ml-2 h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" style={textStyle} />
+                    <ArrowRightIcon 
+                      className="ml-2 h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" 
+                      stroke={polylineColor} // Black stroke for polyline start cue
+                    />
                   </li>
                 );
               })}
@@ -136,7 +137,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
             onCheckedChange={() => onToggleComplete(task.id)}
             className={cn(
               "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
-              isSubTask ? "h-3 w-3" : "h-5 w-5", 
+              isSubTask ? "h-3 w-3" : "h-5 w-5", // Smaller checkbox for sub-tasks
               textColor === '#FFFFFF' ? "border-white/70" : "border-black/50"
             )}
             style={{ borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }}
@@ -147,7 +148,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
             id={`label-complete-${task.id}`}
             className={cn(
               "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              isSubTask ? "text-[10px]" : "text-sm", 
+              isSubTask ? "text-[10px]" : "text-sm", // Smaller label for sub-tasks
               task.completed && "line-through"
             )}
             style={textStyle}
@@ -158,13 +159,13 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       </CardContent>
       <CardFooter className={cn(
         "flex justify-end space-x-0.5", 
-        isSubTask ? "p-1 pt-0" : "p-6 pt-0 space-x-2" 
+        isSubTask ? "p-1 pt-0" : "p-6 pt-0 space-x-2" // Reduced padding and button spacing
       )}>
         <Button
           variant="ghost"
           size={isSubTask ? "icon" : "icon"} 
           onClick={() => onPrint(task)}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-5 w-5 p-0" : "h-8 w-8")} 
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-5 w-5 p-0" : "h-8 w-8")} // Smaller buttons
           style={{color: textColor}}
           aria-label="Print task"
         >
@@ -174,7 +175,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
           variant="ghost"
           size={isSubTask ? "icon" : "icon"}
           onClick={() => onDelete(task.id)}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-5 w-5 p-0" : "h-8 w-8")} 
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-5 w-5 p-0" : "h-8 w-8")} // Smaller buttons
           style={{color: textColor}}
           aria-label="Delete task"
         >
@@ -184,4 +185,3 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
     </Card>
   );
 }
-
