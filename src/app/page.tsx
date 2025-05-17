@@ -57,6 +57,7 @@ export default function HomePage() {
       // No explicit sort here to preserve DnD order; sorting is for display
       return newTasksList;
     });
+    // Moved toast outside of setTasks updater
     toast({
       title: "ToonDo Added!",
       description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
@@ -99,6 +100,7 @@ export default function HomePage() {
       return prevTasks.filter(task => !finalTasksToRemove.has(task.id));
     });
     
+    // Moved toast outside of setTasks updater
     toast({
       title: "ToonDo Removed!",
       description: `Task "${taskToDelete.title}" ${numRemoved > 1 ? 'and its sub-tasks were' : 'was'} removed.`,
@@ -257,7 +259,7 @@ export default function HomePage() {
         <div
           className={cn(
             // Always use grid layout
-            'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'
+            'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-start' // Added items-start
           )}
           onDragOver={handleDragOver} // Allow dropping onto the container (optional, for edge cases)
         >
@@ -295,3 +297,4 @@ export default function HomePage() {
     </div>
   );
 }
+
