@@ -77,7 +77,7 @@ export function TaskCard({
       style={cardStyle}
       onClick={handleCardClick}
     >
-      {isSubTask && parentTask && (
+      {isSubTask && (
          <GitForkIcon
             className="absolute top-2 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90"
             stroke={polylineColor} 
@@ -91,15 +91,15 @@ export function TaskCard({
         <div className="flex items-start justify-between">
           <CardTitle className={cn(
             "font-bold break-words",
-            isSubTask ? "text-sm" : "text-2xl" // Updated for sub-task title
+            isSubTask ? "text-base" : "text-2xl" 
           )} style={textStyle}>
             {task.title}
           </CardTitle>
-          {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0", isSubTask ? "h-2.5 w-2.5 mt-0.5": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
+          {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0", isSubTask ? "h-3 w-3 mt-0.5": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
         </div>
         {parentTask && isSubTask && ( 
-          <Badge variant="outline" className="mt-0.5 text-xs py-0 px-0.5 w-fit leading-tight" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}> {/* Updated font size */}
-            <Link2Icon className="mr-0.5 h-2 w-2" />
+          <Badge variant="outline" className="mt-0.5 text-sm py-0 px-0.5 w-fit leading-tight" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}> 
+            <Link2Icon className="mr-0.5 h-2.5 w-2.5" /> 
             Parent: {parentTask.title.length > 15 ? parentTask.title.substring(0, 12) + '...' : parentTask.title}
           </Badge>
         )}
@@ -109,7 +109,7 @@ export function TaskCard({
           </CardDescription>
         )}
          {task.description && isSubTask && ( 
-          <CardDescription className={cn("mt-0.5 break-words text-xs leading-snug h-8 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}> {/* Updated font size */}
+          <CardDescription className={cn("mt-0.5 break-words text-sm leading-snug max-h-8 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}> 
              {task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
           </CardDescription>
         )}
@@ -119,8 +119,8 @@ export function TaskCard({
         isSubTask ? "p-1 pt-0.5 pb-0 space-y-0" : "p-6 pt-0 space-y-2" 
       )}>
         {task.dueDate && (
-          <div className={cn("flex items-center", isSubTask ? "text-xs" : "text-sm")} style={{color: textColor, opacity: 0.9}}> {/* Updated font size */}
-            <CalendarDaysIcon className={cn("mr-0.5", isSubTask ? "h-2 w-2" : "h-3.5 w-3.5")} style={textStyle} />
+          <div className={cn("flex items-center", isSubTask ? "text-sm" : "text-sm")} style={{color: textColor, opacity: 0.9}}> 
+            <CalendarDaysIcon className={cn("mr-0.5", isSubTask ? "h-3 w-3" : "h-3.5 w-3.5")} style={textStyle} /> 
             Due: {format(new Date(task.dueDate), "PP")}
           </div>
         )}
@@ -163,7 +163,7 @@ export function TaskCard({
             onClick={(e) => e.stopPropagation()} // Explicitly stop propagation for the Checkbox wrapper div if any
             className={cn(
               "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
-              isSubTask ? "h-3 w-3" : "h-5 w-5", 
+              isSubTask ? "h-3.5 w-3.5" : "h-5 w-5", 
               textColor === '#FFFFFF' ? "border-white/70" : "border-black/50"
             )}
             style={{ borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }}
@@ -174,7 +174,7 @@ export function TaskCard({
             id={`label-complete-${task.id}`}
             className={cn(
               "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              isSubTask ? "text-xs" : "text-sm", // Updated font size
+              isSubTask ? "text-sm" : "text-sm", 
               task.completed && "line-through"
             )}
             style={textStyle}
@@ -192,24 +192,23 @@ export function TaskCard({
           variant="ghost"
           size={isSubTask ? "icon" : "icon"}
           onClick={(e) => { e.stopPropagation(); onPrint(task);}}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-5 w-5 p-0.5" : "h-8 w-8")} 
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")} 
           style={{color: textColor}}
           aria-label="Print task"
         >
-          <PrinterIcon className={isSubTask ? "h-3 w-3" : "h-5 w-5"} /> 
+          <PrinterIcon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} /> 
         </Button>
         <Button
           variant="ghost"
           size={isSubTask ? "icon" : "icon"}
           onClick={(e) => { e.stopPropagation(); onDelete(task.id);}}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-5 w-5 p-0.5" : "h-8 w-8")} 
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")} 
           style={{color: textColor}}
           aria-label="Delete task"
         >
-          <Trash2Icon className={isSubTask ? "h-3 w-3" : "h-5 w-5"} />
+          <Trash2Icon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} />
         </Button>
       </CardFooter>
     </Card>
   );
 }
-
