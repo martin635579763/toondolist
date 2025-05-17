@@ -91,14 +91,14 @@ export function TaskCard({
         <div className="flex items-start justify-between">
           <CardTitle className={cn(
             "font-bold break-words",
-            isSubTask ? "text-xs leading-tight" : "text-2xl" 
+            isSubTask ? "text-sm" : "text-2xl" // Updated for sub-task title
           )} style={textStyle}>
             {task.title}
           </CardTitle>
           {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0", isSubTask ? "h-2.5 w-2.5 mt-0.5": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
         </div>
         {parentTask && isSubTask && ( 
-          <Badge variant="outline" className="mt-0.5 text-[9px] py-0 px-0.5 w-fit leading-tight" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}>
+          <Badge variant="outline" className="mt-0.5 text-xs py-0 px-0.5 w-fit leading-tight" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}> {/* Updated font size */}
             <Link2Icon className="mr-0.5 h-2 w-2" />
             Parent: {parentTask.title.length > 15 ? parentTask.title.substring(0, 12) + '...' : parentTask.title}
           </Badge>
@@ -109,7 +109,7 @@ export function TaskCard({
           </CardDescription>
         )}
          {task.description && isSubTask && ( 
-          <CardDescription className={cn("mt-0.5 break-words text-[9px] leading-snug h-8 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}>
+          <CardDescription className={cn("mt-0.5 break-words text-xs leading-snug h-8 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}> {/* Updated font size */}
              {task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
           </CardDescription>
         )}
@@ -119,7 +119,7 @@ export function TaskCard({
         isSubTask ? "p-1 pt-0.5 pb-0 space-y-0" : "p-6 pt-0 space-y-2" 
       )}>
         {task.dueDate && (
-          <div className={cn("flex items-center", isSubTask ? "text-[9px]" : "text-sm")} style={{color: textColor, opacity: 0.9}}>
+          <div className={cn("flex items-center", isSubTask ? "text-xs" : "text-sm")} style={{color: textColor, opacity: 0.9}}> {/* Updated font size */}
             <CalendarDaysIcon className={cn("mr-0.5", isSubTask ? "h-2 w-2" : "h-3.5 w-3.5")} style={textStyle} />
             Due: {format(new Date(task.dueDate), "PP")}
           </div>
@@ -174,7 +174,7 @@ export function TaskCard({
             id={`label-complete-${task.id}`}
             className={cn(
               "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              isSubTask ? "text-[9px]" : "text-sm", 
+              isSubTask ? "text-xs" : "text-sm", // Updated font size
               task.completed && "line-through"
             )}
             style={textStyle}
@@ -212,3 +212,4 @@ export function TaskCard({
     </Card>
   );
 }
+
