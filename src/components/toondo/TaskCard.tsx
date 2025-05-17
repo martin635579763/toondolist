@@ -5,10 +5,15 @@ import type { Task } from "@/types/task";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getContrastingTextColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 
 interface TaskCardProps {
@@ -20,6 +25,7 @@ interface TaskCardProps {
   onEdit: (task: Task) => void;
   isDraggingSelf: boolean;
   isDragOverSelf: boolean;
+  isMainTaskWithIncompleteSubtasks: boolean; // New prop
 }
 
 export function TaskCard({
@@ -30,13 +36,15 @@ export function TaskCard({
   onPrint,
   onEdit,
   isDraggingSelf,
-  isDragOverSelf
+  isDragOverSelf,
+  isMainTaskWithIncompleteSubtasks
 }: TaskCardProps) {
   const textColor = getContrastingTextColor(task.color);
   const isSubTask = !!task.parentId;
+  const isMainTask = !task.parentId;
 
   const parentTask = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
-  const childTasks = allTasks.filter(t => t.parentId === task.id && !t.completed); 
+  const childTasks = allTasks.filter(t => t.parentId === task.id); // All children, not just incomplete
 
   const polylineColor = "#000000"; 
 
@@ -56,20 +64,19 @@ export function TaskCard({
   const mutedTextStyle = { color: textColor, opacity: 0.8 };
   const veryMutedTextStyle = { color: textColor, opacity: 0.6 };
 
-  // Removed handleCardClick as general card click no longer triggers edit
+  const checkboxDisabled = isMainTask && isMainTaskWithIncompleteSubtasks && !task.completed;
 
   return (
     <Card
       className={cn(
-        "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative", // Removed cursor-pointer as general edit is gone
+        "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
         isSubTask && "ml-8 max-w-sm", 
         isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2",
         isDragOverSelf && "ring-2 ring-primary ring-offset-1 scale-102 shadow-2xl z-10",
-        !isDraggingSelf && !isSubTask && "group-hover:cursor-grab" // Drag cursor for main tasks
+        !isDraggingSelf && !isSubTask && "group-hover:cursor-grab" 
       )}
       style={cardStyle}
-      // onClick removed from here
     >
       {isSubTask && parentTask && (
          <GitForkIcon
@@ -97,16 +104,15 @@ export function TaskCard({
             Parent: {parentTask.title.length > 15 ? parentTask.title.substring(0, 12) + '...' : parentTask.title}
           </Badge>
         )}
-        {task.description && !isSubTask && ( 
-          <CardDescription className={cn("mt-1 break-words text-sm")} style={{color: textColor, opacity: 0.85}}>
-            {task.description}
-          </CardDescription>
-        )}
-         {task.description && isSubTask && ( 
-          <CardDescription className={cn("mt-0.5 break-words text-sm leading-snug max-h-10 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}> 
-             {task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
-          </CardDescription>
-        )}
+        {task.description && (isSubTask ? (
+            <CardDescription className={cn("mt-0.5 break-words text-sm leading-snug max-h-10 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}> 
+                {task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
+            </CardDescription>
+        ) : (
+            <CardDescription className={cn("mt-1 break-words text-sm")} style={{color: textColor, opacity: 0.85}}>
+                {task.description}
+            </CardDescription>
+        ))}
       </CardHeader>
       <CardContent className={cn(
         "flex-grow space-y-0.5 pt-0 min-h-7",
@@ -119,7 +125,7 @@ export function TaskCard({
           </div>
         )}
 
-        {!isSubTask && childTasks.length > 0 && (
+        {isMainTask && childTasks.length > 0 && (
            <div className="mt-2 pt-2 border-t border-dashed" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}}>
             <h4 className="text-xs font-semibold uppercase flex items-center mb-1" style={mutedTextStyle}>
               <ListChecks className="mr-1.5 h-3.5 w-3.5" />
@@ -147,28 +153,42 @@ export function TaskCard({
         )}
 
         <div className={cn("flex items-center", isSubTask ? "pt-0.5 space-x-1" : "pt-2 space-x-2")}>
-          <Checkbox
-            id={`complete-${task.id}`}
-            checked={task.completed}
-            onCheckedChange={(e) => {
-                onToggleComplete(task.id);
-            }}
-            onClick={(e) => e.stopPropagation()} 
-            className={cn(
-              "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
-              isSubTask ? "h-3.5 w-3.5" : "h-5 w-5", 
-              textColor === '#FFFFFF' ? "border-white/70" : "border-black/50"
+          <Tooltip>
+            <TooltipTrigger asChild disabled={!checkboxDisabled}>
+                <Checkbox
+                    id={`complete-${task.id}`}
+                    checked={task.completed}
+                    onCheckedChange={() => {
+                        if (!checkboxDisabled) {
+                            onToggleComplete(task.id);
+                        }
+                    }}
+                    onClick={(e) => e.stopPropagation()} 
+                    disabled={checkboxDisabled}
+                    className={cn(
+                    "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
+                    isSubTask ? "h-3.5 w-3.5" : "h-5 w-5", 
+                    textColor === '#FFFFFF' ? "border-white/70" : "border-black/50",
+                    checkboxDisabled && "cursor-not-allowed opacity-70"
+                    )}
+                    style={{ borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }}
+                    aria-labelledby={`label-complete-${task.id}`}
+                />
+            </TooltipTrigger>
+            {checkboxDisabled && (
+                <TooltipContent>
+                    <p className="flex items-center text-xs"><InfoIcon className="h-3 w-3 mr-1.5"/>Complete all sub-tasks first.</p>
+                </TooltipContent>
             )}
-            style={{ borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }}
-            aria-labelledby={`label-complete-${task.id}`}
-          />
+          </Tooltip>
           <label
             htmlFor={`complete-${task.id}`}
             id={`label-complete-${task.id}`}
             className={cn(
               "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
               isSubTask ? "text-sm" : "text-sm", 
-              task.completed && "line-through"
+              task.completed && "line-through",
+              checkboxDisabled && "cursor-not-allowed opacity-70"
             )}
             style={textStyle}
             onClick={(e) => e.stopPropagation()} 
