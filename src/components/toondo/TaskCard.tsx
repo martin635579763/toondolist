@@ -14,6 +14,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useState, useEffect, useRef } from 'react';
 
 
 interface TaskCardProps {
@@ -25,7 +26,7 @@ interface TaskCardProps {
   onEdit: (task: Task) => void;
   isDraggingSelf: boolean;
   isDragOverSelf: boolean;
-  isMainTaskWithIncompleteSubtasks: boolean; // New prop
+  isMainTaskWithIncompleteSubtasks: boolean;
 }
 
 export function TaskCard({
@@ -44,9 +45,9 @@ export function TaskCard({
   const isMainTask = !task.parentId;
 
   const parentTask = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
-  const childTasks = allTasks.filter(t => t.parentId === task.id); // All children, not just incomplete
+  const childTasks = allTasks.filter(t => t.parentId === task.id);
 
-  const polylineColor = "#000000"; 
+  const polylineColor = "#000000";
 
   const cardStyle: React.CSSProperties = {
     backgroundColor: task.color,
@@ -56,7 +57,7 @@ export function TaskCard({
 
   if (isSubTask) {
     cardStyle.borderLeftWidth = '4px';
-    cardStyle.borderLeftColor = polylineColor; 
+    cardStyle.borderLeftColor = polylineColor;
     cardStyle.borderLeftStyle = 'solid';
   }
 
@@ -66,46 +67,94 @@ export function TaskCard({
 
   const checkboxDisabled = isMainTask && isMainTaskWithIncompleteSubtasks && !task.completed;
 
+  const [showFireworks, setShowFireworks] = useState(false);
+  const prevCompleted = useRef(task.completed);
+
+  useEffect(() => {
+    if (task.completed && !prevCompleted.current && isMainTask) { // Main task just completed
+      setShowFireworks(true);
+      const timer = setTimeout(() => setShowFireworks(false), 2500); // Animation duration (2.5 seconds)
+      //return () => clearTimeout(timer); // Cleanup timer on unmount or if dependencies change
+    }
+    prevCompleted.current = task.completed;
+  }, [task.completed, isMainTask]);
+
+
   return (
     <Card
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        isSubTask && "ml-8 max-w-sm", 
+        isSubTask && "ml-8 max-w-sm",
         isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2",
         isDragOverSelf && "ring-2 ring-primary ring-offset-1 scale-102 shadow-2xl z-10",
-        !isDraggingSelf && !isSubTask && "group-hover:cursor-grab" 
+        !isDraggingSelf && !isSubTask && "group-hover:cursor-grab"
       )}
       style={cardStyle}
     >
+      {showFireworks && isMainTask && (
+        <div className="fireworks-container">
+          {Array.from({ length: 20 }).map((_, i) => { // Number of particles
+            const angle = Math.random() * 360;
+            // Ensure particles burst outwards, not just downwards
+            const radius = 30 + Math.random() * 70; // Spread radius from 30 to 100
+            const txVal = Math.cos(angle * Math.PI / 180) * radius;
+            const tyVal = Math.sin(angle * Math.PI / 180) * radius;
+            
+            const tx = txVal + 'px';
+            const ty = tyVal + 'px';
+            const delay = Math.random() * 0.4; 
+            const particleColors = ['#FFD700', '#FF6347', '#ADFF2F', '#87CEEB', '#DA70D6', '#FFFFFF'];
+            const color = particleColors[Math.floor(Math.random() * particleColors.length)];
+            return (
+              <div
+                key={i}
+                className="firework-particle"
+                style={{
+                  top: '50%', 
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)', // Center particle origin before animation takes over
+                  backgroundColor: color,
+                  animationDelay: `${delay}s`,
+                  // @ts-ignore 
+                  '--tx': tx,
+                  // @ts-ignore 
+                  '--ty': ty,
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+
       {isSubTask && parentTask && (
          <GitForkIcon
             className="absolute top-2 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90"
-            stroke={polylineColor} 
+            stroke={polylineColor}
             strokeWidth={2.5}
             aria-hidden="true"
           />
       )}
       <CardHeader className={cn(
-        isSubTask ? "p-1 pt-0.5 pb-0" : "p-6 pb-3" 
+        isSubTask ? "p-1 pt-0.5 pb-0" : "p-6 pb-3"
       )}>
         <div className="flex items-start justify-between">
           <CardTitle className={cn(
             "font-bold break-words",
-            isSubTask ? "text-base" : "text-2xl" 
+            isSubTask ? "text-base" : "text-2xl"
           )} style={textStyle}>
             {task.title}
           </CardTitle>
           {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0", isSubTask ? "h-3.5 w-3.5 mt-0.5": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
         </div>
-        {parentTask && isSubTask && ( 
-          <Badge variant="outline" className="mt-0.5 text-sm py-0 px-0.5 w-fit leading-tight" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}> 
-            <Link2Icon className="mr-0.5 h-2.5 w-2.5" /> 
+        {parentTask && isSubTask && (
+          <Badge variant="outline" className="mt-0.5 text-sm py-0 px-0.5 w-fit leading-tight" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}>
+            <Link2Icon className="mr-0.5 h-2.5 w-2.5" />
             Parent: {parentTask.title.length > 15 ? parentTask.title.substring(0, 12) + '...' : parentTask.title}
           </Badge>
         )}
         {task.description && (isSubTask ? (
-            <CardDescription className={cn("mt-0.5 break-words text-sm leading-snug max-h-10 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}> 
+            <CardDescription className={cn("mt-0.5 break-words text-sm leading-snug max-h-10 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}>
                 {task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
             </CardDescription>
         ) : (
@@ -116,11 +165,11 @@ export function TaskCard({
       </CardHeader>
       <CardContent className={cn(
         "flex-grow space-y-0.5 pt-0 min-h-7",
-        isSubTask ? "p-1 pt-0.5 pb-0 space-y-0" : "p-6 pt-0 space-y-2" 
+        isSubTask ? "p-1 pt-0.5 pb-0 space-y-0" : "p-6 pt-0 space-y-2"
       )}>
         {task.dueDate && (
-          <div className={cn("flex items-center", isSubTask ? "text-sm" : "text-sm")} style={{color: textColor, opacity: 0.9}}> 
-            <CalendarDaysIcon className={cn("mr-0.5", isSubTask ? "h-3.5 w-3.5" : "h-3.5 w-3.5")} style={textStyle} /> 
+          <div className={cn("flex items-center", isSubTask ? "text-sm" : "text-sm")} style={{color: textColor, opacity: 0.9}}>
+            <CalendarDaysIcon className={cn("mr-0.5", isSubTask ? "h-3.5 w-3.5" : "h-3.5 w-3.5")} style={textStyle} />
             Due: {format(new Date(task.dueDate), "PP")}
           </div>
         )}
@@ -133,7 +182,7 @@ export function TaskCard({
             </h4>
             <ul className="list-none pl-1 space-y-0.5">
               {childTasks.slice(0, 3).map(st => {
-                const subTaskFull = allTasks.find(t => t.id === st.id); 
+                const subTaskFull = allTasks.find(t => t.id === st.id);
                 return (
                   <li key={st.id} className="text-xs flex items-center justify-between group" style={veryMutedTextStyle}>
                     <div className="flex items-center">
@@ -142,7 +191,7 @@ export function TaskCard({
                     </div>
                      <ArrowRightIcon
                       className="ml-2 h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
-                      stroke={"#000000"} 
+                      stroke={"#000000"}
                     />
                   </li>
                 );
@@ -163,11 +212,11 @@ export function TaskCard({
                             onToggleComplete(task.id);
                         }
                     }}
-                    onClick={(e) => e.stopPropagation()} 
+                    onClick={(e) => e.stopPropagation()}
                     disabled={checkboxDisabled}
                     className={cn(
                     "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
-                    isSubTask ? "h-3.5 w-3.5" : "h-5 w-5", 
+                    isSubTask ? "h-3.5 w-3.5" : "h-5 w-5",
                     textColor === '#FFFFFF' ? "border-white/70" : "border-black/50",
                     checkboxDisabled && "cursor-not-allowed opacity-70"
                     )}
@@ -186,12 +235,12 @@ export function TaskCard({
             id={`label-complete-${task.id}`}
             className={cn(
               "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              isSubTask ? "text-sm" : "text-sm", 
+              isSubTask ? "text-sm" : "text-sm",
               task.completed && "line-through",
               checkboxDisabled && "cursor-not-allowed opacity-70"
             )}
             style={textStyle}
-            onClick={(e) => e.stopPropagation()} 
+            onClick={(e) => e.stopPropagation()}
           >
             {task.completed ? "Mark Incomplete" : "Mark Complete"}
           </label>
@@ -199,33 +248,33 @@ export function TaskCard({
       </CardContent>
       <CardFooter className={cn(
         "flex justify-end space-x-0.5",
-        isSubTask ? "p-1 pt-0.5 pb-0.5" : "p-6 pt-0 space-x-2" 
+        isSubTask ? "p-1 pt-0.5 pb-0.5" : "p-6 pt-0 space-x-2"
       )}>
         <Button
           variant="ghost"
           size={isSubTask ? "icon" : "icon"}
           onClick={(e) => { e.stopPropagation(); onEdit(task);}}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")} 
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
           style={{color: textColor}}
           aria-label="Edit task"
         >
-          <PencilIcon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} /> 
+          <PencilIcon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} />
         </Button>
         <Button
           variant="ghost"
           size={isSubTask ? "icon" : "icon"}
           onClick={(e) => { e.stopPropagation(); onPrint(task);}}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")} 
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
           style={{color: textColor}}
           aria-label="Print task"
         >
-          <PrinterIcon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} /> 
+          <PrinterIcon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} />
         </Button>
         <Button
           variant="ghost"
           size={isSubTask ? "icon" : "icon"}
           onClick={(e) => { e.stopPropagation(); onDelete(task.id);}}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")} 
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
           style={{color: textColor}}
           aria-label="Delete task"
         >
@@ -235,3 +284,6 @@ export function TaskCard({
     </Card>
   );
 }
+
+
+  
