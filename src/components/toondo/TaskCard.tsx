@@ -27,6 +27,10 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
     backgroundColor: task.color,
     color: textColor,
     borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
+    // Indentation for sub-tasks is handled by a wrapper or margin in the list view,
+    // but we can add a specific class or style if needed directly here for grid view too.
+    // For now, list view handles hierarchy via sorting and potential wrapper styles.
+    // Adding a margin-left for subtasks if we want consistent indentation everywhere:
     marginLeft: isSubTask ? (allTasks.find(t => t.id === task.parentId && !t.parentId) ? '2rem' : (allTasks.find(t => t.id === task.parentId && t.parentId) ? '4rem' : '0')) : '0',
   };
   
@@ -42,12 +46,14 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        isSubTask && "border-l-4", 
+        isSubTask && "border-l-4", // Visual indicator for sub-task
         isSubTask ? "p-1" : "" // Reduced padding for sub-task card itself
       )}
       style={{
         ...cardStyle,
         borderLeftColor: isSubTask ? (parentTask ? parentTask.color : 'hsl(var(--primary))') : undefined,
+        // Explicitly define padding for sub-tasks if 'p-1' isn't enough or if we want more control
+        // padding: isSubTask ? '0.5rem' : undefined, // Example of more specific padding
       }}
     >
       {isSubTask && (
@@ -84,6 +90,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
           </div>
         )}
 
+        {/* Display list of sub-tasks on the main task card */}
         {!isSubTask && childTasks.length > 0 && (
            <div className="mt-2 pt-2 border-t border-dashed" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}}>
             <h4 className="text-xs font-semibold uppercase flex items-center mb-1" style={mutedTextStyle}>
@@ -92,6 +99,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
             </h4>
             <ul className="list-none pl-1 space-y-0.5">
               {childTasks.slice(0, 3).map(st => {
+                // Find the full sub-task object from allTasks to check its completion status
                 const subTaskFull = allTasks.find(t => t.id === st.id);
                 return (
                   <li key={st.id} className="text-xs flex items-center" style={veryMutedTextStyle}>
@@ -123,7 +131,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
             id={`label-complete-${task.id}`}
             className={cn(
               "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              isSubTask ? "text-xs" : "text-sm",
+              isSubTask ? "text-xs" : "text-sm", // Smaller label for sub-tasks
               task.completed && "line-through"
             )}
             style={textStyle}
@@ -135,7 +143,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       <CardFooter className={cn("flex justify-end space-x-2 pt-0", isSubTask && "p-2 pt-0 space-x-1")}>
         <Button
           variant="ghost"
-          size={isSubTask ? "sm" : "icon"}
+          size={isSubTask ? "sm" : "icon"} // Smaller button for sub-tasks
           onClick={() => onPrint(task)}
           className="hover:bg-white/20 dark:hover:bg-black/20"
           style={{color: textColor}}
@@ -145,7 +153,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
         </Button>
         <Button
           variant="ghost"
-          size={isSubTask ? "sm" : "icon"}
+          size={isSubTask ? "sm" : "icon"} // Smaller button for sub-tasks
           onClick={() => onDelete(task.id)}
           className="hover:bg-white/20 dark:hover:bg-black/20"
           style={{color: textColor}}
