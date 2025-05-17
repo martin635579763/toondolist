@@ -7,22 +7,23 @@ import type { Task } from '@/types/task';
 import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
-// import { Button } from '@/components/ui/button'; // Removed as layout toggle is removed
-import { FileTextIcon } from 'lucide-react'; // LayoutGridIcon, ListIcon removed
+import { FileTextIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 
-// type LayoutMode = "grid" | "list"; // Removed
+interface TaskGroup {
+  mainTask: Task;
+  subTasks: Task[];
+}
 
 export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskToPrint, setTaskToPrint] = useState<Task | null>(null);
-  // const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid"); // Removed
   const { toast } = useToast();
   const printableAreaRef = useRef<HTMLDivElement>(null);
 
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null); // ID of the main task of the group being dragged
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null); // ID of the main task of the group being dragged over
 
 
   useEffect(() => {
@@ -31,7 +32,7 @@ export default function HomePage() {
       try {
         const parsedTasks: Task[] = JSON.parse(savedTasks);
         if (Array.isArray(parsedTasks)) {
-          setTasks(parsedTasks); // Keep original sort order from localStorage for DnD
+          setTasks(parsedTasks);
         } else {
           localStorage.removeItem('toondoTasks');
         }
@@ -51,13 +52,7 @@ export default function HomePage() {
   }, [tasks]);
 
   const handleAddTask = (newTask: Task) => {
-    let newTasksList: Task[];
-    setTasks(prevTasks => {
-      newTasksList = [...prevTasks, newTask];
-      // No explicit sort here to preserve DnD order; sorting is for display
-      return newTasksList;
-    });
-    // Moved toast outside of setTasks updater
+    setTasks(prevTasks => [...prevTasks, newTask]);
     toast({
       title: "ToonDo Added!",
       description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
@@ -78,9 +73,9 @@ export default function HomePage() {
 
     let numRemoved = 0;
     const tasksToRemoveBasedOnCurrentState = new Set<string>([id]);
-    if (!taskToDelete.parentId) { // If it's a parent task
+    if (!taskToDelete.parentId) {
       tasks.forEach(t => {
-        if (t.parentId === id) { // Add all its children
+        if (t.parentId === id) {
           tasksToRemoveBasedOnCurrentState.add(t.id);
         }
       });
@@ -100,7 +95,6 @@ export default function HomePage() {
       return prevTasks.filter(task => !finalTasksToRemove.has(task.id));
     });
     
-    // Moved toast outside of setTasks updater
     toast({
       title: "ToonDo Removed!",
       description: `Task "${taskToDelete.title}" ${numRemoved > 1 ? 'and its sub-tasks were' : 'was'} removed.`,
@@ -150,14 +144,14 @@ export default function HomePage() {
   }, []);
 
 
-  // Drag and Drop Handlers
-  const handleDragStart = (id: string) => {
-    setDraggedItemId(id);
+  // Drag and Drop Handlers for Task Groups (identified by main task ID)
+  const handleDragStart = (mainTaskId: string) => {
+    setDraggedItemId(mainTaskId);
   };
 
-  const handleDragEnter = (id: string) => {
-    if (id !== draggedItemId) {
-      setDragOverItemId(id);
+  const handleDragEnter = (mainTaskId: string) => {
+    if (mainTaskId !== draggedItemId) {
+      setDragOverItemId(mainTaskId);
     }
   };
   
@@ -166,30 +160,51 @@ export default function HomePage() {
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault(); // Necessary to allow dropping
+    event.preventDefault(); 
   };
 
-  const handleDrop = (droppedOnItemId: string) => {
-    if (!draggedItemId || draggedItemId === droppedOnItemId) {
+  const handleDrop = (droppedOnMainTaskId: string) => {
+    if (!draggedItemId || draggedItemId === droppedOnMainTaskId || !droppedOnMainTaskId) {
       setDraggedItemId(null);
       setDragOverItemId(null);
       return;
     }
 
     setTasks(prevTasks => {
-      const draggedItemIndex = prevTasks.findIndex(task => task.id === draggedItemId);
-      const droppedOnItemIndex = prevTasks.findIndex(task => task.id === droppedOnItemId);
+      const allMainTasksOriginal = prevTasks.filter(task => !task.parentId);
+      const mainTaskIds = allMainTasksOriginal.map(t => t.id);
 
-      if (draggedItemIndex === -1 || droppedOnItemIndex === -1) return prevTasks;
+      const draggedIdx = mainTaskIds.indexOf(draggedItemId);
+      let targetIdx = mainTaskIds.indexOf(droppedOnMainTaskId);
 
-      const newTasks = [...prevTasks];
-      const [draggedItem] = newTasks.splice(draggedItemIndex, 1);
+      if (draggedIdx === -1 || targetIdx === -1) {
+        return prevTasks; 
+      }
+
+      // Remove draggedItemId and insert it at targetIdx
+      mainTaskIds.splice(draggedIdx, 1); 
+      mainTaskIds.splice(targetIdx, 0, draggedItemId); 
+
+      const newFullTasksArray: Task[] = [];
+      mainTaskIds.forEach(id => {
+        const mainTask = prevTasks.find(t => t.id === id && !t.parentId);
+        if (mainTask) {
+          newFullTasksArray.push(mainTask);
+          const subTasksOfThisParent = prevTasks.filter(st => st.parentId === id)
+                                    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+          newFullTasksArray.push(...subTasksOfThisParent);
+        }
+      });
       
-      // Adjust index if dragging downwards
-      const insertAtIndex = draggedItemIndex < droppedOnItemIndex ? droppedOnItemIndex : droppedOnItemIndex;
-      
-      newTasks.splice(insertAtIndex, 0, draggedItem);
-      return newTasks;
+      // Ensure all tasks are included (e.g., if any somehow became orphaned, though unlikely with this logic)
+      const processedIds = new Set(newFullTasksArray.map(t => t.id));
+      prevTasks.forEach(t => {
+        if (!processedIds.has(t.id)) {
+          newFullTasksArray.push(t);
+        }
+      });
+
+      return newFullTasksArray;
     });
 
     setDraggedItemId(null);
@@ -200,40 +215,49 @@ export default function HomePage() {
     setDraggedItemId(null);
     setDragOverItemId(null);
   };
-
-  // Sorting logic for display - attempts to keep sub-tasks with parents
-  // Main tasks are sorted by completion then creation date (reversed)
-  // Sub-tasks are sorted by creation date within their parent context
-  const sortedTasks = [...tasks].sort((a, b) => {
-    // Group sub-tasks under their parents
-    if (a.parentId && b.parentId) { // Both are sub-tasks
-      if (a.parentId === b.parentId) { // Sub-tasks of the same parent
-        return (a.createdAt || 0) - (b.createdAt || 0); // Sort by creation
-      }
-      // Sub-tasks of different parents, sort by their parent's order (implicitly handled by parent sort)
-    }
-    if (a.parentId && !b.parentId) return 1; // a is sub, b is main, b comes first
-    if (!a.parentId && b.parentId) return -1; // a is main, b is sub, a comes first
-
-    // For main tasks (or if parent sorting doesn't differentiate)
-    if (a.completed === b.completed) {
-      // Original order (which is DnD influenced) is primary sort for items of same completion status
-      // The tasks array itself now reflects the drag-and-drop order.
-      // We don't need an explicit secondary sort by createdAt here if DnD is primary.
-      // Fallback to creation for newly added items if no DnD has occurred for them yet.
-      const indexA = tasks.findIndex(t => t.id === a.id);
-      const indexB = tasks.findIndex(t => t.id === b.id);
-      return indexA - indexB;
-    }
-    return a.completed ? 1 : -1; // Incomplete tasks first
-  });
   
-  // Filter for display: only show top-level tasks or sub-tasks whose parent is visible in the current filtered/sorted list
-  const displayTasks = sortedTasks.filter(task => {
-    if (!task.parentId) return true; // Always show main tasks
-    // Show sub-task only if its parent is in the sortedTasks list (which means it's not filtered out)
-    return sortedTasks.some(parent => parent.id === task.parentId && !parent.completed);
-  });
+  // Prepare tasks for display: Group main tasks with their sub-tasks
+  const taskGroups: TaskGroup[] = [];
+  if (tasks.length > 0) {
+    // First, sort tasks: main tasks by completion then user order, sub-tasks by creation under parent
+    // This initial sort helps in organizing `displayTasks` which then feeds into `taskGroups`
+    const sortedInitialTasks = [...tasks].sort((a, b) => {
+      if (a.parentId && !b.parentId) return 1; // a is sub, b is main -> b first
+      if (!a.parentId && b.parentId) return -1; // a is main, b is sub -> a first
+      if (a.parentId && b.parentId) { // both are subs
+        if (a.parentId === b.parentId) return (a.createdAt || 0) - (b.createdAt || 0); // same parent, sort by creation
+        // subs of different parents, their order is dictated by their parents' order
+        const parentAOrder = tasks.findIndex(t => t.id === a.parentId);
+        const parentBOrder = tasks.findIndex(t => t.id === b.parentId);
+        return parentAOrder - parentBOrder;
+      }
+      // both are main tasks
+      if (a.completed === b.completed) {
+        const indexA = tasks.findIndex(t => t.id === a.id); // Use current 'tasks' for DnD order
+        const indexB = tasks.findIndex(t => t.id === b.id);
+        return indexA - indexB;
+      }
+      return a.completed ? 1 : -1; // Incomplete main tasks first
+    });
+
+    // Filter for display: only show top-level tasks or sub-tasks whose parent is visible and not completed
+    const displayableTasks = sortedInitialTasks.filter(task => {
+      if (!task.parentId) return true; // Always show main tasks
+      const parent = sortedInitialTasks.find(p => p.id === task.parentId);
+      return parent && !parent.completed; // Show sub-task only if its parent is present and not completed
+    });
+
+    const mainDisplayTasks = displayableTasks.filter(task => !task.parentId);
+    
+    mainDisplayTasks.forEach(pt => {
+      const group: TaskGroup = {
+        mainTask: pt,
+        subTasks: displayableTasks.filter(st => st.parentId === pt.id)
+                      .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0)) // ensure sub-tasks are ordered by creation
+      };
+      taskGroups.push(group);
+    });
+  }
 
 
   return (
@@ -246,8 +270,6 @@ export default function HomePage() {
       </header>
 
       <CreateTaskForm onAddTask={handleAddTask} />
-
-      {/* Removed Layout Toggle Buttons */}
       
       {tasks.length === 0 ? (
          <div className="text-center py-16">
@@ -258,29 +280,43 @@ export default function HomePage() {
       ) : (
         <div
           className={cn(
-            // Always use grid layout
-            'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-start' // Added items-start
+            'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8 items-start' // gap-y increased slightly
           )}
-          onDragOver={handleDragOver} // Allow dropping onto the container (optional, for edge cases)
         >
-          {displayTasks.map(task => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              allTasks={tasks} 
-              onToggleComplete={handleToggleComplete}
-              onDelete={handleDeleteTask}
-              onPrint={handleInitiatePrint}
-              // Drag and Drop props
-              onDragStart={() => handleDragStart(task.id)}
-              onDragEnter={() => handleDragEnter(task.id)}
+          {taskGroups.map(({ mainTask, subTasks }) => (
+            <div
+              key={mainTask.id}
+              className="flex flex-col gap-2" // Groups items, ensures sub-tasks stack under main
+              draggable={true}
+              onDragStart={() => handleDragStart(mainTask.id)}
+              onDragEnter={() => handleDragEnter(mainTask.id)}
               onDragLeave={handleDragLeave}
-              onDrop={() => handleDrop(task.id)}
-              onDragOverCard={handleDragOver} // Pass the general drag over for the card itself
+              onDrop={() => handleDrop(mainTask.id)}
+              onDragOver={handleDragOver}
               onDragEnd={handleDragEnd}
-              isDraggingSelf={draggedItemId === task.id}
-              isDragOverSelf={dragOverItemId === task.id && draggedItemId !== task.id}
-            />
+            >
+              <TaskCard
+                task={mainTask}
+                allTasks={tasks} 
+                onToggleComplete={handleToggleComplete}
+                onDelete={handleDeleteTask}
+                onPrint={handleInitiatePrint}
+                isDraggingSelf={draggedItemId === mainTask.id}
+                isDragOverSelf={dragOverItemId === mainTask.id && draggedItemId !== mainTask.id}
+              />
+              {subTasks.map(subTask => (
+                <TaskCard
+                  key={subTask.id}
+                  task={subTask}
+                  allTasks={tasks}
+                  onToggleComplete={handleToggleComplete}
+                  onDelete={handleDeleteTask}
+                  onPrint={handleInitiatePrint}
+                  isDraggingSelf={false} // Sub-tasks are not individually dragged in this model
+                  isDragOverSelf={false} // Sub-tasks are not individual drop targets for groups
+                />
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -297,4 +333,3 @@ export default function HomePage() {
     </div>
   );
 }
-

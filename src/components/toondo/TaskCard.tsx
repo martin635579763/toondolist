@@ -17,13 +17,6 @@ interface TaskCardProps {
   onToggleComplete: (id: string) => void;
   onDelete: (id: string) => void;
   onPrint: (task: Task) => void;
-  // Drag and Drop props
-  onDragStart: () => void;
-  onDragEnter: () => void;
-  onDragLeave: () => void;
-  onDrop: () => void;
-  onDragOverCard: (event: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
   isDraggingSelf: boolean;
   isDragOverSelf: boolean;
 }
@@ -34,12 +27,6 @@ export function TaskCard({
   onToggleComplete,
   onDelete,
   onPrint,
-  onDragStart,
-  onDragEnter,
-  onDragLeave,
-  onDrop,
-  onDragOverCard,
-  onDragEnd,
   isDraggingSelf,
   isDragOverSelf
 }: TaskCardProps) {
@@ -47,9 +34,9 @@ export function TaskCard({
   const isSubTask = !!task.parentId;
 
   const parentTask = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
-  const childTasks = allTasks.filter(t => t.parentId === task.id);
+  const childTasks = allTasks.filter(t => t.parentId === task.id && !t.completed); // Only show non-completed sub-tasks in the list
 
-  const polylineColor = "#000000"; // Polyline is always black
+  const polylineColor = "#000000"; 
 
   const cardStyle: React.CSSProperties = {
     backgroundColor: task.color,
@@ -70,21 +57,16 @@ export function TaskCard({
 
   return (
     <Card
-      draggable={true}
-      onDragStart={onDragStart}
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-      onDragOver={onDragOverCard}
-      onDragEnd={onDragEnd}
       className={cn(
-        "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative cursor-grab",
+        "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        isSubTask && "ml-8 max-w-sm", 
-        isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2",
-        isDragOverSelf && "ring-2 ring-primary ring-offset-1 scale-105 shadow-2xl z-10"
+        isSubTask && "ml-8 max-w-sm", // Indent and make sub-tasks narrower
+        isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2 cursor-grabbing",
+        isDragOverSelf && "ring-2 ring-primary ring-offset-1 scale-102 shadow-2xl z-10",
+        !isDraggingSelf && !isSubTask && "cursor-grab" // Only main tasks in groups are grab-able
       )}
       style={cardStyle}
+      // onClick={(e) => { if(isSubTask) e.stopPropagation();}} // Prevent group drag from sub-task click (optional)
     >
       {isSubTask && parentTask && (
          <GitForkIcon
@@ -109,16 +91,17 @@ export function TaskCard({
         {parentTask && isSubTask && ( 
           <Badge variant="outline" className="mt-0.5 text-[9px] py-0 px-0.5 w-fit leading-tight" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}>
             <Link2Icon className="mr-0.5 h-2 w-2" />
-            Parent: {parentTask.title.length > 8 ? parentTask.title.substring(0, 6) + '...' : parentTask.title}
+            Parent: {parentTask.title.length > 15 ? parentTask.title.substring(0, 12) + '...' : parentTask.title}
           </Badge>
         )}
-        {task.description && (
-          <CardDescription className={cn(
-            "mt-0.5 break-words",
-             isSubTask ? "text-[9px] leading-snug h-8 overflow-y-auto" : "text-sm" 
-          )} style={{color: textColor, opacity: 0.85}}>
-            {isSubTask && task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
-            {!isSubTask && task.description}
+        {task.description && !isSubTask && ( // Full description only for main tasks
+          <CardDescription className={cn("mt-1 break-words text-sm")} style={{color: textColor, opacity: 0.85}}>
+            {task.description}
+          </CardDescription>
+        )}
+         {task.description && isSubTask && ( // Shorter description for sub-tasks
+          <CardDescription className={cn("mt-0.5 break-words text-[9px] leading-snug h-8 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}>
+             {task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
           </CardDescription>
         )}
       </CardHeader>
@@ -141,7 +124,7 @@ export function TaskCard({
             </h4>
             <ul className="list-none pl-1 space-y-0.5">
               {childTasks.slice(0, 3).map(st => {
-                const subTaskFull = allTasks.find(t => t.id === st.id);
+                const subTaskFull = allTasks.find(t => t.id === st.id); // Get full sub-task for completion status
                 return (
                   <li key={st.id} className="text-xs flex items-center justify-between group" style={veryMutedTextStyle}>
                     <div className="flex items-center">
@@ -150,7 +133,7 @@ export function TaskCard({
                     </div>
                      <ArrowRightIcon
                       className="ml-2 h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
-                      stroke={"#000000"}
+                      stroke={"#000000"} // Explicitly black
                     />
                   </li>
                 );
@@ -164,7 +147,10 @@ export function TaskCard({
           <Checkbox
             id={`complete-${task.id}`}
             checked={task.completed}
-            onCheckedChange={() => onToggleComplete(task.id)}
+            onCheckedChange={(e) => {
+                // e.stopPropagation(); // Prevent group drag if checkbox is clicked
+                onToggleComplete(task.id);
+            }}
             className={cn(
               "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
               isSubTask ? "h-3 w-3" : "h-5 w-5", 
@@ -182,6 +168,7 @@ export function TaskCard({
               task.completed && "line-through"
             )}
             style={textStyle}
+            // onClick={(e) => e.stopPropagation()} // Prevent group drag
           >
             {task.completed ? "Mark Incomplete" : "Mark Complete"}
           </label>
@@ -215,4 +202,3 @@ export function TaskCard({
     </Card>
   );
 }
-
