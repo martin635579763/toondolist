@@ -136,7 +136,7 @@ body {
   border-radius: 50%;
   opacity: 0;
   /* Ensure --tx and --ty are available or have defaults if not set by style prop */
-  animation: firework-burst 0.8s ease-out forwards;
+  animation: firework-burst 1s ease-out forwards; /* Increased individual particle animation time */
 }
 
 @keyframes firework-burst {

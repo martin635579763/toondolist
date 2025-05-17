@@ -47,7 +47,7 @@ export function TaskCard({
   const parentTask = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
   const childTasks = allTasks.filter(t => t.parentId === task.id);
 
-  const polylineColor = "#000000";
+  const polylineColor = "#000000"; 
 
   const cardStyle: React.CSSProperties = {
     backgroundColor: task.color,
@@ -73,8 +73,8 @@ export function TaskCard({
   useEffect(() => {
     if (task.completed && !prevCompleted.current && isMainTask) { // Main task just completed
       setShowFireworks(true);
-      const timer = setTimeout(() => setShowFireworks(false), 2500); // Animation duration (2.5 seconds)
-      //return () => clearTimeout(timer); // Cleanup timer on unmount or if dependencies change
+      const timer = setTimeout(() => setShowFireworks(false), 4000); // Increased animation duration to 4 seconds
+      return () => clearTimeout(timer); 
     }
     prevCompleted.current = task.completed;
   }, [task.completed, isMainTask]);
@@ -88,16 +88,15 @@ export function TaskCard({
         isSubTask && "ml-8 max-w-sm",
         isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2",
         isDragOverSelf && "ring-2 ring-primary ring-offset-1 scale-102 shadow-2xl z-10",
-        !isDraggingSelf && !isSubTask && "group-hover:cursor-grab"
+        !isDraggingSelf && isMainTask && "cursor-grab" 
       )}
       style={cardStyle}
     >
       {showFireworks && isMainTask && (
         <div className="fireworks-container">
-          {Array.from({ length: 20 }).map((_, i) => { // Number of particles
+          {Array.from({ length: 20 }).map((_, i) => { 
             const angle = Math.random() * 360;
-            // Ensure particles burst outwards, not just downwards
-            const radius = 30 + Math.random() * 70; // Spread radius from 30 to 100
+            const radius = 30 + Math.random() * 70; 
             const txVal = Math.cos(angle * Math.PI / 180) * radius;
             const tyVal = Math.sin(angle * Math.PI / 180) * radius;
             
@@ -113,7 +112,7 @@ export function TaskCard({
                 style={{
                   top: '50%', 
                   left: '50%',
-                  transform: 'translate(-50%, -50%)', // Center particle origin before animation takes over
+                  transform: 'translate(-50%, -50%)', 
                   backgroundColor: color,
                   animationDelay: `${delay}s`,
                   // @ts-ignore 
