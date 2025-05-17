@@ -1,12 +1,14 @@
+
 "use client";
 
 import type { Task } from "@/types/task";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, PencilIcon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, ListChecks } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getContrastingTextColor } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 
 interface TaskCardProps {
   task: Task;
@@ -23,8 +25,10 @@ export function TaskCard({ task, onToggleComplete, onDelete, onPrint }: TaskCard
     borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
   };
   
-  // Custom style for child elements to ensure they inherit the correct text color
   const textStyle = { color: textColor };
+  const mutedTextStyle = { color: textColor, opacity: 0.8 };
+  const separatorStyle = { backgroundColor: textColor, opacity: 0.3 };
+
 
   return (
     <Card
@@ -54,7 +58,31 @@ export function TaskCard({ task, onToggleComplete, onDelete, onPrint }: TaskCard
             Due: {format(new Date(task.dueDate), "PPP")}
           </div>
         )}
-        <div className="flex items-center space-x-2">
+
+        {(task.breakdownSummary || (task.suggestedBreakdown && task.suggestedBreakdown.length > 0)) && (
+          <div className="mt-3 pt-3 border-t border-dashed" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'}}>
+            <h4 className="text-xs font-semibold uppercase mb-1 flex items-center" style={mutedTextStyle}>
+              <ListChecks className="mr-1.5 h-3.5 w-3.5" />
+              AI Suggested Breakdown
+            </h4>
+            {task.breakdownSummary && (
+              <p className="text-xs italic mb-1" style={mutedTextStyle}>{task.breakdownSummary}</p>
+            )}
+            {task.suggestedBreakdown && task.suggestedBreakdown.length > 0 && (
+              <ul className="list-none pl-0 space-y-0.5 text-xs">
+                {task.suggestedBreakdown.map((item, index) => (
+                  <li key={index} className="break-words">
+                    <span className="font-medium" style={textStyle}>&#8227; {item.step}</span>
+                    {item.requiredRole && <span className="ml-1 opacity-80" style={mutedTextStyle}>(Role: {item.requiredRole})</span>}
+                    {item.details && <p className="pl-3 text-xs opacity-70" style={mutedTextStyle}>{item.details}</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center space-x-2 pt-2">
           <Checkbox
             id={`complete-${task.id}`}
             checked={task.completed}

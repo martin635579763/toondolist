@@ -1,3 +1,10 @@
+
+export interface TaskBreakdownStep {
+  step: string;
+  details?: string;
+  requiredRole?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -6,4 +13,6 @@ export interface Task {
   dueDate: string | null; // ISO date string or null
   color: string; // Hex color string for card background
   createdAt: number; // Timestamp for sorting
+  suggestedBreakdown?: TaskBreakdownStep[];
+  breakdownSummary?: string;
 }
