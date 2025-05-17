@@ -30,7 +30,8 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
     backgroundColor: task.color,
     color: textColor,
     borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
-    marginLeft: isSubTask ? (allTasks.find(t => t.id === task.parentId && !t.parentId) ? '2rem' : (allTasks.find(t => t.id === task.parentId && t.parentId) ? '4rem' : '0')) : '0',
+    // marginLeft for indentation is handled by Tailwind classes based on nesting level if desired, or kept simple here
+    marginLeft: isSubTask ? '2rem' : '0', 
     borderLeftWidth: isSubTask ? '4px' : undefined,
     borderLeftColor: isSubTask ? (parentTask ? parentTask.color : 'hsl(var(--primary))') : undefined,
   };
@@ -45,7 +46,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        // Removed isSubTask ? "p-1" : "" from here to control padding internally
+        isSubTask && "min-w-[280px]" // ensure subtasks have a min-width if they get too small
       )}
       style={cardStyle}
     >
@@ -56,31 +57,43 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
             aria-hidden="true"
           />
       )}
-      <CardHeader className={cn("pb-3", isSubTask ? "p-2 pb-1" : "p-6")}>
+      <CardHeader className={cn(
+        "pb-3", 
+        isSubTask ? "p-2 pb-1" : "p-6" // Reduced padding for sub-tasks
+      )}>
         <div className="flex items-start justify-between">
-          <CardTitle className={cn("font-bold break-words", isSubTask ? "text-base" : "text-2xl")} style={textStyle}>
+          <CardTitle className={cn(
+            "font-bold break-words", 
+            isSubTask ? "text-sm" : "text-2xl" // Reduced font size for sub-task title
+          )} style={textStyle}>
             {task.title}
           </CardTitle>
-          {task.completed && <PartyPopperIcon className={cn("ml-2 shrink-0", isSubTask ? "h-5 w-5": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
+          {task.completed && <PartyPopperIcon className={cn("ml-2 shrink-0", isSubTask ? "h-4 w-4": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
         </div>
         {parentTask && (
-          <Badge variant="outline" className="mt-1 text-xs py-0.5 px-1.5 w-fit" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}>
-            <Link2Icon className="mr-1 h-3 w-3" />
-            Sub-task of: {parentTask.title.length > (isSubTask ? 12 : 20) ? parentTask.title.substring(0, (isSubTask ? 9 : 17)) + '...' : parentTask.title}
+          <Badge variant="outline" className="mt-0.5 text-xs py-0 px-1 w-fit" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}>
+            <Link2Icon className="mr-1 h-2.5 w-2.5" />
+            Parent: {parentTask.title.length > (isSubTask ? 10 : 20) ? parentTask.title.substring(0, (isSubTask ? 7 : 17)) + '...' : parentTask.title}
           </Badge>
         )}
         {task.description && (
-          <CardDescription className={cn("mt-1 break-words", isSubTask ? "text-xs leading-tight" : "text-sm" )} style={{color: textColor, opacity: 0.85}}>
-            {isSubTask && task.description.length > 60 ? task.description.substring(0, 57) + "..." : task.description}
+          <CardDescription className={cn(
+            "mt-1 break-words", 
+            isSubTask ? "text-xs leading-tight max-h-10 overflow-y-auto" : "text-sm" // Reduced font size, tighter leading for sub-task description
+          )} style={{color: textColor, opacity: 0.85}}>
+            {isSubTask && task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
             {!isSubTask && task.description}
           </CardDescription>
         )}
       </CardHeader>
-      <CardContent className={cn("flex-grow space-y-3 pt-0 pb-4", isSubTask ? "p-2 pt-1 pb-2 space-y-1" : "p-6 pt-0")}>
+      <CardContent className={cn(
+        "flex-grow space-y-2 pt-0 pb-3", 
+        isSubTask ? "p-2 pt-1 pb-1 space-y-1" : "p-6 pt-0" // Reduced padding and spacing for sub-tasks
+      )}>
         {task.dueDate && (
           <div className={cn("flex items-center", isSubTask ? "text-xs" : "text-sm")} style={{color: textColor, opacity: 0.9}}>
-            <CalendarDaysIcon className="mr-1.5 h-4 w-4" style={textStyle} />
-            Due: {format(new Date(task.dueDate), "PPP")}
+            <CalendarDaysIcon className="mr-1 h-3.5 w-3.5" style={textStyle} /> {/* Slightly smaller icon for sub-task */}
+            Due: {format(new Date(task.dueDate), "PP")} {/* Shorter date format for sub-tasks */}
           </div>
         )}
 
@@ -105,14 +118,14 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
           </div>
         )}
 
-        <div className={cn("flex items-center space-x-2 pt-2", isSubTask ? "pt-1" : "pt-2")}>
+        <div className={cn("flex items-center space-x-2", isSubTask ? "pt-1" : "pt-2")}>
           <Checkbox
             id={`complete-${task.id}`}
             checked={task.completed}
             onCheckedChange={() => onToggleComplete(task.id)}
             className={cn(
               "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
-              isSubTask ? "h-4 w-4" : "h-5 w-5", 
+              isSubTask ? "h-3.5 w-3.5" : "h-5 w-5",  // Smaller checkbox for sub-tasks
               textColor === '#FFFFFF' ? "border-white/70" : "border-black/50"
             )}
             style={{ borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }}
@@ -123,35 +136,38 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
             id={`label-complete-${task.id}`}
             className={cn(
               "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              isSubTask ? "text-xs" : "text-sm",
+              isSubTask ? "text-xs" : "text-sm", // Smaller label for sub-tasks
               task.completed && "line-through"
             )}
             style={textStyle}
           >
-            {task.completed ? "Mark as Incomplete" : "Mark as Complete"}
+            {task.completed ? "Mark Incomplete" : "Mark Complete"}
           </label>
         </div>
       </CardContent>
-      <CardFooter className={cn("flex justify-end space-x-2", isSubTask ? "p-2 pt-1 space-x-1" : "p-6 pt-0")}>
+      <CardFooter className={cn(
+        "flex justify-end space-x-1", 
+        isSubTask ? "p-1 pt-0" : "p-6 pt-0 space-x-2" // Reduced padding and spacing for sub-task footer
+      )}>
         <Button
           variant="ghost"
-          size={isSubTask ? "icon" : "icon"} 
+          size="icon" 
           onClick={() => onPrint(task)}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask && "h-7 w-7")}
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6" : "h-8 w-8")} // Smaller button for sub-tasks
           style={{color: textColor}}
           aria-label="Print task"
         >
-          <PrinterIcon className={isSubTask ? "h-4 w-4" : "h-5 w-5"} />
+          <PrinterIcon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} /> {/* Smaller icon for sub-tasks */}
         </Button>
         <Button
           variant="ghost"
-          size={isSubTask ? "icon" : "icon"} 
+          size="icon"
           onClick={() => onDelete(task.id)}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask && "h-7 w-7")}
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6" : "h-8 w-8")} // Smaller button for sub-tasks
           style={{color: textColor}}
           aria-label="Delete task"
         >
-          <Trash2Icon className={isSubTask ? "h-4 w-4" : "h-5 w-5"} />
+          <Trash2Icon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} /> {/* Smaller icon for sub-tasks */}
         </Button>
       </CardFooter>
     </Card>
