@@ -7,7 +7,7 @@ import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
 import { Button } from '@/components/ui/button';
-import { FileTextIcon, LayoutGridIcon, ListIcon, Share2Icon, UsersIcon } from 'lucide-react';
+import { FileTextIcon, LayoutGridIcon, ListIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 
@@ -26,7 +26,7 @@ export default function HomePage() {
       try {
         const parsedTasks: Task[] = JSON.parse(savedTasks);
         if (Array.isArray(parsedTasks)) {
-          setTasks(parsedTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))); // oldest first for consistency with adding new ones
+          setTasks(parsedTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
         } else {
           localStorage.removeItem('toondoTasks');
         }
@@ -39,7 +39,6 @@ export default function HomePage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Only save if tasks have been loaded/modified (not initial empty array)
       if (tasks.length > 0 || localStorage.getItem('toondoTasks') !== null) {
          localStorage.setItem('toondoTasks', JSON.stringify(tasks));
       }
@@ -48,10 +47,10 @@ export default function HomePage() {
 
   const handleAddTask = (newTask: Task) => {
     setTasks(prevTasks => {
-      // Add new task and resort. Newest usually at the end with current sorting or based on parent relationship
       const updatedTasks = [...prevTasks, newTask];
       return updatedTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     });
+    // Moved toast call outside of setTasks updater
     toast({
       title: "ToonDo Added!",
       description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
@@ -67,29 +66,41 @@ export default function HomePage() {
   };
 
   const handleDeleteTask = (id: string) => {
-    setTasks(prevTasks => {
-      const taskToDelete = prevTasks.find(t => t.id === id);
-      if (!taskToDelete) return prevTasks;
+    const taskToDelete = tasks.find(t => t.id === id);
+    if (!taskToDelete) return;
 
-      // Filter out the task itself and any direct children
-      const tasksToRemove = new Set<string>([id]);
-      // If it's a parent, find children to remove
-      if (!taskToDelete.parentId) { // Only primary tasks can be parents in this simple model
-        prevTasks.forEach(t => {
-          if (t.parentId === id) {
-            tasksToRemove.add(t.id);
-          }
-        });
-      }
-      
-      const remainingTasks = prevTasks.filter(task => !tasksToRemove.has(task.id));
-      
-      toast({
-        title: "ToonDo Removed!",
-        description: `Task "${taskToDelete.title}" ${tasksToRemove.size > 1 ? 'and its sub-tasks were' : 'was'} removed.`,
-        variant: "destructive"
+    let numRemoved = 0;
+    const tasksToRemoveBasedOnCurrentState = new Set<string>([id]);
+    if (!taskToDelete.parentId) {
+      tasks.forEach(t => {
+        if (t.parentId === id) {
+          tasksToRemoveBasedOnCurrentState.add(t.id);
+        }
       });
-      return remainingTasks;
+    }
+    numRemoved = tasksToRemoveBasedOnCurrentState.size;
+
+    setTasks(prevTasks => {
+      // Recalculate tasks to remove based on prevTasks to be safe, though tasksToRemoveBasedOnCurrentState should be accurate
+      const taskToDeleteInUpdater = prevTasks.find(t => t.id === id);
+      if (!taskToDeleteInUpdater) return prevTasks;
+
+      const finalTasksToRemove = new Set<string>([id]);
+      if (!taskToDeleteInUpdater.parentId) {
+          prevTasks.forEach(pt => {
+              if (pt.parentId === id) {
+                  finalTasksToRemove.add(pt.id);
+              }
+          });
+      }
+      return prevTasks.filter(task => !finalTasksToRemove.has(task.id));
+    });
+
+    // Moved toast call outside of setTasks updater
+    toast({
+      title: "ToonDo Removed!",
+      description: `Task "${taskToDelete.title}" ${numRemoved > 1 ? 'and its sub-tasks were' : 'was'} removed.`,
+      variant: "destructive"
     });
   };
   
@@ -134,29 +145,22 @@ export default function HomePage() {
     };
   }, []);
 
-  // Primary tasks (no parentId) sorted first, then sub-tasks grouped with their parents or sorted by creation.
-  // Then within those groups, incomplete before complete, then by creation time (newest first within status group).
   const sortedTasks = [...tasks].sort((a, b) => {
-    // Group sub-tasks under their parents visually by sorting
-    if (a.parentId && !b.parentId) return 1; // a is sub, b is main -> b first
-    if (!a.parentId && b.parentId) return -1; // a is main, b is sub -> a first
+    if (a.parentId && !b.parentId) return 1; 
+    if (!a.parentId && b.parentId) return -1; 
     if (a.parentId && b.parentId) {
-      if (a.parentId < b.parentId) return -1; // group by parentId
+      if (a.parentId < b.parentId) return -1; 
       if (a.parentId > b.parentId) return 1;
-      // same parent, sort by completion then creation
     }
-    // For tasks at the same "level" (both main or sub-tasks of the same parent)
     if (a.completed === b.completed) {
-      return (b.createdAt || 0) - (a.createdAt || 0); // Newest first within same completion status
+      return (b.createdAt || 0) - (a.createdAt || 0); 
     }
-    return a.completed ? 1 : -1; // Incomplete tasks first
+    return a.completed ? 1 : -1; 
   });
   
-  // Filter for display: only show top-level tasks or tasks whose parents exist
-  // This prevents orphaned sub-tasks from showing if a parent was somehow deleted without its children.
   const displayTasks = sortedTasks.filter(task => {
-    if (!task.parentId) return true; // Always show main tasks
-    return sortedTasks.some(parent => parent.id === task.parentId); // Only show sub-tasks if parent exists in current list
+    if (!task.parentId) return true; 
+    return sortedTasks.some(parent => parent.id === task.parentId); 
   });
 
 
@@ -212,7 +216,7 @@ export default function HomePage() {
             <TaskCard
               key={task.id}
               task={task}
-              allTasks={tasks} // Pass all tasks for context
+              allTasks={tasks} 
               onToggleComplete={handleToggleComplete}
               onDelete={handleDeleteTask}
               onPrint={handleInitiatePrint}
