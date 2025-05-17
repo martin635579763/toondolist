@@ -1,8 +1,8 @@
 
 "use client";
 
-import type { ChangeEvent, FormEvent} from 'react';
-import { useState, useEffect } from 'react';
+import type { FormEvent} from 'react';
+import { useState } from 'react';
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -16,9 +16,8 @@ import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIc
 import { format, parseISO } from "date-fns";
 import { cn, generateId } from "@/lib/utils";
 import { getRandomColor } from "@/lib/colors";
-import type { Task, TaskBreakdownStep } from "@/types/task";
+import type { Task, TaskBreakdownStep } from "@/types/task"; // TaskBreakdownStep is now mainly for form state
 import { suggestDueDate } from "@/ai/flows/suggest-due-date";
-// Removed: import { suggestTaskBreakdown } from "@/ai/flows/suggest-task-breakdown";
 import { useToast } from "@/hooks/use-toast";
 import {
   Tooltip,
@@ -28,13 +27,13 @@ import {
 } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-const taskSchema = z.object({
+const taskFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(100, "Title too long"),
   description: z.string().max(500, "Description too long").optional(),
   dueDate: z.date().nullable().optional(),
 });
 
-type TaskFormData = z.infer<typeof taskSchema>;
+type TaskFormData = z.infer<typeof taskFormSchema>;
 
 interface CreateTaskFormProps {
   onAddTask: (task: Task) => void;
@@ -45,13 +44,13 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
   const [isSuggestingDate, setIsSuggestingDate] = useState(false);
   const [suggestedDateReasoning, setSuggestedDateReasoning] = useState<string | null>(null);
   
-  const [manualBreakdownSummary, setManualBreakdownSummary] = useState<string>("");
+  const [manualBreakdownSummaryText, setManualBreakdownSummaryText] = useState<string>(""); // For user notes, not saved on task directly
   const [manualBreakdownSteps, setManualBreakdownSteps] = useState<TaskBreakdownStep[]>([]);
 
   const { toast } = useToast();
   
   const { register, handleSubmit, setValue, watch, formState: { errors }, reset } = useForm<TaskFormData>({
-    resolver: zodResolver(taskSchema),
+    resolver: zodResolver(taskFormSchema),
     defaultValues: {
       title: "",
       description: "",
@@ -93,9 +92,16 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       }
     } catch (error) {
       console.error("Error suggesting due date:", error);
+      // Check if genkit is configured, if not, provide a more specific message.
+      // This requires a way to check genkit configuration status from here, which might be tricky.
+      // For now, a generic error is shown.
+      let description = "Could not suggest a due date. Please try again or set it manually.";
+      if (error instanceof Error && (error.message.includes('plugin not configured') || error.message.includes('GOOGLE_API_KEY'))) {
+        description = "Could not suggest a due date. AI features may not be configured (e.g., API key missing).";
+      }
       toast({
         title: "Oops!",
-        description: "Could not suggest a due date. Please try again or set it manually.",
+        description: description,
         variant: "destructive",
       });
     } finally {
@@ -118,21 +124,39 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
   };
 
   const onSubmit: SubmitHandler<TaskFormData> = (data) => {
-    const newTask: Task = {
-      id: generateId(),
+    const mainTaskId = generateId();
+    const mainTask: Task = {
+      id: mainTaskId,
       title: data.title,
       description: data.description || "",
       completed: false,
       dueDate: data.dueDate ? data.dueDate.toISOString() : null,
       color: getRandomColor(),
       createdAt: Date.now(),
-      suggestedBreakdown: manualBreakdownSteps.length > 0 ? manualBreakdownSteps : undefined,
-      breakdownSummary: manualBreakdownSummary || undefined,
+      // parentId will be undefined for the main task
     };
-    onAddTask(newTask);
+    onAddTask(mainTask); // Add the main task
+
+    // Create and add sub-tasks
+    manualBreakdownSteps.forEach(step => {
+      if (step.step.trim() === "") return; // Skip empty steps
+
+      const subTask: Task = {
+        id: generateId(),
+        title: step.step,
+        description: `${step.details || ""}${step.requiredRole ? ` (Role: ${step.requiredRole})` : ""}`.trim(),
+        completed: false,
+        dueDate: null, // Sub-tasks don't inherit due date by default
+        color: getRandomColor(),
+        createdAt: Date.now() + 1, // Ensure subtasks sort slightly after parent if created at same millisecond
+        parentId: mainTaskId,
+      };
+      onAddTask(subTask);
+    });
+
     reset(); 
     setSuggestedDateReasoning(null);
-    setManualBreakdownSummary("");
+    setManualBreakdownSummaryText("");
     setManualBreakdownSteps([]);
   };
 
@@ -204,7 +228,7 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
                 {isSuggestingDate ? <Loader2 className="h-5 w-5 animate-spin" /> : <SparklesIcon className="h-5 w-5 text-primary" />}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Suggest Due Date with AI (requires API key)</TooltipContent>
+            <TooltipContent>Suggest Due Date with AI</TooltipContent>
           </Tooltip>
             {suggestedDateReasoning && (
               <Tooltip>
@@ -224,23 +248,23 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       {/* Manual Task Breakdown Section */}
       <Card className="border-dashed border-primary/50">
         <CardHeader className="pb-3">
-          <CardTitle className="text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Task Breakdown (Manual)</CardTitle>
-          <CardDescription className="text-sm">Optionally, break down this task into smaller steps or components.</CardDescription>
+          <CardTitle className="text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Task Breakdown to Sub-Tasks</CardTitle>
+          <CardDescription className="text-sm">Optionally, break this main task into smaller sub-tasks. Each step will become its own ToonDo card linked to this one.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="breakdownSummary" className="text-sm font-medium">Breakdown Summary / Notes</Label>
+            <Label htmlFor="breakdownSummary" className="text-sm font-medium">Overall Notes for Breakdown (Optional)</Label>
             <Textarea
               id="breakdownSummary"
-              value={manualBreakdownSummary}
-              onChange={(e) => setManualBreakdownSummary(e.target.value)}
-              placeholder="e.g., This task involves multiple parts like design and coding."
+              value={manualBreakdownSummaryText}
+              onChange={(e) => setManualBreakdownSummaryText(e.target.value)}
+              placeholder="e.g., This task involves multiple parts like design and coding. These notes are for your reference and won't be part of the main task description."
               className="text-sm mt-1"
             />
           </div>
 
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Breakdown Steps</Label>
+            <Label className="text-sm font-medium">Sub-Task Steps</Label>
             {manualBreakdownSteps.map((step, index) => (
               <div key={index} className="p-3 border rounded-md space-y-2 relative bg-background/50">
                 <Button 
@@ -254,28 +278,28 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
                   <XCircleIcon className="h-4 w-4" />
                 </Button>
                 <div>
-                  <Label htmlFor={`step-title-${index}`} className="text-xs">Step {index + 1}</Label>
+                  <Label htmlFor={`step-title-${index}`} className="text-xs">Sub-Task Title (Step {index + 1})</Label>
                   <Input
                     id={`step-title-${index}`}
                     value={step.step}
                     onChange={(e) => handleBreakdownStepChange(index, 'step', e.target.value)}
-                    placeholder="Step description (e.g., Design UI)"
+                    placeholder="Title for this sub-task (e.g., Design UI)"
                     className="text-sm mt-0.5"
                   />
                 </div>
                 <div>
-                  <Label htmlFor={`step-details-${index}`} className="text-xs">Details (Optional)</Label>
+                  <Label htmlFor={`step-details-${index}`} className="text-xs">Sub-Task Details (Optional)</Label>
                   <Textarea
                     id={`step-details-${index}`}
                     value={step.details || ""}
                     onChange={(e) => handleBreakdownStepChange(index, 'details', e.target.value)}
-                    placeholder="Further details for this step"
+                    placeholder="Further details for this sub-task"
                     className="text-sm mt-0.5 min-h-[40px]"
                     rows={2}
                   />
                 </div>
                 <div>
-                  <Label htmlFor={`step-role-${index}`} className="text-xs">Required Role (Optional)</Label>
+                  <Label htmlFor={`step-role-${index}`} className="text-xs">Assigned Role for Sub-Task (Optional)</Label>
                   <Input
                     id={`step-role-${index}`}
                     value={step.requiredRole || ""}
@@ -287,17 +311,16 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
               </div>
             ))}
             <Button type="button" variant="outline" size="sm" onClick={handleAddBreakdownStep} className="mt-2">
-              <PlusCircleIcon className="mr-2 h-4 w-4" /> Add Step
+              <PlusCircleIcon className="mr-2 h-4 w-4" /> Add Sub-Task Step
             </Button>
           </div>
         </CardContent>
       </Card>
 
       <Button type="submit" className="w-full text-lg py-3 h-auto">
-        Add ToonDo Task!
+        Add ToonDo Task(s)!
       </Button>
     </form>
     </TooltipProvider>
   );
 }
-

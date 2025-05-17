@@ -7,60 +7,54 @@ import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
 import { Button } from '@/components/ui/button';
-import { FileTextIcon, LayoutGridIcon, ListIcon } from 'lucide-react';
+import { FileTextIcon, LayoutGridIcon, ListIcon, Share2Icon, UsersIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 
 type LayoutMode = "grid" | "list";
 
 export default function HomePage() {
-  const [tasks, setTasks] = useState<Task[]>([]); // Initialize with empty array
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [taskToPrint, setTaskToPrint] = useState<Task | null>(null);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid");
   const { toast } = useToast();
   const printableAreaRef = useRef<HTMLDivElement>(null);
 
-  // Load tasks from localStorage on client-side after initial hydration
   useEffect(() => {
     const savedTasks = localStorage.getItem('toondoTasks');
     if (savedTasks) {
       try {
         const parsedTasks: Task[] = JSON.parse(savedTasks);
         if (Array.isArray(parsedTasks)) {
-          // Ensure tasks are sorted consistently (e.g., by creation time)
-          setTasks(parsedTasks.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+          setTasks(parsedTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))); // oldest first for consistency with adding new ones
         } else {
-          // Clear invalid data if it's not an array
           localStorage.removeItem('toondoTasks');
         }
       } catch (e) {
         console.error("Failed to parse tasks from localStorage", e);
-        // Clear invalid data on parsing error
         localStorage.removeItem('toondoTasks');
       }
     }
-  }, []); // Empty dependency array ensures this runs once on mount
+  }, []);
 
-  // Save tasks to localStorage whenever they change
   useEffect(() => {
-    // This effect runs after the initial load and whenever tasks are modified.
-    // Avoids running on initial server render or initial empty client render before hydration.
-    // Only run on client where localStorage is available.
     if (typeof window !== 'undefined') {
-        // Check if tasks is not the initial empty array to avoid overwriting potentially loaded tasks with an empty array immediately
-        // This check is a bit nuanced. If tasks is empty because it was loaded as empty, it's fine.
-        // If tasks is empty because it's the very first render cycle of this effect, it's also fine.
-        // The main goal is to ensure we don't save an empty array if tasks haven't been loaded yet.
-        // However, since loading happens in a separate effect that runs first, this should be safe.
-        localStorage.setItem('toondoTasks', JSON.stringify(tasks));
+      // Only save if tasks have been loaded/modified (not initial empty array)
+      if (tasks.length > 0 || localStorage.getItem('toondoTasks') !== null) {
+         localStorage.setItem('toondoTasks', JSON.stringify(tasks));
+      }
     }
   }, [tasks]);
 
   const handleAddTask = (newTask: Task) => {
-    setTasks(prevTasks => [newTask, ...prevTasks].sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0)));
+    setTasks(prevTasks => {
+      // Add new task and resort. Newest usually at the end with current sorting or based on parent relationship
+      const updatedTasks = [...prevTasks, newTask];
+      return updatedTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    });
     toast({
       title: "ToonDo Added!",
-      description: `"${newTask.title}" is ready to be tackled!`,
+      description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
     });
   };
 
@@ -73,11 +67,29 @@ export default function HomePage() {
   };
 
   const handleDeleteTask = (id: string) => {
-    setTasks(prevTasks => prevTasks.filter(task => task.id !== id));
-    toast({
-      title: "ToonDo Removed!",
-      description: "One less task on your list.",
-      variant: "destructive"
+    setTasks(prevTasks => {
+      const taskToDelete = prevTasks.find(t => t.id === id);
+      if (!taskToDelete) return prevTasks;
+
+      // Filter out the task itself and any direct children
+      const tasksToRemove = new Set<string>([id]);
+      // If it's a parent, find children to remove
+      if (!taskToDelete.parentId) { // Only primary tasks can be parents in this simple model
+        prevTasks.forEach(t => {
+          if (t.parentId === id) {
+            tasksToRemove.add(t.id);
+          }
+        });
+      }
+      
+      const remainingTasks = prevTasks.filter(task => !tasksToRemove.has(task.id));
+      
+      toast({
+        title: "ToonDo Removed!",
+        description: `Task "${taskToDelete.title}" ${tasksToRemove.size > 1 ? 'and its sub-tasks were' : 'was'} removed.`,
+        variant: "destructive"
+      });
+      return remainingTasks;
     });
   };
   
@@ -99,9 +111,9 @@ export default function HomePage() {
   
   useEffect(() => {
     if (taskToPrint) {
-      const timer = setTimeout(() => { // Allow state to update and component to render
+      const timer = setTimeout(() => {
         actualPrint();
-        setTaskToPrint(null); // Reset after print dialog
+        setTaskToPrint(null);
       }, 100); 
       return () => clearTimeout(timer);
     }
@@ -113,7 +125,7 @@ export default function HomePage() {
         printableAreaRef.current.classList.add('hidden');
         printableAreaRef.current.classList.remove('print:block');
       }
-      setTaskToPrint(null); // Ensure it's reset
+      setTaskToPrint(null);
     };
 
     window.addEventListener('afterprint', afterPrintHandler);
@@ -122,13 +134,31 @@ export default function HomePage() {
     };
   }, []);
 
-
+  // Primary tasks (no parentId) sorted first, then sub-tasks grouped with their parents or sorted by creation.
+  // Then within those groups, incomplete before complete, then by creation time (newest first within status group).
   const sortedTasks = [...tasks].sort((a, b) => {
+    // Group sub-tasks under their parents visually by sorting
+    if (a.parentId && !b.parentId) return 1; // a is sub, b is main -> b first
+    if (!a.parentId && b.parentId) return -1; // a is main, b is sub -> a first
+    if (a.parentId && b.parentId) {
+      if (a.parentId < b.parentId) return -1; // group by parentId
+      if (a.parentId > b.parentId) return 1;
+      // same parent, sort by completion then creation
+    }
+    // For tasks at the same "level" (both main or sub-tasks of the same parent)
     if (a.completed === b.completed) {
-      return (b.createdAt || 0) - (a.createdAt || 0); // Newest first
+      return (b.createdAt || 0) - (a.createdAt || 0); // Newest first within same completion status
     }
     return a.completed ? 1 : -1; // Incomplete tasks first
   });
+  
+  // Filter for display: only show top-level tasks or tasks whose parents exist
+  // This prevents orphaned sub-tasks from showing if a parent was somehow deleted without its children.
+  const displayTasks = sortedTasks.filter(task => {
+    if (!task.parentId) return true; // Always show main tasks
+    return sortedTasks.some(parent => parent.id === task.parentId); // Only show sub-tasks if parent exists in current list
+  });
+
 
   return (
     <div className="container mx-auto px-4 py-8 min-h-screen">
@@ -178,10 +208,11 @@ export default function HomePage() {
               : 'space-y-4'
           )}
         >
-          {sortedTasks.map(task => (
+          {displayTasks.map(task => (
             <TaskCard
               key={task.id}
               task={task}
+              allTasks={tasks} // Pass all tasks for context
               onToggleComplete={handleToggleComplete}
               onDelete={handleDeleteTask}
               onPrint={handleInitiatePrint}

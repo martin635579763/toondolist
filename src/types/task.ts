@@ -13,6 +13,5 @@ export interface Task {
   dueDate: string | null; // ISO date string or null
   color: string; // Hex color string for card background
   createdAt: number; // Timestamp for sorting
-  suggestedBreakdown?: TaskBreakdownStep[];
-  breakdownSummary?: string;
+  parentId?: string; // ID of the parent task, if this is a sub-task
 }
