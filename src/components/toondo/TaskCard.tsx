@@ -17,6 +17,7 @@ interface TaskCardProps {
   onToggleComplete: (id: string) => void;
   onDelete: (id: string) => void;
   onPrint: (task: Task) => void;
+  onEdit: (task: Task) => void;
   isDraggingSelf: boolean;
   isDragOverSelf: boolean;
 }
@@ -27,6 +28,7 @@ export function TaskCard({
   onToggleComplete,
   onDelete,
   onPrint,
+  onEdit,
   isDraggingSelf,
   isDragOverSelf
 }: TaskCardProps) {
@@ -34,7 +36,7 @@ export function TaskCard({
   const isSubTask = !!task.parentId;
 
   const parentTask = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
-  const childTasks = allTasks.filter(t => t.parentId === task.id && !t.completed); // Only show non-completed sub-tasks in the list
+  const childTasks = allTasks.filter(t => t.parentId === task.id && !t.completed); 
 
   const polylineColor = "#000000"; 
 
@@ -54,19 +56,26 @@ export function TaskCard({
   const mutedTextStyle = { color: textColor, opacity: 0.8 };
   const veryMutedTextStyle = { color: textColor, opacity: 0.6 };
 
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only trigger edit if the click is directly on the card, not on buttons/checkboxes
+    if ((e.target as HTMLElement).closest('button, [role="checkbox"], a')) {
+      return;
+    }
+    onEdit(task);
+  };
 
   return (
     <Card
       className={cn(
-        "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
+        "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative cursor-pointer",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        isSubTask && "ml-8 max-w-sm", // Indent and make sub-tasks narrower
-        isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2 cursor-grabbing",
+        isSubTask && "ml-8 max-w-sm", 
+        isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2",
         isDragOverSelf && "ring-2 ring-primary ring-offset-1 scale-102 shadow-2xl z-10",
-        !isDraggingSelf && !isSubTask && "cursor-grab" // Only main tasks in groups are grab-able
+        !isDraggingSelf && !isSubTask && "group-hover:cursor-grab" 
       )}
       style={cardStyle}
-      // onClick={(e) => { if(isSubTask) e.stopPropagation();}} // Prevent group drag from sub-task click (optional)
+      onClick={handleCardClick}
     >
       {isSubTask && parentTask && (
          <GitForkIcon
@@ -94,20 +103,20 @@ export function TaskCard({
             Parent: {parentTask.title.length > 15 ? parentTask.title.substring(0, 12) + '...' : parentTask.title}
           </Badge>
         )}
-        {task.description && !isSubTask && ( // Full description only for main tasks
+        {task.description && !isSubTask && ( 
           <CardDescription className={cn("mt-1 break-words text-sm")} style={{color: textColor, opacity: 0.85}}>
             {task.description}
           </CardDescription>
         )}
-         {task.description && isSubTask && ( // Shorter description for sub-tasks
+         {task.description && isSubTask && ( 
           <CardDescription className={cn("mt-0.5 break-words text-[9px] leading-snug h-8 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}>
              {task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
           </CardDescription>
         )}
       </CardHeader>
       <CardContent className={cn(
-        "flex-grow space-y-0.5 pt-0",
-        isSubTask ? "p-1 pt-0.5 pb-0 space-y-0 min-h-7" : "p-6 pt-0 space-y-2" 
+        "flex-grow space-y-0.5 pt-0 min-h-7",
+        isSubTask ? "p-1 pt-0.5 pb-0 space-y-0" : "p-6 pt-0 space-y-2" 
       )}>
         {task.dueDate && (
           <div className={cn("flex items-center", isSubTask ? "text-[9px]" : "text-sm")} style={{color: textColor, opacity: 0.9}}>
@@ -124,7 +133,7 @@ export function TaskCard({
             </h4>
             <ul className="list-none pl-1 space-y-0.5">
               {childTasks.slice(0, 3).map(st => {
-                const subTaskFull = allTasks.find(t => t.id === st.id); // Get full sub-task for completion status
+                const subTaskFull = allTasks.find(t => t.id === st.id); 
                 return (
                   <li key={st.id} className="text-xs flex items-center justify-between group" style={veryMutedTextStyle}>
                     <div className="flex items-center">
@@ -133,7 +142,7 @@ export function TaskCard({
                     </div>
                      <ArrowRightIcon
                       className="ml-2 h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
-                      stroke={"#000000"} // Explicitly black
+                      stroke={"#000000"} 
                     />
                   </li>
                 );
@@ -148,9 +157,10 @@ export function TaskCard({
             id={`complete-${task.id}`}
             checked={task.completed}
             onCheckedChange={(e) => {
-                // e.stopPropagation(); // Prevent group drag if checkbox is clicked
+                // Stop propagation handled by Radix UI for Checkbox by default in this setup
                 onToggleComplete(task.id);
             }}
+            onClick={(e) => e.stopPropagation()} // Explicitly stop propagation for the Checkbox wrapper div if any
             className={cn(
               "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
               isSubTask ? "h-3 w-3" : "h-5 w-5", 
@@ -168,7 +178,7 @@ export function TaskCard({
               task.completed && "line-through"
             )}
             style={textStyle}
-            // onClick={(e) => e.stopPropagation()} // Prevent group drag
+            onClick={(e) => e.stopPropagation()} // Prevent triggering card edit when label is clicked
           >
             {task.completed ? "Mark Incomplete" : "Mark Complete"}
           </label>

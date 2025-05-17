@@ -5,6 +5,7 @@ import type { ReactNode} from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Task } from '@/types/task';
 import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
+import { EditTaskDialog } from '@/components/toondo/EditTaskDialog';
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
 import { FileTextIcon } from 'lucide-react';
@@ -22,9 +23,11 @@ export default function HomePage() {
   const { toast } = useToast();
   const printableAreaRef = useRef<HTMLDivElement>(null);
 
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null); // ID of the main task of the group being dragged
-  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null); // ID of the main task of the group being dragged over
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
 
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   useEffect(() => {
     const savedTasks = localStorage.getItem('toondoTasks');
@@ -57,6 +60,29 @@ export default function HomePage() {
       title: "ToonDo Added!",
       description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
     });
+  };
+
+  const handleOpenEditDialog = (task: Task) => {
+    setEditingTask(task);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleCloseEditDialog = () => {
+    setIsEditDialogOpen(false);
+    setEditingTask(null);
+  };
+
+  const handleUpdateTask = (updatedTask: Task) => {
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
+        task.id === updatedTask.id ? { ...task, ...updatedTask } : task
+      )
+    );
+    toast({
+      title: "ToonDo Updated!",
+      description: `"${updatedTask.title}" has been saved.`,
+    });
+    handleCloseEditDialog();
   };
 
   const handleToggleComplete = (id: string) => {
@@ -143,8 +169,6 @@ export default function HomePage() {
     };
   }, []);
 
-
-  // Drag and Drop Handlers for Task Groups (identified by main task ID)
   const handleDragStart = (mainTaskId: string) => {
     setDraggedItemId(mainTaskId);
   };
@@ -181,7 +205,6 @@ export default function HomePage() {
         return prevTasks; 
       }
 
-      // Remove draggedItemId and insert it at targetIdx
       mainTaskIds.splice(draggedIdx, 1); 
       mainTaskIds.splice(targetIdx, 0, draggedItemId); 
 
@@ -196,7 +219,6 @@ export default function HomePage() {
         }
       });
       
-      // Ensure all tasks are included (e.g., if any somehow became orphaned, though unlikely with this logic)
       const processedIds = new Set(newFullTasksArray.map(t => t.id));
       prevTasks.forEach(t => {
         if (!processedIds.has(t.id)) {
@@ -216,35 +238,29 @@ export default function HomePage() {
     setDragOverItemId(null);
   };
   
-  // Prepare tasks for display: Group main tasks with their sub-tasks
   const taskGroups: TaskGroup[] = [];
   if (tasks.length > 0) {
-    // First, sort tasks: main tasks by completion then user order, sub-tasks by creation under parent
-    // This initial sort helps in organizing `displayTasks` which then feeds into `taskGroups`
     const sortedInitialTasks = [...tasks].sort((a, b) => {
-      if (a.parentId && !b.parentId) return 1; // a is sub, b is main -> b first
-      if (!a.parentId && b.parentId) return -1; // a is main, b is sub -> a first
-      if (a.parentId && b.parentId) { // both are subs
-        if (a.parentId === b.parentId) return (a.createdAt || 0) - (b.createdAt || 0); // same parent, sort by creation
-        // subs of different parents, their order is dictated by their parents' order
+      if (a.parentId && !b.parentId) return 1; 
+      if (!a.parentId && b.parentId) return -1; 
+      if (a.parentId && b.parentId) { 
+        if (a.parentId === b.parentId) return (a.createdAt || 0) - (b.createdAt || 0); 
         const parentAOrder = tasks.findIndex(t => t.id === a.parentId);
         const parentBOrder = tasks.findIndex(t => t.id === b.parentId);
         return parentAOrder - parentBOrder;
       }
-      // both are main tasks
       if (a.completed === b.completed) {
-        const indexA = tasks.findIndex(t => t.id === a.id); // Use current 'tasks' for DnD order
+        const indexA = tasks.findIndex(t => t.id === a.id); 
         const indexB = tasks.findIndex(t => t.id === b.id);
         return indexA - indexB;
       }
-      return a.completed ? 1 : -1; // Incomplete main tasks first
+      return a.completed ? 1 : -1; 
     });
 
-    // Filter for display: only show top-level tasks or sub-tasks whose parent is visible and not completed
     const displayableTasks = sortedInitialTasks.filter(task => {
-      if (!task.parentId) return true; // Always show main tasks
+      if (!task.parentId) return true; 
       const parent = sortedInitialTasks.find(p => p.id === task.parentId);
-      return parent && !parent.completed; // Show sub-task only if its parent is present and not completed
+      return parent && !parent.completed; 
     });
 
     const mainDisplayTasks = displayableTasks.filter(task => !task.parentId);
@@ -253,12 +269,11 @@ export default function HomePage() {
       const group: TaskGroup = {
         mainTask: pt,
         subTasks: displayableTasks.filter(st => st.parentId === pt.id)
-                      .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0)) // ensure sub-tasks are ordered by creation
+                      .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0)) 
       };
       taskGroups.push(group);
     });
   }
-
 
   return (
     <div className="container mx-auto px-4 py-8 min-h-screen">
@@ -280,20 +295,20 @@ export default function HomePage() {
       ) : (
         <div
           className={cn(
-            'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8 items-start' // gap-y increased slightly
+            'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8 items-start'
           )}
         >
           {taskGroups.map(({ mainTask, subTasks }) => (
             <div
               key={mainTask.id}
-              className="flex flex-col gap-2" // Groups items, ensures sub-tasks stack under main
+              className="flex flex-col gap-2" 
               draggable={true}
-              onDragStart={() => handleDragStart(mainTask.id)}
-              onDragEnter={() => handleDragEnter(mainTask.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={() => handleDrop(mainTask.id)}
-              onDragOver={handleDragOver}
-              onDragEnd={handleDragEnd}
+              onDragStart={(e) => { e.stopPropagation(); handleDragStart(mainTask.id);}}
+              onDragEnter={(e) => { e.stopPropagation(); handleDragEnter(mainTask.id);}}
+              onDragLeave={(e) => { e.stopPropagation(); handleDragLeave();}}
+              onDrop={(e) => { e.stopPropagation(); handleDrop(mainTask.id);}}
+              onDragOver={(e) => { e.stopPropagation(); handleDragOver(e);}}
+              onDragEnd={(e) => { e.stopPropagation(); handleDragEnd();}}
             >
               <TaskCard
                 task={mainTask}
@@ -301,6 +316,7 @@ export default function HomePage() {
                 onToggleComplete={handleToggleComplete}
                 onDelete={handleDeleteTask}
                 onPrint={handleInitiatePrint}
+                onEdit={handleOpenEditDialog}
                 isDraggingSelf={draggedItemId === mainTask.id}
                 isDragOverSelf={dragOverItemId === mainTask.id && draggedItemId !== mainTask.id}
               />
@@ -312,8 +328,9 @@ export default function HomePage() {
                   onToggleComplete={handleToggleComplete}
                   onDelete={handleDeleteTask}
                   onPrint={handleInitiatePrint}
-                  isDraggingSelf={false} // Sub-tasks are not individually dragged in this model
-                  isDragOverSelf={false} // Sub-tasks are not individual drop targets for groups
+                  onEdit={handleOpenEditDialog}
+                  isDraggingSelf={false} 
+                  isDragOverSelf={false} 
                 />
               ))}
             </div>
@@ -324,6 +341,15 @@ export default function HomePage() {
       <div id="printable-area" ref={printableAreaRef} className="hidden">
         {taskToPrint && <PrintableTaskCard task={taskToPrint} />}
       </div>
+
+      {editingTask && (
+        <EditTaskDialog
+          isOpen={isEditDialogOpen}
+          onClose={handleCloseEditDialog}
+          taskToEdit={editingTask}
+          onSaveTask={handleUpdateTask}
+        />
+      )}
 
       <footer className="text-center mt-16 py-8 border-t border-border">
         <p className="text-muted-foreground">
