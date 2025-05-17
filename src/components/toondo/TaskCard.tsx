@@ -30,9 +30,8 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
     backgroundColor: task.color,
     color: textColor,
     borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
-    // marginLeft for indentation is handled by Tailwind classes based on nesting level if desired, or kept simple here
     marginLeft: isSubTask ? '2rem' : '0', 
-    borderLeftWidth: isSubTask ? '4px' : undefined,
+    borderLeftWidth: isSubTask ? '4px' : undefined, // This acts as part of the "polyline"
     borderLeftColor: isSubTask ? (parentTask ? parentTask.color : 'hsl(var(--primary))') : undefined,
   };
   
@@ -46,25 +45,24 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        isSubTask && "min-w-[280px]" // ensure subtasks have a min-width if they get too small
+        isSubTask && "min-w-[250px]" // ensure subtasks have a min-width
       )}
       style={cardStyle}
     >
       {isSubTask && (
          <GitForkIcon 
-            className="absolute top-3 left-[-14px] h-5 w-5 transform -translate-x-1/2 rotate-90" 
+            className="absolute top-2.5 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90" // Adjusted size and position
             style={{ color: parentTask ? parentTask.color : 'hsl(var(--primary))', strokeWidth: 2.5 }}
             aria-hidden="true"
           />
       )}
       <CardHeader className={cn(
-        "pb-3", 
-        isSubTask ? "p-2 pb-1" : "p-6" // Reduced padding for sub-tasks
+        isSubTask ? "p-2 pb-1" : "p-6 pb-3" // Reduced padding for sub-tasks
       )}>
         <div className="flex items-start justify-between">
           <CardTitle className={cn(
             "font-bold break-words", 
-            isSubTask ? "text-sm" : "text-2xl" // Reduced font size for sub-task title
+            isSubTask ? "text-base" : "text-2xl" // Adjusted font size for sub-task title
           )} style={textStyle}>
             {task.title}
           </CardTitle>
@@ -87,12 +85,12 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
         )}
       </CardHeader>
       <CardContent className={cn(
-        "flex-grow space-y-2 pt-0 pb-3", 
-        isSubTask ? "p-2 pt-1 pb-1 space-y-1" : "p-6 pt-0" // Reduced padding and spacing for sub-tasks
+        "flex-grow space-y-1 pt-0 pb-2", 
+        isSubTask ? "p-2 pt-1 pb-1 space-y-0.5" : "p-6 pt-0 space-y-2" // Reduced padding and spacing for sub-tasks
       )}>
         {task.dueDate && (
           <div className={cn("flex items-center", isSubTask ? "text-xs" : "text-sm")} style={{color: textColor, opacity: 0.9}}>
-            <CalendarDaysIcon className="mr-1 h-3.5 w-3.5" style={textStyle} /> {/* Slightly smaller icon for sub-task */}
+            <CalendarDaysIcon className={cn("mr-1", isSubTask ? "h-3 w-3" : "h-3.5 w-3.5")} style={textStyle} /> {/* Slightly smaller icon for sub-task */}
             Due: {format(new Date(task.dueDate), "PP")} {/* Shorter date format for sub-tasks */}
           </div>
         )}
@@ -157,7 +155,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
           style={{color: textColor}}
           aria-label="Print task"
         >
-          <PrinterIcon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} /> {/* Smaller icon for sub-tasks */}
+          <PrinterIcon className={isSubTask ? "h-3 w-3" : "h-5 w-5"} /> {/* Smaller icon for sub-tasks */}
         </Button>
         <Button
           variant="ghost"
@@ -167,9 +165,10 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
           style={{color: textColor}}
           aria-label="Delete task"
         >
-          <Trash2Icon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} /> {/* Smaller icon for sub-tasks */}
+          <Trash2Icon className={isSubTask ? "h-3 w-3" : "h-5 w-5"} /> {/* Smaller icon for sub-tasks */}
         </Button>
       </CardFooter>
     </Card>
   );
 }
+
