@@ -5,7 +5,7 @@ import type { Task } from "@/types/task";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2 } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getContrastingTextColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -26,15 +26,16 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
   const parentTask = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
   const childTasks = allTasks.filter(t => t.parentId === task.id);
 
-  let polylineColor = 'hsl(var(--primary))'; // Default fallback
+  let polylineColor = 'hsl(var(--primary))'; 
   if (isSubTask && parentTask) {
+    // If parent color is same as sub-task color, use parent's contrasting text for polyline
     if (parentTask.color === task.color) {
-      polylineColor = getContrastingTextColor(parentTask.color); // Use parent's text color for polyline if colors clash
+      polylineColor = getContrastingTextColor(parentTask.color);
     } else {
       polylineColor = parentTask.color;
     }
   } else if (isSubTask) {
-    // Parent not found, but it's a subtask - use default primary color for polyline
+    // Fallback for orphaned sub-tasks, though ideally these shouldn't render if parent is gone
     polylineColor = 'hsl(var(--primary))';
   }
 
@@ -43,7 +44,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
     backgroundColor: task.color,
     color: textColor,
     borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
-    marginLeft: isSubTask ? '2rem' : '0',
+    marginLeft: isSubTask ? '2rem' : '0', // Indent sub-tasks
     borderLeftWidth: isSubTask ? '4px' : undefined,
     borderLeftColor: isSubTask ? polylineColor : undefined,
   };
@@ -58,7 +59,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        isSubTask && "min-w-[250px]" // ensure subtasks have a min-width
+        isSubTask && "min-w-[200px]" // Ensure subtasks have a min-width, adjust as needed
       )}
       style={cardStyle}
     >
@@ -70,16 +71,16 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
           />
       )}
       <CardHeader className={cn(
-        isSubTask ? "p-2 pb-1" : "p-6 pb-3" 
+        isSubTask ? "p-2 pb-1" : "p-6 pb-3"  // Reduced padding for sub-tasks
       )}>
         <div className="flex items-start justify-between">
           <CardTitle className={cn(
             "font-bold break-words", 
-            isSubTask ? "text-base" : "text-2xl" 
+            isSubTask ? "text-sm" : "text-2xl" // Reduced font size for sub-task titles
           )} style={textStyle}>
             {task.title}
           </CardTitle>
-          {task.completed && <PartyPopperIcon className={cn("ml-2 shrink-0", isSubTask ? "h-4 w-4": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
+          {task.completed && <PartyPopperIcon className={cn("ml-2 shrink-0", isSubTask ? "h-3.5 w-3.5": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
         </div>
         {parentTask && (
           <Badge variant="outline" className="mt-0.5 text-xs py-0 px-1 w-fit" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}>
@@ -90,16 +91,16 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
         {task.description && (
           <CardDescription className={cn(
             "mt-1 break-words", 
-            isSubTask ? "text-xs leading-tight max-h-10 overflow-y-auto" : "text-sm" 
+            isSubTask ? "text-xs leading-tight max-h-8 overflow-y-auto" : "text-sm" // Reduced font size and max height for sub-task descriptions
           )} style={{color: textColor, opacity: 0.85}}>
-            {isSubTask && task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
+            {isSubTask && task.description.length > 40 ? task.description.substring(0, 37) + "..." : task.description}
             {!isSubTask && task.description}
           </CardDescription>
         )}
       </CardHeader>
       <CardContent className={cn(
         "flex-grow space-y-1 pt-0 pb-2", 
-        isSubTask ? "p-2 pt-1 pb-1 space-y-0.5" : "p-6 pt-0 space-y-2" 
+        isSubTask ? "p-2 pt-1 pb-1 space-y-0.5" : "p-6 pt-0 space-y-2" // Reduced padding
       )}>
         {task.dueDate && (
           <div className={cn("flex items-center", isSubTask ? "text-xs" : "text-sm")} style={{color: textColor, opacity: 0.9}}>
@@ -118,9 +119,12 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
               {childTasks.slice(0, 3).map(st => {
                 const subTaskFull = allTasks.find(t => t.id === st.id);
                 return (
-                  <li key={st.id} className="text-xs flex items-center" style={veryMutedTextStyle}>
-                    {subTaskFull?.completed ? <CheckCircle2 className="mr-1.5 h-3 w-3 text-green-400 opacity-90" /> : <CircleDot className="mr-1.5 h-3 w-3 opacity-70" />}
-                    <span className={cn(subTaskFull?.completed && "line-through")}>{st.title.length > 30 ? st.title.substring(0,27) + "..." : st.title}</span>
+                  <li key={st.id} className="text-xs flex items-center justify-between" style={veryMutedTextStyle}>
+                    <div className="flex items-center">
+                      {subTaskFull?.completed ? <CheckCircle2 className="mr-1.5 h-3 w-3 text-green-400 opacity-90" /> : <CircleDot className="mr-1.5 h-3 w-3 opacity-70" />}
+                      <span className={cn(subTaskFull?.completed && "line-through", "truncate max-w-[150px] sm:max-w-[200px]")}>{st.title}</span>
+                    </div>
+                    <ArrowRightIcon className="ml-2 h-3 w-3 shrink-0 opacity-60" style={textStyle} />
                   </li>
                 );
               })}
@@ -136,7 +140,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
             onCheckedChange={() => onToggleComplete(task.id)}
             className={cn(
               "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
-              isSubTask ? "h-3.5 w-3.5" : "h-5 w-5",  
+              isSubTask ? "h-3.5 w-3.5" : "h-5 w-5", // Smaller checkbox for sub-tasks
               textColor === '#FFFFFF' ? "border-white/70" : "border-black/50"
             )}
             style={{ borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }}
@@ -147,7 +151,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
             id={`label-complete-${task.id}`}
             className={cn(
               "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              isSubTask ? "text-xs" : "text-sm", 
+              isSubTask ? "text-xs" : "text-sm", // Smaller label for sub-tasks
               task.completed && "line-through"
             )}
             style={textStyle}
@@ -158,13 +162,13 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       </CardContent>
       <CardFooter className={cn(
         "flex justify-end space-x-1", 
-        isSubTask ? "p-1 pt-0" : "p-6 pt-0 space-x-2" 
+        isSubTask ? "p-1 pt-0" : "p-6 pt-0 space-x-2" // Reduced padding, smaller buttons for sub-tasks
       )}>
         <Button
           variant="ghost"
-          size="icon" 
+          size={isSubTask ? "sm" : "icon"} 
           onClick={() => onPrint(task)}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6" : "h-8 w-8")} 
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-5 w-5 p-0" : "h-8 w-8")} 
           style={{color: textColor}}
           aria-label="Print task"
         >
@@ -172,9 +176,9 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
         </Button>
         <Button
           variant="ghost"
-          size="icon"
+          size={isSubTask ? "sm" : "icon"}
           onClick={() => onDelete(task.id)}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6" : "h-8 w-8")} 
+          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-5 w-5 p-0" : "h-8 w-8")} 
           style={{color: textColor}}
           aria-label="Delete task"
         >
@@ -184,3 +188,4 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
     </Card>
   );
 }
+
