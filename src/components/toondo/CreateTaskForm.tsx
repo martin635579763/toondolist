@@ -12,13 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, LightbulbIcon, ListChecks } from "lucide-react";
+import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn, generateId } from "@/lib/utils";
 import { getRandomColor } from "@/lib/colors";
 import type { Task, TaskBreakdownStep } from "@/types/task";
 import { suggestDueDate } from "@/ai/flows/suggest-due-date";
-import { suggestTaskBreakdown } from "@/ai/flows/suggest-task-breakdown";
+// Removed: import { suggestTaskBreakdown } from "@/ai/flows/suggest-task-breakdown";
 import { useToast } from "@/hooks/use-toast";
 import {
   Tooltip,
@@ -45,9 +45,8 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
   const [isSuggestingDate, setIsSuggestingDate] = useState(false);
   const [suggestedDateReasoning, setSuggestedDateReasoning] = useState<string | null>(null);
   
-  const [isSuggestingBreakdown, setIsSuggestingBreakdown] = useState(false);
-  const [suggestedBreakdown, setSuggestedBreakdown] = useState<TaskBreakdownStep[] | null>(null);
-  const [breakdownSummary, setBreakdownSummary] = useState<string | null>(null);
+  const [manualBreakdownSummary, setManualBreakdownSummary] = useState<string>("");
+  const [manualBreakdownSteps, setManualBreakdownSteps] = useState<TaskBreakdownStep[]>([]);
 
   const { toast } = useToast();
   
@@ -85,7 +84,7 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
           title: "Due Date Suggested!",
           description: `AI suggested ${format(parsedDate, "PPP")}. ${result.reasoning ? `Reason: ${result.reasoning.substring(0,50)}...` : ''}`,
         });
-      } else if (result.reasoning) { // Handle cases where only reasoning is returned (e.g. API key issue)
+      } else if (result.reasoning) { 
          toast({
           title: "AI Suggestion",
           description: result.reasoning,
@@ -104,50 +103,19 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
     }
   };
 
-  const handleSuggestBreakdown = async () => {
-    if (!taskTitleForAISuggestion) {
-      toast({
-        title: "Hmm...",
-        description: "Please enter a title for the task first to suggest a breakdown.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsSuggestingBreakdown(true);
-    setSuggestedBreakdown(null);
-    setBreakdownSummary(null);
-    try {
-      const result = await suggestTaskBreakdown({ 
-        taskTitle: taskTitleForAISuggestion,
-        taskDescription: taskDescriptionForAISuggestion 
-      });
-      if (result.summary) {
-        setBreakdownSummary(result.summary);
-      }
-      if (result.breakdown && result.breakdown.length > 0) {
-        setSuggestedBreakdown(result.breakdown);
-        toast({
-          title: "Task Breakdown Suggested!",
-          description: result.summary || "AI has provided a task breakdown.",
-        });
-      } else if (result.summary) { // Even if breakdown is empty, show summary
-         toast({
-          title: "AI Suggestion",
-          description: result.summary,
-        });
-      }
-    } catch (error) {
-      console.error("Error suggesting task breakdown:", error);
-      toast({
-        title: "Oops!",
-        description: "Could not suggest a task breakdown. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSuggestingBreakdown(false);
-    }
+  const handleAddBreakdownStep = () => {
+    setManualBreakdownSteps(prev => [...prev, { step: '', details: '', requiredRole: '' }]);
   };
 
+  const handleRemoveBreakdownStep = (index: number) => {
+    setManualBreakdownSteps(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleBreakdownStepChange = (index: number, field: keyof TaskBreakdownStep, value: string) => {
+    setManualBreakdownSteps(prev => 
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    );
+  };
 
   const onSubmit: SubmitHandler<TaskFormData> = (data) => {
     const newTask: Task = {
@@ -158,14 +126,14 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       dueDate: data.dueDate ? data.dueDate.toISOString() : null,
       color: getRandomColor(),
       createdAt: Date.now(),
-      suggestedBreakdown: suggestedBreakdown || undefined,
-      breakdownSummary: breakdownSummary || undefined,
+      suggestedBreakdown: manualBreakdownSteps.length > 0 ? manualBreakdownSteps : undefined,
+      breakdownSummary: manualBreakdownSummary || undefined,
     };
     onAddTask(newTask);
-    reset(); // Reset form fields
+    reset(); 
     setSuggestedDateReasoning(null);
-    setSuggestedBreakdown(null);
-    setBreakdownSummary(null);
+    setManualBreakdownSummary("");
+    setManualBreakdownSteps([]);
   };
 
   return (
@@ -193,107 +161,137 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
         {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
       </div>
       
-      <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-        <div className="space-y-2 flex-grow">
-          <Label htmlFor="dueDate" className="text-lg font-semibold">Due Date (Optional)</Label>
-          <div className="flex items-center gap-2">
-            <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal h-10 text-base",
-                    !currentDueDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-5 w-5" />
-                  {currentDueDate ? format(currentDueDate, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={currentDueDate || undefined}
-                  onSelect={(date) => {
-                    setValue("dueDate", date || null, { shouldValidate: true });
-                    setShowDatePicker(false);
-                    setSuggestedDateReasoning(null); 
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  onClick={handleSuggestDueDate}
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 shrink-0"
-                  disabled={isSuggestingDate}
-                  aria-label="Suggest Due Date"
-                >
-                  {isSuggestingDate ? <Loader2 className="h-5 w-5 animate-spin" /> : <SparklesIcon className="h-5 w-5 text-primary" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Suggest Due Date with AI</TooltipContent>
-            </Tooltip>
-             {suggestedDateReasoning && (
-               <Tooltip>
-                  <TooltipTrigger asChild>
-                    <InfoIcon className="h-5 w-5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-sm font-medium">AI Suggestion Reasoning:</p>
-                    <p className="text-xs">{suggestedDateReasoning}</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-          </div>
-          {errors.dueDate && <p className="text-sm text-destructive">{errors.dueDate.message}</p>}
-        </div>
-
-        <Tooltip>
+      <div className="space-y-2 flex-grow">
+        <Label htmlFor="dueDate" className="text-lg font-semibold">Due Date (Optional)</Label>
+        <div className="flex items-center gap-2">
+          <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-full justify-start text-left font-normal h-10 text-base",
+                  !currentDueDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-5 w-5" />
+                {currentDueDate ? format(currentDueDate, "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={currentDueDate || undefined}
+                onSelect={(date) => {
+                  setValue("dueDate", date || null, { shouldValidate: true });
+                  setShowDatePicker(false);
+                  setSuggestedDateReasoning(null); 
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          <Tooltip>
             <TooltipTrigger asChild>
-                <Button
+              <Button
                 type="button"
-                onClick={handleSuggestBreakdown}
-                variant="outline"
-                className="shrink-0 h-10"
-                disabled={isSuggestingBreakdown}
-                aria-label="Suggest Task Breakdown"
-                >
-                {isSuggestingBreakdown ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <LightbulbIcon className="h-5 w-5 mr-2 text-yellow-500" />}
-                Suggest Breakdown
-                </Button>
+                onClick={handleSuggestDueDate}
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                disabled={isSuggestingDate}
+                aria-label="Suggest Due Date"
+              >
+                {isSuggestingDate ? <Loader2 className="h-5 w-5 animate-spin" /> : <SparklesIcon className="h-5 w-5 text-primary" />}
+              </Button>
             </TooltipTrigger>
-            <TooltipContent>Get AI suggestions for sub-tasks and roles</TooltipContent>
-        </Tooltip>
+            <TooltipContent>Suggest Due Date with AI (requires API key)</TooltipContent>
+          </Tooltip>
+            {suggestedDateReasoning && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InfoIcon className="h-5 w-5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm font-medium">AI Suggestion Reasoning:</p>
+                  <p className="text-xs">{suggestedDateReasoning}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+        </div>
+        {errors.dueDate && <p className="text-sm text-destructive">{errors.dueDate.message}</p>}
       </div>
 
-      { (breakdownSummary || (suggestedBreakdown && suggestedBreakdown.length > 0)) && (
-        <Card className="mt-4 border-dashed border-primary/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/> AI Suggested Breakdown</CardTitle>
-            {breakdownSummary && <CardDescription className="text-sm">{breakdownSummary}</CardDescription>}
-          </CardHeader>
-          {suggestedBreakdown && suggestedBreakdown.length > 0 && (
-            <CardContent className="text-sm space-y-2 pt-2">
-              <ul className="list-disc pl-5 space-y-1">
-                {suggestedBreakdown.map((item, index) => (
-                  <li key={index}>
-                    <strong>{item.step}</strong>
-                    {item.requiredRole && <span className="text-xs text-muted-foreground ml-1">(Role: {item.requiredRole})</span>}
-                    {item.details && <p className="text-xs pl-2 text-muted-foreground">{item.details}</p>}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          )}
-        </Card>
-      )}
+      {/* Manual Task Breakdown Section */}
+      <Card className="border-dashed border-primary/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Task Breakdown (Manual)</CardTitle>
+          <CardDescription className="text-sm">Optionally, break down this task into smaller steps or components.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="breakdownSummary" className="text-sm font-medium">Breakdown Summary / Notes</Label>
+            <Textarea
+              id="breakdownSummary"
+              value={manualBreakdownSummary}
+              onChange={(e) => setManualBreakdownSummary(e.target.value)}
+              placeholder="e.g., This task involves multiple parts like design and coding."
+              className="text-sm mt-1"
+            />
+          </div>
 
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Breakdown Steps</Label>
+            {manualBreakdownSteps.map((step, index) => (
+              <div key={index} className="p-3 border rounded-md space-y-2 relative bg-background/50">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="icon" 
+                  className="absolute top-1 right-1 h-6 w-6 text-muted-foreground hover:text-destructive"
+                  onClick={() => handleRemoveBreakdownStep(index)}
+                  aria-label="Remove step"
+                >
+                  <XCircleIcon className="h-4 w-4" />
+                </Button>
+                <div>
+                  <Label htmlFor={`step-title-${index}`} className="text-xs">Step {index + 1}</Label>
+                  <Input
+                    id={`step-title-${index}`}
+                    value={step.step}
+                    onChange={(e) => handleBreakdownStepChange(index, 'step', e.target.value)}
+                    placeholder="Step description (e.g., Design UI)"
+                    className="text-sm mt-0.5"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`step-details-${index}`} className="text-xs">Details (Optional)</Label>
+                  <Textarea
+                    id={`step-details-${index}`}
+                    value={step.details || ""}
+                    onChange={(e) => handleBreakdownStepChange(index, 'details', e.target.value)}
+                    placeholder="Further details for this step"
+                    className="text-sm mt-0.5 min-h-[40px]"
+                    rows={2}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`step-role-${index}`} className="text-xs">Required Role (Optional)</Label>
+                  <Input
+                    id={`step-role-${index}`}
+                    value={step.requiredRole || ""}
+                    onChange={(e) => handleBreakdownStepChange(index, 'requiredRole', e.target.value)}
+                    placeholder="e.g., Designer, Developer"
+                    className="text-sm mt-0.5"
+                  />
+                </div>
+              </div>
+            ))}
+            <Button type="button" variant="outline" size="sm" onClick={handleAddBreakdownStep} className="mt-2">
+              <PlusCircleIcon className="mr-2 h-4 w-4" /> Add Step
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Button type="submit" className="w-full text-lg py-3 h-auto">
         Add ToonDo Task!
@@ -302,3 +300,4 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
     </TooltipProvider>
   );
 }
+
