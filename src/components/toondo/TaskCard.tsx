@@ -28,14 +28,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
 
   let polylineColor: string;
   if (isSubTask) {
-    if (parentTask) {
-      // Use the sub-task's own text color for the polyline.
-      // This ensures it contrasts well with the sub-task's background color (task.color).
-      polylineColor = textColor;
-    } else {
-      // Orphaned sub-task, fallback to primary theme color.
-      polylineColor = 'hsl(var(--primary))';
-    }
+    polylineColor = '#000000'; // Set polyline color to black for sub-tasks
   } else {
     polylineColor = 'transparent'; // Not used for main tasks' direct border/icon styling
   }
