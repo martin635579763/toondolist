@@ -59,24 +59,24 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        isSubTask && "min-w-[200px]" // Ensure subtasks have a min-width, adjust as needed
+        isSubTask && "min-w-[200px]" 
       )}
       style={cardStyle}
     >
       {isSubTask && (
          <GitForkIcon 
-            className="absolute top-2.5 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90" 
+            className="absolute top-2 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90" 
             style={{ color: polylineColor, strokeWidth: 2.5 }}
             aria-hidden="true"
           />
       )}
       <CardHeader className={cn(
-        isSubTask ? "p-2 pb-1" : "p-6 pb-3"  // Reduced padding for sub-tasks
+        isSubTask ? "p-2 pb-1" : "p-6 pb-3"
       )}>
         <div className="flex items-start justify-between">
           <CardTitle className={cn(
             "font-bold break-words", 
-            isSubTask ? "text-sm" : "text-2xl" // Reduced font size for sub-task titles
+            isSubTask ? "text-sm" : "text-2xl"
           )} style={textStyle}>
             {task.title}
           </CardTitle>
@@ -91,7 +91,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
         {task.description && (
           <CardDescription className={cn(
             "mt-1 break-words", 
-            isSubTask ? "text-xs leading-tight max-h-8 overflow-y-auto" : "text-sm" // Reduced font size and max height for sub-task descriptions
+            isSubTask ? "text-xs leading-tight max-h-8 overflow-y-auto" : "text-sm"
           )} style={{color: textColor, opacity: 0.85}}>
             {isSubTask && task.description.length > 40 ? task.description.substring(0, 37) + "..." : task.description}
             {!isSubTask && task.description}
@@ -100,7 +100,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       </CardHeader>
       <CardContent className={cn(
         "flex-grow space-y-1 pt-0 pb-2", 
-        isSubTask ? "p-2 pt-1 pb-1 space-y-0.5" : "p-6 pt-0 space-y-2" // Reduced padding
+        isSubTask ? "p-2 pt-1 pb-1 space-y-0.5" : "p-6 pt-0 space-y-2"
       )}>
         {task.dueDate && (
           <div className={cn("flex items-center", isSubTask ? "text-xs" : "text-sm")} style={{color: textColor, opacity: 0.9}}>
@@ -140,7 +140,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
             onCheckedChange={() => onToggleComplete(task.id)}
             className={cn(
               "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
-              isSubTask ? "h-3.5 w-3.5" : "h-5 w-5", // Smaller checkbox for sub-tasks
+              isSubTask ? "h-3.5 w-3.5" : "h-5 w-5", 
               textColor === '#FFFFFF' ? "border-white/70" : "border-black/50"
             )}
             style={{ borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }}
@@ -151,7 +151,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
             id={`label-complete-${task.id}`}
             className={cn(
               "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              isSubTask ? "text-xs" : "text-sm", // Smaller label for sub-tasks
+              isSubTask ? "text-xs" : "text-sm", 
               task.completed && "line-through"
             )}
             style={textStyle}
@@ -162,7 +162,7 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
       </CardContent>
       <CardFooter className={cn(
         "flex justify-end space-x-1", 
-        isSubTask ? "p-1 pt-0" : "p-6 pt-0 space-x-2" // Reduced padding, smaller buttons for sub-tasks
+        isSubTask ? "p-1 pt-0" : "p-6 pt-0 space-x-2"
       )}>
         <Button
           variant="ghost"
@@ -188,4 +188,3 @@ export function TaskCard({ task, allTasks, onToggleComplete, onDelete, onPrint }
     </Card>
   );
 }
-
