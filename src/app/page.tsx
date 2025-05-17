@@ -114,7 +114,8 @@ export default function HomePage() {
         newTasks = [...newTasks, ...newSubTasksToCreate];
         subTasksAddedCount = newSubTasksToCreate.length;
 
-        const parentIndex = newTasks.findIndex(t => t.id === updatedTask.id); // Parent is the updatedTask itself
+        // The parent is the updatedTask itself, since we are editing it and adding sub-tasks to it.
+        const parentIndex = newTasks.findIndex(t => t.id === updatedTask.id); 
         if (parentIndex !== -1 && newTasks[parentIndex].completed) {
           newTasks[parentIndex] = { ...newTasks[parentIndex], completed: false };
           parentTaskAffectedByNewSubtasks = true;
@@ -147,8 +148,8 @@ export default function HomePage() {
   const handleToggleComplete = (id: string) => {
     let parentMarkedIncompleteTitle = "";
     let taskThatTriggeredParentChange: Task | null = null;
-    let mainTaskJustCompleted = false;
-    let mainTaskTitleForCompletion = "";
+    // let mainTaskJustCompleted = false; // For fireworks, not toast
+    // let mainTaskTitleForCompletion = ""; // For fireworks, not toast
 
 
     setTasks(prevTasks => {
@@ -162,16 +163,17 @@ export default function HomePage() {
             const subTasks = newTasksState.filter(t => t.parentId === id);
             const hasIncompleteSubtasks = subTasks.some(st => !st.completed);
 
-            if (!taskToToggle.completed && hasIncompleteSubtasks) {
+            if (!taskToToggle.completed && hasIncompleteSubtasks) { // Trying to complete main task with incomplete sub-tasks
                 taskThatTriggeredParentChange = taskToToggle; 
                 return prevTasks; 
             }
+            // Allowed to toggle (either completing a main task with all sub-tasks done, or marking a main task incomplete)
             if (taskIndex !== -1) {
                 newTasksState[taskIndex] = { ...newTasksState[taskIndex], completed: !taskToToggle.completed };
-                if(newTasksState[taskIndex].completed){ // Main task just completed
-                    mainTaskJustCompleted = true;
-                    mainTaskTitleForCompletion = newTasksState[taskIndex].title;
-                }
+                // if(newTasksState[taskIndex].completed){ 
+                //     mainTaskJustCompleted = true;
+                //     mainTaskTitleForCompletion = newTasksState[taskIndex].title;
+                // }
             }
         } else { // SUB-TASK
             if (taskIndex !== -1) {
@@ -185,15 +187,15 @@ export default function HomePage() {
                         const allSubTasksNowComplete = siblingSubTasks.every(st => st.completed);
 
                         if (allSubTasksNowComplete) {
-                            if (!parentTask.completed) { // Parent wasn't complete, now it is
+                            if (!parentTask.completed) { // Parent wasn't complete, now it is (auto-complete)
                                 newTasksState[parentTaskIndex] = { ...parentTask, completed: true };
-                                if(newTasksState[parentTaskIndex].completed){ // Main task (parent) just completed
-                                    mainTaskJustCompleted = true;
-                                    mainTaskTitleForCompletion = newTasksState[parentTaskIndex].title;
-                                }
+                                // if(newTasksState[parentTaskIndex].completed){ 
+                                //     mainTaskJustCompleted = true;
+                                //     mainTaskTitleForCompletion = newTasksState[parentTaskIndex].title;
+                                // }
                             }
                         } else { // Not all sub-tasks are complete
-                            if (parentTask.completed) { // Parent was complete, now it's not
+                            if (parentTask.completed) { // Parent was complete, now it's not (auto-incomplete)
                                 newTasksState[parentTaskIndex] = { ...parentTask, completed: false };
                                 parentMarkedIncompleteTitle = parentTask.title;
                             }
@@ -216,13 +218,7 @@ export default function HomePage() {
     if (parentMarkedIncompleteTitle) {
         toast({ title: "Heads up!", description: `Main task "${parentMarkedIncompleteTitle}" marked incomplete as a sub-task was updated.` });
     }
-    // if (mainTaskJustCompleted && mainTaskTitleForCompletion) {
-    //   dismiss(); // Dismiss all existing toasts first
-    //   toast({    // Then show the new completion toast
-    //       title: "ToonDo Complete!",
-    //       description: `"${mainTaskTitleForCompletion}" is all done! Great job!`,
-    //   });
-    // }
+    // Main task completion toast is handled by fireworks or intentionally suppressed
 };
 
 
@@ -231,10 +227,10 @@ export default function HomePage() {
     if (!taskToDelete) return;
 
     let numRemoved = 0;
-    let toastMessageForParentCompletion = "";
+    // let toastMessageForParentCompletion = ""; // Removed: We don't want to toast main task completion
     let removedTaskTitle = taskToDelete.title;
-    let mainTaskJustCompletedAfterDelete = false;
-    let completedParentTitle = "";
+    // let mainTaskJustCompletedAfterDelete = false; // For fireworks, not toast
+    // let completedParentTitle = ""; // For fireworks, not toast
 
 
     setTasks(prevTasks => {
@@ -259,21 +255,19 @@ export default function HomePage() {
                 const siblingSubTasks = remainingTasks.filter(t => t.parentId === parentId);
                 const allRemainingSubTasksComplete = siblingSubTasks.length === 0 || siblingSubTasks.every(st => st.completed);
 
-                if (allRemainingSubTasksComplete && !parentTask.completed) {
+                if (allRemainingSubTasksComplete && !parentTask.completed) { // Parent auto-completes
                     remainingTasks[parentTaskIndex] = { ...parentTask, completed: true };
-                    mainTaskJustCompletedAfterDelete = true;
-                    completedParentTitle = remainingTasks[parentTaskIndex].title;
-                    toastMessageForParentCompletion = `Main task "${parentTask.title}" auto-completed.`;
+                    // mainTaskJustCompletedAfterDelete = true; // For fireworks
+                    // completedParentTitle = remainingTasks[parentTaskIndex].title; // For fireworks
+                    // toastMessageForParentCompletion = `Main task "${parentTask.title}" auto-completed.`; // No longer used for toast
                 }
             }
         }
         return remainingTasks;
     });
     
-    let fullToastDescription = `Task "${removedTaskTitle}" ${numRemoved > 1 ? 'and its sub-tasks were' : 'was'} removed.`;
-    if (toastMessageForParentCompletion && !mainTaskJustCompletedAfterDelete) { // Avoid double toast if main task completion also fires one
-        fullToastDescription += ` ${toastMessageForParentCompletion}`;
-    }
+    const fullToastDescription = `Task "${removedTaskTitle}" ${numRemoved > 1 ? 'and its sub-tasks were' : 'was'} removed.`;
+    // The part that appended toastMessageForParentCompletion has been removed.
 
     toast({
       title: "ToonDo Removed!",
@@ -281,13 +275,7 @@ export default function HomePage() {
       variant: "destructive"
     });
 
-    // if (mainTaskJustCompletedAfterDelete && completedParentTitle) {
-    //     dismiss();
-    //     toast({
-    //         title: "ToonDo Complete!",
-    //         description: `"${completedParentTitle}" is all done! Great job!`,
-    //     });
-    // }
+    // Main task completion toast is handled by fireworks or intentionally suppressed
   };
   
   const actualPrint = useCallback(() => {
@@ -489,9 +477,9 @@ export default function HomePage() {
                   onDelete={handleDeleteTask}
                   onPrint={handleInitiatePrint}
                   onEdit={handleOpenEditDialog}
-                  isDraggingSelf={false} // Sub-tasks themselves are not individually dragged in this model
-                  isDragOverSelf={false} // Sub-tasks are not drop targets in this model
-                  isMainTaskWithIncompleteSubtasks={false} // This prop is for main tasks
+                  isDraggingSelf={false} 
+                  isDragOverSelf={false} 
+                  isMainTaskWithIncompleteSubtasks={false} 
                 />
               ))}
             </div>
