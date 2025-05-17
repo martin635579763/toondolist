@@ -30,7 +30,6 @@ export default function HomePage() {
   const [taskToPrint, setTaskToPrint] = useState<Task | null>(null);
   const { toast, dismiss } = useToast();
   const printableAreaRef = useRef<HTMLDivElement>(null);
-  const prevTasksRef = useRef<Task[]>();
 
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
@@ -62,26 +61,6 @@ export default function HomePage() {
       }
     }
   }, [tasks]);
-
-  // Effect to handle main task completion toasts and dismiss others
-  useEffect(() => {
-    if (prevTasksRef.current) {
-      tasks.forEach(currentTask => {
-        if (!currentTask.parentId) { // It's a main task
-          const prevTask = prevTasksRef.current!.find(pt => pt.id === currentTask.id);
-          if (prevTask && !prevTask.completed && currentTask.completed) {
-            // Main task just transitioned to completed
-            dismiss(); // Dismiss all existing toasts first
-            toast({    // Then show the new completion toast
-              title: "ToonDo Complete!",
-              description: `"${currentTask.title}" is all done! Great job!`,
-            });
-          }
-        }
-      });
-    }
-    prevTasksRef.current = tasks; // Update prevTasks for next comparison
-  }, [tasks, toast, dismiss]);
 
 
   const handleAddTask = (newTask: Task) => {
@@ -167,6 +146,10 @@ export default function HomePage() {
 
   const handleToggleComplete = (id: string) => {
     let parentMarkedIncompleteTitle = "";
+    let taskThatTriggeredParentChange: Task | null = null;
+    let mainTaskJustCompleted = false;
+    let mainTaskTitleForCompletion = "";
+
 
     setTasks(prevTasks => {
         const taskToToggle = prevTasks.find(t => t.id === id);
@@ -180,11 +163,15 @@ export default function HomePage() {
             const hasIncompleteSubtasks = subTasks.some(st => !st.completed);
 
             if (!taskToToggle.completed && hasIncompleteSubtasks) {
-                // Toast shown outside setTasks
+                taskThatTriggeredParentChange = taskToToggle; 
                 return prevTasks; 
             }
             if (taskIndex !== -1) {
                 newTasksState[taskIndex] = { ...newTasksState[taskIndex], completed: !taskToToggle.completed };
+                if(newTasksState[taskIndex].completed){ // Main task just completed
+                    mainTaskJustCompleted = true;
+                    mainTaskTitleForCompletion = newTasksState[taskIndex].title;
+                }
             }
         } else { // SUB-TASK
             if (taskIndex !== -1) {
@@ -200,7 +187,10 @@ export default function HomePage() {
                         if (allSubTasksNowComplete) {
                             if (!parentTask.completed) { // Parent wasn't complete, now it is
                                 newTasksState[parentTaskIndex] = { ...parentTask, completed: true };
-                                // Main task completion toast handled by useEffect
+                                if(newTasksState[parentTaskIndex].completed){ // Main task (parent) just completed
+                                    mainTaskJustCompleted = true;
+                                    mainTaskTitleForCompletion = newTasksState[parentTaskIndex].title;
+                                }
                             }
                         } else { // Not all sub-tasks are complete
                             if (parentTask.completed) { // Parent was complete, now it's not
@@ -216,21 +206,23 @@ export default function HomePage() {
     });
 
     // Toasts after state update attempt
-    const taskToToggle = tasks.find(t => t.id === id); // Re-fetch task from potentially updated state for accurate info
-    if (taskToToggle && !taskToToggle.parentId) {
-        const subTasks = tasks.filter(t => t.parentId === id);
-        const hasIncompleteSubtasks = subTasks.some(st => !st.completed);
-        if (!taskToToggle.completed && hasIncompleteSubtasks) {
-             toast({
-                title: "Still have work to do!",
-                description: `"${taskToToggle.title}" cannot be completed until all its sub-tasks are done.`,
-                variant: "default",
-            });
-        }
+    if (taskThatTriggeredParentChange) {
+         toast({
+            title: "Still have work to do!",
+            description: `"${taskThatTriggeredParentChange.title}" cannot be completed until all its sub-tasks are done.`,
+            variant: "default",
+        });
     }
     if (parentMarkedIncompleteTitle) {
         toast({ title: "Heads up!", description: `Main task "${parentMarkedIncompleteTitle}" marked incomplete as a sub-task was updated.` });
     }
+    // if (mainTaskJustCompleted && mainTaskTitleForCompletion) {
+    //   dismiss(); // Dismiss all existing toasts first
+    //   toast({    // Then show the new completion toast
+    //       title: "ToonDo Complete!",
+    //       description: `"${mainTaskTitleForCompletion}" is all done! Great job!`,
+    //   });
+    // }
 };
 
 
@@ -241,6 +233,8 @@ export default function HomePage() {
     let numRemoved = 0;
     let toastMessageForParentCompletion = "";
     let removedTaskTitle = taskToDelete.title;
+    let mainTaskJustCompletedAfterDelete = false;
+    let completedParentTitle = "";
 
 
     setTasks(prevTasks => {
@@ -267,8 +261,8 @@ export default function HomePage() {
 
                 if (allRemainingSubTasksComplete && !parentTask.completed) {
                     remainingTasks[parentTaskIndex] = { ...parentTask, completed: true };
-                    // Main task completion toast handled by useEffect.
-                    // We can add info to the delete toast.
+                    mainTaskJustCompletedAfterDelete = true;
+                    completedParentTitle = remainingTasks[parentTaskIndex].title;
                     toastMessageForParentCompletion = `Main task "${parentTask.title}" auto-completed.`;
                 }
             }
@@ -277,7 +271,7 @@ export default function HomePage() {
     });
     
     let fullToastDescription = `Task "${removedTaskTitle}" ${numRemoved > 1 ? 'and its sub-tasks were' : 'was'} removed.`;
-    if (toastMessageForParentCompletion) {
+    if (toastMessageForParentCompletion && !mainTaskJustCompletedAfterDelete) { // Avoid double toast if main task completion also fires one
         fullToastDescription += ` ${toastMessageForParentCompletion}`;
     }
 
@@ -286,6 +280,14 @@ export default function HomePage() {
       description: fullToastDescription,
       variant: "destructive"
     });
+
+    // if (mainTaskJustCompletedAfterDelete && completedParentTitle) {
+    //     dismiss();
+    //     toast({
+    //         title: "ToonDo Complete!",
+    //         description: `"${completedParentTitle}" is all done! Great job!`,
+    //     });
+    // }
   };
   
   const actualPrint = useCallback(() => {
