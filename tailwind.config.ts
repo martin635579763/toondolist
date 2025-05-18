@@ -10,7 +10,7 @@ export default {
   theme: {
   	extend: {
       fontFamily: {
-        sans: ['var(--font-comic-neue)', 'sans-serif'], // Add Comic Neue as primary sans-serif
+        sans: ['var(--font-medieval-sharp)', 'serif'], // Changed to MedievalSharp, added serif fallback
       },
   		colors: {
   			background: 'hsl(var(--background))',
@@ -66,8 +66,8 @@ export default {
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			md: 'calc(var(--radius) - 1px)', // Adjusted for sharper feel
+  			sm: 'calc(var(--radius) - 2px)'  // Adjusted for sharper feel
   		},
   		keyframes: {
   			'accordion-down': {

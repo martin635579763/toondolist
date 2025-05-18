@@ -1,18 +1,18 @@
 import type {Metadata} from 'next';
-import { Comic_Neue } from 'next/font/google'; // Using a more playful font
+import { MedievalSharp } from 'next/font/google'; // Changed font
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 
-const comicNeue = Comic_Neue({
-  weight: ["400", "700"],
+const medievalSharp = MedievalSharp({ // Changed font
+  weight: ["400"], // MedievalSharp typically only has a 400 weight
   subsets: ['latin'],
-  variable: '--font-comic-neue',
+  variable: '--font-medieval-sharp', // Changed variable name
 });
 
 export const metadata: Metadata = {
-  title: 'ToonDo List',
-  description: 'A fun, cartoon-style ToDo list!',
+  title: 'ToonDo List - Realm of Tasks', // Updated title
+  description: 'A fantasy-style ToDo list for your epic quests!', // Updated description
 };
 
 export default function RootLayout({
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn("min-h-screen bg-background font-sans antialiased", comicNeue.variable)}>
+      <body className={cn("min-h-screen bg-background font-sans antialiased", medievalSharp.variable)}>
         <main>{children}</main>
         <Toaster />
       </body>
