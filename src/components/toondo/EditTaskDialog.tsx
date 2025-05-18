@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Task, TaskBreakdownStep } from "@/types/task";
+import type { Task, TaskBreakdownStep, Applicant } from "@/types/task";
 import { useEffect, useState } from 'react';
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon, UsersIcon } from "lucide-react";
+import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon, UsersIcon, UserPlusIcon, UserCheckIcon, UserXIcon, CheckIcon, XIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn, generateId } from "@/lib/utils";
 import { suggestDueDate } from "@/ai/flows/suggest-due-date";
@@ -27,6 +27,13 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -34,6 +41,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getRandomColor } from "@/lib/colors";
+import { Badge } from "@/components/ui/badge";
 
 
 const editTaskFormSchema = z.object({
@@ -57,6 +65,13 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
   const [isSuggestingDate, setIsSuggestingDate] = useState(false);
   const [suggestedDateReasoning, setSuggestedDateReasoning] = useState<string | null>(null);
   const [newSubTaskSteps, setNewSubTaskSteps] = useState<TaskBreakdownStep[]>([]);
+  
+  // State for managing applicants within the dialog
+  const [currentApplicants, setCurrentApplicants] = useState<Applicant[]>([]);
+  const [newApplicantName, setNewApplicantName] = useState('');
+  const [selectedRoleForApplicant, setSelectedRoleForApplicant] = useState<string>('');
+
+
   const { toast } = useToast();
 
   const { register, handleSubmit, setValue, watch, formState: { errors }, reset } = useForm<EditTaskFormData>({
@@ -77,10 +92,17 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
       });
       setSuggestedDateReasoning(null);
       setNewSubTaskSteps([]);
+      setCurrentApplicants(taskToEdit.applicants || []);
+      setNewApplicantName('');
+      setSelectedRoleForApplicant(taskToEdit.assignedRoles && taskToEdit.assignedRoles.length > 0 ? taskToEdit.assignedRoles[0] : '');
+
     } else {
       reset({ title: "", description: "", dueDate: null, assignedRoles: "" });
        setSuggestedDateReasoning(null);
        setNewSubTaskSteps([]);
+       setCurrentApplicants([]);
+       setNewApplicantName('');
+       setSelectedRoleForApplicant('');
     }
   }, [taskToEdit, reset, isOpen]);
 
@@ -141,6 +163,43 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
     );
   };
 
+  const handleAddApplicant = () => {
+    if (!newApplicantName.trim() || !selectedRoleForApplicant) {
+      toast({ title: "Missing Info", description: "Please enter applicant name and select a role.", variant: "destructive"});
+      return;
+    }
+    const newId = generateId();
+    setCurrentApplicants(prev => [...prev, { id: newId, name: newApplicantName, role: selectedRoleForApplicant, status: 'pending' }]);
+    setNewApplicantName(''); 
+  };
+
+  const handleApplicantStatusChange = (applicantId: string, newStatus: 'accepted' | 'rejected') => {
+    setCurrentApplicants(prevApplicants => {
+      const applicantToUpdate = prevApplicants.find(app => app.id === applicantId);
+      if (!applicantToUpdate) return prevApplicants;
+
+      let updatedApplicants = prevApplicants.map(app => 
+        app.id === applicantId ? { ...app, status: newStatus } : app
+      );
+
+      // If accepting, ensure only one is accepted per role
+      if (newStatus === 'accepted') {
+        updatedApplicants = updatedApplicants.map(app => {
+          if (app.role === applicantToUpdate.role && app.id !== applicantId && app.status === 'accepted') {
+            return { ...app, status: 'pending' }; // Or 'rejected', depending on desired logic
+          }
+          return app;
+        });
+      }
+      return updatedApplicants;
+    });
+  };
+  
+  const handleRemoveApplicant = (applicantId: string) => {
+    setCurrentApplicants(prev => prev.filter(app => app.id !== applicantId));
+  };
+
+
   const onSubmit: SubmitHandler<EditTaskFormData> = (data) => {
     if (!taskToEdit) return;
 
@@ -154,6 +213,7 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
       description: data.description || "",
       dueDate: data.dueDate ? data.dueDate.toISOString() : null,
       assignedRoles: rolesArray.length > 0 ? rolesArray : undefined,
+      applicants: currentApplicants, // Save the managed applicants
     };
 
     const subTasksToCreate: Task[] = newSubTaskSteps.map(step => {
@@ -178,6 +238,9 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
     reset({ title: "", description: "", dueDate: null, assignedRoles: "" }); 
     setSuggestedDateReasoning(null);
     setNewSubTaskSteps([]);
+    setCurrentApplicants([]);
+    setNewApplicantName('');
+    setSelectedRoleForApplicant('');
     onClose();
   };
 
@@ -186,17 +249,17 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleDialogClose(); }}>
-      <DialogContent className="sm:max-w-[425px] md:max-w-lg bg-card shadow-xl rounded-xl border border-border">
+      <DialogContent className="sm:max-w-[425px] md:max-w-2xl bg-card shadow-xl rounded-xl border border-border">
         <TooltipProvider>
           <form onSubmit={handleSubmit(onSubmit)}>
             <DialogHeader className="pt-2 pb-4">
               <DialogTitle className="text-2xl font-semibold">Edit ToonDo Task</DialogTitle>
               <DialogDescription>
-                Make changes to your task details below. You can also add new sub-tasks.
+                Make changes to your task details below. You can also add new sub-tasks or manage role applicants if this is a main task.
               </DialogDescription>
             </DialogHeader>
             
-            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-3">
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-3 custom-scrollbar">
               <div className="space-y-2">
                 <Label htmlFor="edit-title" className="text-lg font-semibold">Task Title</Label>
                 <Input
@@ -280,10 +343,10 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
                   {errors.dueDate && <p className="text-sm text-destructive">{errors.dueDate.message}</p>}
                 </div>
 
-                {!taskToEdit.parentId && (
+                {!taskToEdit.parentId && ( // Only for main tasks
                   <div className="space-y-2">
                     <Label htmlFor="edit-assignedRoles" className="text-lg font-semibold flex items-center">
-                       <UsersIcon className="mr-2 h-5 w-5" /> Assign Roles/People
+                       <UsersIcon className="mr-2 h-5 w-5" /> Needed Roles/People
                     </Label>
                     <Input
                       id="edit-assignedRoles"
@@ -292,72 +355,175 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
                       className="text-base"
                       aria-describedby="edit-roles-description"
                     />
-                    <p id="edit-roles-description" className="text-xs text-muted-foreground">Comma-separated list of roles or names.</p>
+                    <p id="edit-roles-description" className="text-xs text-muted-foreground">Comma-separated list of roles.</p>
                     {errors.assignedRoles && <p className="text-sm text-destructive">{errors.assignedRoles.message}</p>}
                   </div>
                 )}
               </div>
 
 
-              {!taskToEdit.parentId && (
-                <Card className="border-dashed border-primary/50 mt-4">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Add New Sub-Tasks</CardTitle>
-                    <CardDescription className="text-sm">Break this main task into smaller new sub-tasks. Each step will become its own ToonDo card linked to this one.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-3">
-                      {newSubTaskSteps.map((step, index) => (
-                        <div key={index} className="p-3 border rounded-md space-y-2 relative bg-background/50">
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="icon" 
-                            className="absolute top-1 right-1 h-6 w-6 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleRemoveSubTaskStep(index)}
-                            aria-label="Remove step"
-                          >
-                            <XCircleIcon className="h-4 w-4" />
-                          </Button>
-                          <div>
-                            <Label htmlFor={`new-sub-step-title-${index}`} className="text-xs">New Sub-Task Title (Step {index + 1})</Label>
-                            <Input
-                              id={`new-sub-step-title-${index}`}
-                              value={step.step}
-                              onChange={(e) => handleSubTaskStepChange(index, 'step', e.target.value)}
-                              placeholder="Title for this new sub-task"
-                              className="text-sm mt-0.5"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`new-sub-step-details-${index}`} className="text-xs">New Sub-Task Details (Optional)</Label>
-                            <Textarea
-                              id={`new-sub-step-details-${index}`}
-                              value={step.details || ""}
-                              onChange={(e) => handleSubTaskStepChange(index, 'details', e.target.value)}
-                              placeholder="Further details for this new sub-task"
-                              className="text-sm mt-0.5 min-h-[40px]"
-                              rows={2}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`new-sub-step-role-${index}`} className="text-xs">Assigned Role for New Sub-Task (Optional)</Label>
-                            <Input
-                              id={`new-sub-step-role-${index}`}
-                              value={step.requiredRole || ""}
-                              onChange={(e) => handleSubTaskStepChange(index, 'requiredRole', e.target.value)}
-                              placeholder="e.g., Designer, Developer"
-                              className="text-sm mt-0.5"
-                            />
-                          </div>
+              {!taskToEdit.parentId && ( // Section for main tasks only
+                <>
+                  <Card className="border-dashed border-secondary/50 mt-4">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-md flex items-center"><UserPlusIcon className="mr-2 h-5 w-5 text-secondary"/>Manage Role Applicants</CardTitle>
+                      <CardDescription className="text-sm">Add applicants for the roles defined above. Accept or reject pending applications.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                        <div className="space-y-1 sm:col-span-1">
+                          <Label htmlFor="new-applicant-name" className="text-xs">Applicant Name</Label>
+                          <Input 
+                            id="new-applicant-name"
+                            value={newApplicantName}
+                            onChange={(e) => setNewApplicantName(e.target.value)}
+                            placeholder="e.g., John Doe"
+                            className="text-sm"
+                          />
                         </div>
-                      ))}
-                      <Button type="button" variant="outline" size="sm" onClick={handleAddSubTaskStep} className="mt-2">
-                        <PlusCircleIcon className="mr-2 h-4 w-4" /> Add New Sub-Task Step
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                        <div className="space-y-1 sm:col-span-1">
+                          <Label htmlFor="new-applicant-role" className="text-xs">Applying for Role</Label>
+                          <Select 
+                            value={selectedRoleForApplicant} 
+                            onValueChange={setSelectedRoleForApplicant}
+                            disabled={!taskToEdit.assignedRoles || taskToEdit.assignedRoles.length === 0}
+                          >
+                            <SelectTrigger className="text-sm">
+                              <SelectValue placeholder="Select a role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {taskToEdit.assignedRoles && taskToEdit.assignedRoles.map(role => (
+                                <SelectItem key={role} value={role} className="text-sm">{role}</SelectItem>
+                              ))}
+                              {(!taskToEdit.assignedRoles || taskToEdit.assignedRoles.length === 0) && (
+                                 <div className="px-2 py-1.5 text-sm text-muted-foreground">Define roles first</div>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button type="button" onClick={handleAddApplicant} size="sm" className="sm:self-end" disabled={!taskToEdit.assignedRoles || taskToEdit.assignedRoles.length === 0}>
+                          <UserPlusIcon className="mr-1.5 h-4 w-4"/>Add Applicant
+                        </Button>
+                      </div>
+
+                      {currentApplicants.length > 0 && (
+                        <div className="space-y-2 pt-3 border-t">
+                          <Label className="text-sm font-medium">Current Applicants</Label>
+                          {currentApplicants.map(applicant => (
+                            <div key={applicant.id} className="flex items-center justify-between p-2 border rounded-md bg-background/50">
+                              <div className="flex-grow">
+                                <p className="text-sm font-semibold">{applicant.name}</p>
+                                <p className="text-xs text-muted-foreground">Role: {applicant.role}</p>
+                                <Badge 
+                                  variant={applicant.status === 'accepted' ? 'default' : applicant.status === 'rejected' ? 'destructive' : 'secondary'}
+                                  className="mt-1 text-xs py-0 px-1.5"
+                                  style={applicant.status === 'accepted' ? {backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))'} : {}}
+                                >
+                                  Status: {applicant.status}
+                                </Badge>
+                              </div>
+                              <div className="flex space-x-1 shrink-0">
+                                {applicant.status === 'pending' && (
+                                  <>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-700" onClick={() => handleApplicantStatusChange(applicant.id, 'accepted')}>
+                                          <CheckIcon className="h-4 w-4"/>
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Accept</p></TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:text-red-700" onClick={() => handleApplicantStatusChange(applicant.id, 'rejected')}>
+                                          <XIcon className="h-4 w-4"/>
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Reject</p></TooltipContent>
+                                    </Tooltip>
+                                  </>
+                                )}
+                                 <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleRemoveApplicant(applicant.id)}>
+                                      <Trash2Icon className="h-4 w-4"/>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Remove Applicant</p></TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {currentApplicants.length === 0 && (!taskToEdit.assignedRoles || taskToEdit.assignedRoles.length === 0) && (
+                         <p className="text-xs text-center text-muted-foreground py-2">Define needed roles for this task first to add applicants.</p>
+                      )}
+                       {currentApplicants.length === 0 && (taskToEdit.assignedRoles && taskToEdit.assignedRoles.length > 0) && (
+                         <p className="text-xs text-center text-muted-foreground py-2">No applicants yet for the defined roles.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-dashed border-primary/50 mt-4">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Add New Sub-Tasks</CardTitle>
+                      <CardDescription className="text-sm">Break this main task into smaller new sub-tasks. Each step will become its own ToonDo card linked to this one.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-3">
+                        {newSubTaskSteps.map((step, index) => (
+                          <div key={index} className="p-3 border rounded-md space-y-2 relative bg-background/50">
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="absolute top-1 right-1 h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleRemoveSubTaskStep(index)}
+                              aria-label="Remove step"
+                            >
+                              <XCircleIcon className="h-4 w-4" />
+                            </Button>
+                            <div>
+                              <Label htmlFor={`new-sub-step-title-${index}`} className="text-xs">New Sub-Task Title (Step {index + 1})</Label>
+                              <Input
+                                id={`new-sub-step-title-${index}`}
+                                value={step.step}
+                                onChange={(e) => handleSubTaskStepChange(index, 'step', e.target.value)}
+                                placeholder="Title for this new sub-task"
+                                className="text-sm mt-0.5"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`new-sub-step-details-${index}`} className="text-xs">New Sub-Task Details (Optional)</Label>
+                              <Textarea
+                                id={`new-sub-step-details-${index}`}
+                                value={step.details || ""}
+                                onChange={(e) => handleSubTaskStepChange(index, 'details', e.target.value)}
+                                placeholder="Further details for this new sub-task"
+                                className="text-sm mt-0.5 min-h-[40px]"
+                                rows={2}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`new-sub-step-role-${index}`} className="text-xs">Assigned Role for New Sub-Task (Optional)</Label>
+                              <Input
+                                id={`new-sub-step-role-${index}`}
+                                value={step.requiredRole || ""}
+                                onChange={(e) => handleSubTaskStepChange(index, 'requiredRole', e.target.value)}
+                                placeholder="e.g., Designer, Developer"
+                                className="text-sm mt-0.5"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        <Button type="button" variant="outline" size="sm" onClick={handleAddSubTaskStep} className="mt-2">
+                          <PlusCircleIcon className="mr-2 h-4 w-4" /> Add New Sub-Task Step
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
               )}
             </div>
             

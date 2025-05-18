@@ -1,11 +1,11 @@
 
 "use client";
 
-import type { Task } from "@/types/task";
+import type { Task, Applicant } from "@/types/task";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon, UsersIcon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getContrastingTextColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -57,7 +57,7 @@ export function TaskCard({
 
   if (isSubTask) {
     cardStyle.borderLeftWidth = '4px';
-    cardStyle.borderLeftColor = polylineColor;
+    cardStyle.borderLeftColor = polylineColor; // Use the determined polyline color
     cardStyle.borderLeftStyle = 'solid';
   }
 
@@ -85,7 +85,7 @@ export function TaskCard({
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        isSubTask && "ml-8 max-w-sm",
+        isSubTask && "ml-8 max-w-sm", // max-width for sub-tasks
         isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2",
         isDragOverSelf && "ring-2 ring-primary ring-offset-1 scale-102 shadow-2xl z-10",
         !isDraggingSelf && isMainTask && "cursor-grab" 
@@ -128,19 +128,19 @@ export function TaskCard({
 
       {isSubTask && parentTask && (
          <GitForkIcon
-            className="absolute top-2 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90"
+            className="absolute top-2 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90" // Aligned with title area
             stroke={polylineColor}
             strokeWidth={2.5}
             aria-hidden="true"
           />
       )}
       <CardHeader className={cn(
-        isSubTask ? "p-1 pt-0.5 pb-0" : "p-6 pb-3"
+        isSubTask ? "p-1 pt-0.5 pb-0" : "p-6 pb-3" 
       )}>
         <div className="flex items-start justify-between">
           <CardTitle className={cn(
             "font-bold break-words",
-            isSubTask ? "text-base" : "text-2xl" // Sub-task title size
+            isSubTask ? "text-base" : "text-2xl" // Larger font for sub-task title
           )} style={textStyle}>
             {task.title}
           </CardTitle>
@@ -163,8 +163,8 @@ export function TaskCard({
         ))}
       </CardHeader>
       <CardContent className={cn(
-        "flex-grow space-y-0.5 pt-0 min-h-7",
-        isSubTask ? "p-1 pt-0.5 pb-0 space-y-0" : "p-6 pt-0 space-y-2"
+        "flex-grow space-y-0.5 pt-0 min-h-7", // min-h for sub-task content consistency
+        isSubTask ? "p-1 pt-0.5 pb-0 space-y-0" : "p-6 pt-0 space-y-2" 
       )}>
         {task.dueDate && (
           <div className={cn("flex items-center", isSubTask ? "text-sm" : "text-sm")} style={{color: textColor, opacity: 0.9}}>
@@ -177,14 +177,36 @@ export function TaskCard({
           <div className="mt-2 pt-2 border-t border-dashed" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}}>
             <h4 className="text-xs font-semibold uppercase flex items-center mb-1" style={mutedTextStyle}>
               <UsersIcon className="mr-1.5 h-3.5 w-3.5" />
-              Assigned Roles:
+              Needed Roles:
             </h4>
-            <div className="flex flex-wrap gap-1">
-              {task.assignedRoles.map((role, index) => (
-                <Badge key={index} variant="secondary" className="text-xs py-0.5 px-1.5" style={{backgroundColor: 'rgba(0,0,0,0.15)', color: textColor}}>
-                  {role}
-                </Badge>
-              ))}
+            <div className="flex flex-col gap-1 text-xs">
+              {task.assignedRoles.map((role, index) => {
+                const acceptedApplicant = task.applicants?.find(app => app.role === role && app.status === 'accepted');
+                const pendingApplicants = task.applicants?.filter(app => app.role === role && app.status === 'pending') || [];
+                return (
+                  <div key={index} className="flex items-center" style={textStyle}>
+                    <span className="mr-1.5">- {role}:</span>
+                    {acceptedApplicant ? (
+                      <Badge variant="default" className="py-0 px-1.5 text-[10px] bg-green-500/80 hover:bg-green-500 text-white">
+                        <UserCheckIcon className="h-3 w-3 mr-1"/> Filled by {acceptedApplicant.name}
+                      </Badge>
+                    ) : pendingApplicants.length > 0 ? (
+                       <Badge variant="secondary" className="py-0 px-1.5 text-[10px]">
+                        <ClockIcon className="h-3 w-3 mr-1"/> {pendingApplicants.length} pending
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="py-0 px-1.5 text-[10px]" style={{borderColor: textColor, color: textColor}}>
+                        Open
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })}
+               {(task.applicants?.length || 0) > 0 && (
+                <Button variant="link" size="sm" className="p-0 h-auto text-xs mt-1" style={{color: textColor}} onClick={(e) => { e.stopPropagation(); onEdit(task); }}>
+                    Manage Applicants...
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -206,7 +228,7 @@ export function TaskCard({
                     </div>
                      <ArrowRightIcon
                       className="ml-2 h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
-                      stroke={"#000000"}
+                      stroke={"#000000"} // Ensure this is black
                     />
                   </li>
                 );
@@ -231,7 +253,7 @@ export function TaskCard({
                     disabled={checkboxDisabled}
                     className={cn(
                     "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
-                    isSubTask ? "h-3.5 w-3.5" : "h-5 w-5", // Sub-task checkbox size
+                    isSubTask ? "h-3.5 w-3.5" : "h-5 w-5", 
                     textColor === '#FFFFFF' ? "border-white/70" : "border-black/50",
                     checkboxDisabled && "cursor-not-allowed opacity-70"
                     )}
@@ -250,7 +272,7 @@ export function TaskCard({
             id={`label-complete-${task.id}`}
             className={cn(
               "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              isSubTask ? "text-sm" : "text-sm", // Sub-task label size
+              isSubTask ? "text-sm" : "text-sm", 
               task.completed && "line-through",
               checkboxDisabled && "cursor-not-allowed opacity-70"
             )}
@@ -263,11 +285,11 @@ export function TaskCard({
       </CardContent>
       <CardFooter className={cn(
         "flex justify-end space-x-0.5",
-        isSubTask ? "p-1 pt-0.5 pb-0.5" : "p-6 pt-0 space-x-2"
+        isSubTask ? "p-1 pt-0.5 pb-0.5" : "p-6 pt-0 space-x-2" 
       )}>
         <Button
           variant="ghost"
-          size={isSubTask ? "icon" : "icon"} // Sub-task button size
+          size={isSubTask ? "icon" : "icon"} 
           onClick={(e) => { e.stopPropagation(); onEdit(task);}}
           className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
           style={{color: textColor}}
@@ -277,7 +299,7 @@ export function TaskCard({
         </Button>
         <Button
           variant="ghost"
-          size={isSubTask ? "icon" : "icon"} // Sub-task button size
+          size={isSubTask ? "icon" : "icon"} 
           onClick={(e) => { e.stopPropagation(); onPrint(task);}}
           className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
           style={{color: textColor}}
@@ -287,7 +309,7 @@ export function TaskCard({
         </Button>
         <Button
           variant="ghost"
-          size={isSubTask ? "icon" : "icon"} // Sub-task button size
+          size={isSubTask ? "icon" : "icon"} 
           onClick={(e) => { e.stopPropagation(); onDelete(task.id);}}
           className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
           style={{color: textColor}}
@@ -299,3 +321,5 @@ export function TaskCard({
     </Card>
   );
 }
+
+    
