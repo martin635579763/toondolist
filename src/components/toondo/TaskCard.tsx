@@ -5,7 +5,7 @@ import type { Task, Applicant } from "@/types/task";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getContrastingTextColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ interface TaskCardProps {
   task: Task;
   allTasks: Task[];
   onToggleComplete: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (task: Task) => void; // Changed to accept full Task object
   onPrint: (task: Task) => void;
   onEdit: (task: Task) => void;
   isDraggingSelf: boolean;
@@ -57,7 +57,7 @@ export function TaskCard({
 
   if (isSubTask) {
     cardStyle.borderLeftWidth = '4px';
-    cardStyle.borderLeftColor = polylineColor; // Use the determined polyline color
+    cardStyle.borderLeftColor = polylineColor;
     cardStyle.borderLeftStyle = 'solid';
   }
 
@@ -85,7 +85,7 @@ export function TaskCard({
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        isSubTask && "ml-8 max-w-sm", // max-width for sub-tasks
+        isSubTask && "ml-8 max-w-sm", 
         isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2",
         isDragOverSelf && "ring-2 ring-primary ring-offset-1 scale-102 shadow-2xl z-10",
         !isDraggingSelf && isMainTask && "cursor-grab" 
@@ -128,7 +128,7 @@ export function TaskCard({
 
       {isSubTask && parentTask && (
          <GitForkIcon
-            className="absolute top-2 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90" // Aligned with title area
+            className="absolute top-2 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90" 
             stroke={polylineColor}
             strokeWidth={2.5}
             aria-hidden="true"
@@ -140,7 +140,7 @@ export function TaskCard({
         <div className="flex items-start justify-between">
           <CardTitle className={cn(
             "font-bold break-words",
-            isSubTask ? "text-base" : "text-2xl" // Larger font for sub-task title
+            isSubTask ? "text-base" : "text-2xl" 
           )} style={textStyle}>
             {task.title}
           </CardTitle>
@@ -163,7 +163,7 @@ export function TaskCard({
         ))}
       </CardHeader>
       <CardContent className={cn(
-        "flex-grow space-y-0.5 pt-0 min-h-7", // min-h for sub-task content consistency
+        "flex-grow space-y-0.5 pt-0 min-h-7", 
         isSubTask ? "p-1 pt-0.5 pb-0 space-y-0" : "p-6 pt-0 space-y-2" 
       )}>
         {task.dueDate && (
@@ -228,7 +228,7 @@ export function TaskCard({
                     </div>
                      <ArrowRightIcon
                       className="ml-2 h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
-                      stroke={"#000000"} // Ensure this is black
+                      stroke={"#000000"} 
                     />
                   </li>
                 );
@@ -310,7 +310,7 @@ export function TaskCard({
         <Button
           variant="ghost"
           size={isSubTask ? "icon" : "icon"} 
-          onClick={(e) => { e.stopPropagation(); onDelete(task.id);}}
+          onClick={(e) => { e.stopPropagation(); onDelete(task);}} // Pass full task object
           className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
           style={{color: textColor}}
           aria-label="Delete task"
@@ -321,5 +321,3 @@ export function TaskCard({
     </Card>
   );
 }
-
-    
