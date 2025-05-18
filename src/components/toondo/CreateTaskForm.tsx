@@ -97,6 +97,8 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       let description = "Could not suggest a due date. Please try again or set it manually.";
       if (error instanceof Error && (error.message.includes('plugin not configured') || error.message.includes('GOOGLE_API_KEY'))) {
         description = "Could not suggest a due date. AI features may not be configured (e.g., API key missing).";
+      } else if (error instanceof Error && error.message.includes('GENKIT_API_KEY')) {
+        description = "Could not suggest a due date. AI features may not be configured (e.g., API key missing).";
       }
       toast({
         title: "Oops!",
@@ -123,7 +125,7 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
   };
 
   const onSubmit: SubmitHandler<TaskFormData> = (data) => {
-    const mainTaskId = generateId(); // Client-generated ID for consistency
+    const mainTaskId = generateId(); 
     const rolesArray = data.assignedRoles 
       ? data.assignedRoles.split(',').map(role => role.trim()).filter(role => role !== "") 
       : [];
@@ -139,8 +141,8 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       color: getRandomColor(),
       createdAt: currentTime,
       assignedRoles: rolesArray.length > 0 ? rolesArray : undefined,
-      applicants: [], // Initialize applicants
-      order: 0, // Default order, will be managed by parent list
+      applicants: [], 
+      order: 0, 
     };
     onAddTask(mainTask);
 
@@ -157,7 +159,7 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
         createdAt: currentTime + index + 1, 
         parentId: mainTaskId,
         applicants: [],
-        order: index,
+        // order is not set for sub-tasks directly, they follow parent
       };
       onAddTask(subTask);
     });

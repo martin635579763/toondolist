@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon, UsersIcon, UserPlusIcon, Trash2Icon, CheckIcon, XIcon } from "lucide-react"; // Removed UserCheckIcon, UserXIcon
+import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon, UsersIcon, UserPlusIcon, Trash2Icon, CheckIcon, XIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn, generateId } from "@/lib/utils";
 import { suggestDueDate } from "@/ai/flows/suggest-due-date";
@@ -73,7 +73,7 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
 
   const { toast } = useToast();
 
-  const { register, handleSubmit, setValue, watch, formState: { errors }, reset, getValues } = useForm<EditTaskFormData>({
+  const { register, handleSubmit, setValue, watch, formState: { errors }, reset } = useForm<EditTaskFormData>({
     resolver: zodResolver(editTaskFormSchema),
   });
 
@@ -138,6 +138,8 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
       console.error("Error suggesting due date:", error);
       let description = "Could not suggest a due date. Please try again or set it manually.";
       if (error instanceof Error && (error.message.includes('plugin not configured') || error.message.includes('GOOGLE_API_KEY'))) {
+        description = "Could not suggest a due date. AI features may not be configured (e.g., API key missing).";
+      } else if (error instanceof Error && error.message.includes('GENKIT_API_KEY')) {
         description = "Could not suggest a due date. AI features may not be configured (e.g., API key missing).";
       }
       toast({
@@ -207,7 +209,7 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
       ? data.assignedRoles.split(',').map(role => role.trim()).filter(role => role !== "")
       : [];
 
-    const updatedTaskData: Partial<Task> = { // Use Partial<Task> as not all fields are directly from form
+    const updatedTaskData: Partial<Task> = { 
       title: data.title,
       description: data.description || "",
       dueDate: data.dueDate ? data.dueDate.toISOString() : null,
@@ -218,6 +220,7 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
     const updatedTask: Task = {
       ...taskToEdit,
       ...updatedTaskData,
+      createdAt: typeof taskToEdit.createdAt === 'number' ? taskToEdit.createdAt : Date.now(), // Ensure createdAt is a number
     };
 
 
@@ -234,7 +237,7 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
         createdAt: currentTime + index + 1, 
         parentId: taskToEdit.id,
         applicants: [],
-        order: index,
+        order: undefined, // Sub-tasks don't have main order
       };
     }).filter(task => task !== null) as Task[];
     
@@ -269,7 +272,7 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
               </DialogDescription>
             </DialogHeader>
             
-            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-3 custom-scrollbar"> {/* Added custom-scrollbar if you have one defined */}
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-3 custom-scrollbar"> 
               <div className="space-y-2">
                 <Label htmlFor="edit-title" className="text-lg font-semibold">Task Title</Label>
                 <Input

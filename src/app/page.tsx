@@ -3,23 +3,18 @@
 
 import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Task, Applicant } from '@/types/task';
+import type { Task } from '@/types/task';
 import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
 import { EditTaskDialog } from '@/components/toondo/EditTaskDialog';
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
 import { FileTextIcon, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { cn } from '@/lib/utils';
+import { cn, generateId } from '@/lib/utils';
 import {
   Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider, useQuery, useMutation } from '@tanstack/react-query';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, writeBatch, query, orderBy, Timestamp, where, getDoc, setDoc } from 'firebase/firestore';
 
 interface TaskGroup {
   mainTask: Task;
@@ -27,25 +22,13 @@ interface TaskGroup {
   mainTaskHasIncompleteSubtasks: boolean;
 }
 
-interface DeleteTaskVariables {
-  taskId: string;
-  originalParentId?: string;
-}
-
-interface DeleteTaskMutationResult {
-  numRemoved: number;
-  removedTaskTitle: string;
-  parentIdOfDeletedTask?: string;
-  status: 'deleted' | 'notFound';
-}
-
-
-const queryClient = new QueryClient();
-
 function HomePageContent() {
   const { toast, dismiss } = useToast();
   const printableAreaRef = useRef<HTMLDivElement>(null);
   const [taskToPrint, setTaskToPrint] = useState<Task | null>(null);
+
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
@@ -53,180 +36,63 @@ function HomePageContent() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  const { data: tasks = [], isLoading: isLoadingTasks, error: tasksError } = useQuery<Task[]>({
-    queryKey: ['tasks'],
-    queryFn: async () => {
-      const tasksCollection = collection(db, 'tasks');
-      const q = query(tasksCollection, orderBy('order', 'asc'), orderBy('createdAt', 'asc'));
-      const tasksSnapshot = await getDocs(q);
-      return tasksSnapshot.docs.map(docSnapshot => {
-        const data = docSnapshot.data();
-        return {
-          id: docSnapshot.id,
-          ...data,
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toMillis() : data.createdAt,
-          applicants: data.applicants || [],
-        } as Task;
-      });
-    },
-  });
-
-  // CREATE: Mutation for adding a new task to Firestore using setDoc with client-generated ID.
-  const addTaskMutation = useMutation<void, Error, Task>({
-    mutationFn: async (newTask) => {
-      if (!newTask.id) {
-        throw new Error("Task ID is missing for setDoc operation.");
+  // Load tasks from localStorage on initial render
+  useEffect(() => {
+    const storedTasks = localStorage.getItem('toondo-tasks');
+    if (storedTasks) {
+      try {
+        const parsedTasks = JSON.parse(storedTasks) as Task[];
+        // Ensure all tasks have an applicants array
+        const tasksWithApplicants = parsedTasks.map(task => ({
+          ...task,
+          applicants: task.applicants || [],
+          order: task.order ?? (task.parentId ? undefined : tasks.filter(t => !t.parentId).length)
+        }));
+        setTasks(tasksWithApplicants);
+      } catch (error) {
+        console.error("Error parsing tasks from localStorage:", error);
+        setTasks([]); // Fallback to empty if parsing fails
       }
-      const taskRef = doc(db, 'tasks', newTask.id);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id, ...taskData } = newTask; // Exclude id from the data payload
+    }
+    setIsLoadingTasks(false);
+  }, []);
 
-      await setDoc(taskRef, {
-        ...taskData,
-        createdAt: Timestamp.fromMillis(newTask.createdAt as number || Date.now()),
-        applicants: newTask.applicants || [],
-        order: newTask.order ?? 0, // Ensure order has a default value
-      });
-    },
-    onSuccess: (_, newTask) => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      toast({
-        title: "ToonDo Added!",
-        description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
-      });
-      if (newTask.parentId) {
-        const parentTask = tasks.find(t => t.id === newTask.parentId);
-        if (parentTask && parentTask.completed) {
-           const updatedParent = { ...parentTask, completed: false, applicants: parentTask.applicants || [] };
-           // Ensure 'order' is not undefined
-           if (typeof updatedParent.order === 'undefined' && !updatedParent.parentId) {
-             updatedParent.order = tasks.filter(t => !t.parentId).length;
-           }
-           updateTaskMutation.mutate(updatedParent);
-        }
-      }
-    },
-    onError: (error) => {
-      toast({ title: "Error adding task", description: error.message, variant: "destructive" });
-    },
-  });
-
-  // UPDATE: Mutation for updating an existing task in Firestore.
-  const updateTaskMutation = useMutation<void, Error, Task>({
-    mutationFn: async (updatedTask) => {
-      const taskRef = doc(db, 'tasks', updatedTask.id);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id, ...taskDataToUpdate } = updatedTask; // Exclude id from the data payload
-
-      await updateDoc(taskRef, {
-        ...taskDataToUpdate,
-        createdAt: typeof updatedTask.createdAt === 'number' ? Timestamp.fromMillis(updatedTask.createdAt) : updatedTask.createdAt,
-        applicants: updatedTask.applicants || [],
-        // Ensure 'order' is not undefined if it's a main task being updated
-        order: typeof updatedTask.order === 'number' ? updatedTask.order : (updatedTask.parentId ? undefined : 0),
-      });
-    },
-    onSuccess: (_, updatedTask) => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      // Toast for update is handled by the calling function (e.g., handleUpdateTask)
-    },
-    onError: (error) => {
-      toast({ title: "Error updating task", description: error.message, variant: "destructive" });
-    },
-  });
-
-  // DELETE: Mutation for deleting a task from Firestore.
-  const deleteTaskMutation = useMutation<
-    DeleteTaskMutationResult,
-    Error,
-    DeleteTaskVariables
-  >({
-    mutationFn: async (variables) => {
-      const { taskId, originalParentId } = variables;
-      const taskDocRef = doc(db, 'tasks', taskId);
-      const taskSnapshot = await getDoc(taskDocRef);
-
-      if (!taskSnapshot.exists()) {
-        console.warn(`Task with ID ${taskId} not found in Firestore during delete. It might have been already deleted.`);
-        return { numRemoved: 0, removedTaskTitle: taskId, parentIdOfDeletedTask: originalParentId, status: 'notFound' };
-      }
-      
-      const taskData = taskSnapshot.data() as Task; 
-      const currentTitle = taskData.title;
-      const currentParentId = taskData.parentId;
-
-      const batch = writeBatch(db);
-      batch.delete(taskDocRef);
-      let numRemoved = 1;
-
-      if (!currentParentId) {
-        const subTasksQuery = query(collection(db, 'tasks'), where('parentId', '==', taskId));
-        const subTasksSnapshot = await getDocs(subTasksQuery);
-        subTasksSnapshot.forEach(subDoc => {
-          batch.delete(subDoc.ref);
-          numRemoved++;
-        });
-      }
-      
-      await batch.commit();
-      return { numRemoved, removedTaskTitle: currentTitle, parentIdOfDeletedTask: currentParentId || originalParentId, status: 'deleted' };
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      const { numRemoved, removedTaskTitle, parentIdOfDeletedTask, status } = data;
-      
-      if (status === 'notFound') {
-        toast({
-          title: "Info",
-          description: `Task ID "${removedTaskTitle}" was already gone or could not be found.`,
-        });
-      } else { 
-        toast({
-          title: "ToonDo Removed!",
-          description: `Task "${removedTaskTitle}" ${numRemoved > 1 ? 'and its sub-tasks were' : 'was'} removed.`,
-        });
-      }
-
-      if (parentIdOfDeletedTask) {
-        queryClient.refetchQueries({queryKey: ['tasks']}).then(() => {
-          const currentTasks = queryClient.getQueryData<Task[]>(['tasks']) ?? [];
-          const parentTask = currentTasks.find(t => t.id === parentIdOfDeletedTask);
-
-          if (parentTask && !parentTask.completed) {
-            const remainingSubTasks = currentTasks.filter(st => st.parentId === parentIdOfDeletedTask);
-            if (remainingSubTasks.length === 0 || remainingSubTasks.every(st => st.completed)) {
-              if (status === 'deleted' && numRemoved > 0) { 
-                 const updatedParent = { ...parentTask, completed: true, applicants: parentTask.applicants || [] };
-                 if (typeof updatedParent.order === 'undefined' && !updatedParent.parentId) {
-                   updatedParent.order = tasks.filter(t => !t.parentId).length;
-                 }
-                 updateTaskMutation.mutate(updatedParent);
-              } else if (remainingSubTasks.length === 0 || remainingSubTasks.every(st => st.completed)) {
-                 const updatedParent = { ...parentTask, completed: true, applicants: parentTask.applicants || [] };
-                  if (typeof updatedParent.order === 'undefined' && !updatedParent.parentId) {
-                   updatedParent.order = tasks.filter(t => !t.parentId).length;
-                 }
-                 updateTaskMutation.mutate(updatedParent);
-              }
-            }
-          }
-        });
-      }
-    },
-    onError: (error) => { 
-      toast({ title: "Error deleting task", description: error.message, variant: "destructive" });
-    },
-  });
+  // Save tasks to localStorage whenever they change
+  useEffect(() => {
+    if (!isLoadingTasks) { // Only save if initial load is done
+      localStorage.setItem('toondo-tasks', JSON.stringify(tasks));
+    }
+  }, [tasks, isLoadingTasks]);
 
 
   const handleAddTask = (newTask: Task) => {
     const mainTasks = tasks.filter(t => !t.parentId);
     const taskWithDefaults = {
       ...newTask,
-      order: newTask.parentId ? undefined : mainTasks.length, 
-      applicants: newTask.applicants || [], 
+      id: newTask.id || generateId(), // Ensure ID exists
+      createdAt: newTask.createdAt || Date.now(),
+      applicants: newTask.applicants || [],
+      order: newTask.parentId ? undefined : mainTasks.length,
     };
-    addTaskMutation.mutate(taskWithDefaults);
+
+    setTasks(prevTasks => {
+      const updatedTasks = [...prevTasks, taskWithDefaults];
+      if (newTask.parentId) {
+        const parentTask = updatedTasks.find(t => t.id === newTask.parentId);
+        if (parentTask && parentTask.completed) {
+          // Mark parent as incomplete if a new sub-task is added
+          return updatedTasks.map(t =>
+            t.id === parentTask.id ? { ...t, completed: false } : t
+          );
+        }
+      }
+      return updatedTasks;
+    });
+
+    toast({
+      title: "ToonDo Added!",
+      description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
+    });
   };
 
   const handleOpenEditDialog = (task: Task) => {
@@ -240,46 +106,39 @@ function HomePageContent() {
   };
 
   const handleUpdateTask = (updatedTask: Task, newSubTasksToCreate?: Task[]) => {
-    // Ensure 'order' is not undefined for main tasks being updated
-    const taskToUpdate = { ...updatedTask };
-    if (typeof taskToUpdate.order === 'undefined' && !taskToUpdate.parentId) {
-      // Try to find its existing order or default to end of list
-      const existingTask = tasks.find(t => t.id === taskToUpdate.id);
-      taskToUpdate.order = existingTask?.order ?? tasks.filter(t => !t.parentId).length;
-    }
+    let newTasksList = tasks.map(task =>
+      task.id === updatedTask.id ? { ...task, ...updatedTask, applicants: updatedTask.applicants || [] } : task
+    );
 
+    let toastDescription = `"${updatedTask.title}" has been saved.`;
 
-    updateTaskMutation.mutate(taskToUpdate, {
-      onSuccess: () => {
-        let toastDescription = `"${taskToUpdate.title}" has been saved.`;
-        if (newSubTasksToCreate && newSubTasksToCreate.length > 0) {
-          newSubTasksToCreate.forEach(subTask => {
-            const subTaskWithParent = {
-              ...subTask,
-              parentId: taskToUpdate.id,
-              order: undefined, 
-              applicants: [], 
-            };
-            addTaskMutation.mutate(subTaskWithParent);
-          });
-          toastDescription += ` ${newSubTasksToCreate.length} new sub-task${newSubTasksToCreate.length > 1 ? 's were' : ' was'} added.`;
-          
-          if (taskToUpdate.completed && !taskToUpdate.parentId) {
-             const hasIncompleteNewSubtasks = newSubTasksToCreate.some(st => !st.completed);
-             if (hasIncompleteNewSubtasks) {
-                const reIncompleteParent = {...taskToUpdate, completed: false, applicants: taskToUpdate.applicants || []};
-                if (typeof reIncompleteParent.order === 'undefined' && !reIncompleteParent.parentId) {
-                  reIncompleteParent.order = tasks.filter(t => !t.parentId).length;
-                }
-                updateTaskMutation.mutate(reIncompleteParent);
-             }
-          }
+    if (newSubTasksToCreate && newSubTasksToCreate.length > 0) {
+      const subTasksWithParent = newSubTasksToCreate.map((subTask, index) => ({
+        ...subTask,
+        id: subTask.id || generateId(),
+        parentId: updatedTask.id,
+        createdAt: Date.now() + index + 1,
+        applicants: [],
+        color: subTask.color || '#CCCCCC', // Ensure color
+        order: undefined, // Sub-tasks don't have main order
+      }));
+      newTasksList = [...newTasksList, ...subTasksWithParent];
+      toastDescription += ` ${newSubTasksToCreate.length} new sub-task${newSubTasksToCreate.length > 1 ? 's were' : ' was'} added.`;
+
+      // If main task was complete but new incomplete subtasks added, mark main task incomplete
+      if (updatedTask.completed && !updatedTask.parentId) {
+        const hasIncompleteNewSubtasks = newSubTasksToCreate.some(st => !st.completed);
+        if (hasIncompleteNewSubtasks) {
+          newTasksList = newTasksList.map(t =>
+            t.id === updatedTask.id ? { ...t, completed: false } : t
+          );
         }
-        toast({
-          title: "ToonDo Updated!",
-          description: toastDescription,
-        });
       }
+    }
+    setTasks(newTasksList);
+    toast({
+      title: "ToonDo Updated!",
+      description: toastDescription,
     });
     handleCloseEditDialog();
   };
@@ -289,15 +148,8 @@ function HomePageContent() {
     if (!taskToToggle) return;
 
     const newCompletedStatus = !taskToToggle.completed;
-    let taskWithUpdate = { ...taskToToggle, completed: newCompletedStatus, applicants: taskToToggle.applicants || [] };
-    
-    // Ensure order is defined for main tasks
-    if (typeof taskWithUpdate.order === 'undefined' && !taskWithUpdate.parentId) {
-        taskWithUpdate.order = tasks.filter(t => !t.parentId).length;
-    }
 
-
-    if (!taskToToggle.parentId) { 
+    if (!taskToToggle.parentId) { // Main task
       const subTasks = tasks.filter(t => t.parentId === id);
       const hasIncompleteSubtasks = subTasks.some(st => !st.completed);
 
@@ -305,52 +157,73 @@ function HomePageContent() {
         toast({
           title: "Still have work to do!",
           description: `"${taskToToggle.title}" cannot be completed until all its sub-tasks are done.`,
-          variant: "default", 
+          variant: "default",
         });
-        return; 
+        return;
       }
-      updateTaskMutation.mutate(taskWithUpdate);
-    } else { 
-      updateTaskMutation.mutate(taskWithUpdate, {
-        onSuccess: () => {
-          const parentId = taskToToggle.parentId;
-          if (parentId) {
-            queryClient.refetchQueries({queryKey: ['tasks']}).then(() => {
-              const currentTasks = queryClient.getQueryData<Task[]>(['tasks']) ?? [];
-              const parentTask = currentTasks.find(t => t.id === parentId);
-              if (parentTask) {
-                const siblingSubTasks = currentTasks.filter(t => t.parentId === parentId);
-                const allSubTasksNowComplete = siblingSubTasks.every(st => st.completed);
-                
-                let parentToUpdate = {...parentTask, applicants: parentTask.applicants || []};
-                 if (typeof parentToUpdate.order === 'undefined' && !parentToUpdate.parentId) {
-                    parentToUpdate.order = tasks.filter(t => !t.parentId).length;
-                 }
-
-
-                if (allSubTasksNowComplete) {
-                  if (!parentTask.completed) {
-                    updateTaskMutation.mutate({ ...parentToUpdate, completed: true });
-                  }
-                } else { 
-                  if (parentTask.completed) {
-                    updateTaskMutation.mutate({ ...parentToUpdate, completed: false });
-                  }
-                }
-              }
-            });
-          }
-        }
-      });
     }
+
+    setTasks(prevTasks => {
+      let newTasks = prevTasks.map(task =>
+        task.id === id ? { ...task, completed: newCompletedStatus } : task
+      );
+
+      if (taskToToggle.parentId && newCompletedStatus) { // Sub-task completed
+        const parentId = taskToToggle.parentId;
+        const siblingSubTasks = newTasks.filter(t => t.parentId === parentId);
+        const allSubTasksNowComplete = siblingSubTasks.every(st => st.completed);
+        if (allSubTasksNowComplete) {
+          newTasks = newTasks.map(t =>
+            t.id === parentId ? { ...t, completed: true } : t
+          );
+        }
+      } else if (taskToToggle.parentId && !newCompletedStatus) { // Sub-task marked incomplete
+        const parentId = taskToToggle.parentId;
+         newTasks = newTasks.map(t =>
+            t.id === parentId ? { ...t, completed: false } : t
+          );
+      }
+      return newTasks;
+    });
   };
 
-  const handleDeleteTask = (task: Task) => {
-    if (!task || !task.id) {
+  const handleDeleteTask = (taskToDelete: Task) => {
+    if (!taskToDelete || !taskToDelete.id) {
       toast({title: "Error", description: "Task data is invalid for deletion.", variant: "destructive"});
       return;
     }
-    deleteTaskMutation.mutate({ taskId: task.id, originalParentId: task.parentId });
+
+    let tasksToRemoveIds = [taskToDelete.id];
+    let parentIdOfDeletedSubTask: string | undefined = undefined;
+
+    // If it's a main task, find and mark its sub-tasks for removal
+    if (!taskToDelete.parentId) {
+      const subTasksOfDeletedMain = tasks.filter(t => t.parentId === taskToDelete.id).map(st => st.id);
+      tasksToRemoveIds = [...tasksToRemoveIds, ...subTasksOfDeletedMain];
+    } else {
+      parentIdOfDeletedSubTask = taskToDelete.parentId;
+    }
+    
+    const newTasks = tasks.filter(task => !tasksToRemoveIds.includes(task.id));
+    
+    setTasks(prevTasks => {
+        let updatedTasks = prevTasks.filter(task => !tasksToRemoveIds.includes(task.id));
+        if (parentIdOfDeletedSubTask) {
+            const parentTask = updatedTasks.find(t => t.id === parentIdOfDeletedSubTask);
+            if (parentTask && !parentTask.completed) {
+                const remainingSubTasks = updatedTasks.filter(st => st.parentId === parentIdOfDeletedSubTask);
+                if (remainingSubTasks.length === 0 || remainingSubTasks.every(st => st.completed)) {
+                     updatedTasks = updatedTasks.map(t => t.id === parentIdOfDeletedSubTask ? {...t, completed: true} : t);
+                }
+            }
+        }
+        return updatedTasks;
+    });
+
+    toast({
+      title: "ToonDo Removed!",
+      description: `Task "${taskToDelete.title}" ${tasksToRemoveIds.length > 1 ? 'and its sub-tasks were' : 'was'} removed.`,
+    });
   };
   
   const actualPrint = useCallback(() => {
@@ -419,36 +292,41 @@ function HomePageContent() {
       return;
     }
 
-    const allMainTasksOriginal = tasks.filter(task => !task.parentId)
-                                    .sort((a,b) => (a.order ?? (a.createdAt ?? 0) as number) - ((b.order ?? (b.createdAt ?? 0)) as number));
-    
-    const mainTaskIds = allMainTasksOriginal.map(t => t.id);
-    const draggedIdx = mainTaskIds.indexOf(draggedItemId);
-    const targetIdx = mainTaskIds.indexOf(droppedOnMainTaskId);
+    setTasks(prevTasks => {
+      const allMainTasksOriginal = prevTasks
+        .filter(task => !task.parentId)
+        .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
 
-    if (draggedIdx === -1 || targetIdx === -1) {
-      console.error("Drag and drop error: task ID not found in main task list.");
-      setDraggedItemId(null);
-      setDragOverItemId(null);
-      return;
-    }
+      const mainTaskIds = allMainTasksOriginal.map(t => t.id);
+      const draggedIdx = mainTaskIds.indexOf(draggedItemId);
+      const targetIdx = mainTaskIds.indexOf(droppedOnMainTaskId);
 
-    const itemToMove = mainTaskIds.splice(draggedIdx, 1)[0];
-    mainTaskIds.splice(targetIdx, 0, itemToMove);
+      if (draggedIdx === -1 || targetIdx === -1) {
+        console.error("Drag and drop error: task ID not found in main task list.");
+        return prevTasks;
+      }
 
-    const batch = writeBatch(db);
-    mainTaskIds.forEach((id, index) => {
-        const taskRef = doc(db, 'tasks', id);
-        batch.update(taskRef, { order: index });
+      // Reorder main task IDs
+      const itemToMove = mainTaskIds.splice(draggedIdx, 1)[0];
+      mainTaskIds.splice(targetIdx, 0, itemToMove);
+
+      // Create a new tasks array with updated order for main tasks
+      const newTasks = [...prevTasks];
+      mainTaskIds.forEach((id, index) => {
+        const taskIndexInNewTasks = newTasks.findIndex(t => t.id === id && !t.parentId);
+        if (taskIndexInNewTasks !== -1) {
+          newTasks[taskIndexInNewTasks] = { ...newTasks[taskIndexInNewTasks], order: index };
+        }
+      });
+      return newTasks.sort((a, b) => { // Re-sort to ensure sub-tasks follow parents
+        if (a.parentId && b.parentId) return (a.createdAt || 0) - (b.createdAt || 0);
+        if (a.parentId && !b.parentId) return a.parentId === b.id ? 1 : -1; // Simplified: needs improvement for multi-level
+        if (!a.parentId && b.parentId) return a.id === b.parentId ? -1 : 1;
+        return (a.order ?? Infinity) - (b.order ?? Infinity) || (a.createdAt || 0) - (b.createdAt || 0);
+      });
     });
-
-    batch.commit().then(() => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] }); 
-      toast({ title: "Tasks Reordered!", description: "Your ToonDos have a new sequence."});
-    }).catch(error => {
-      toast({ title: "Error reordering", description: error.message, variant: "destructive"});
-    });
     
+    toast({ title: "Tasks Reordered!", description: "Your ToonDos have a new sequence."});
     setDraggedItemId(null);
     setDragOverItemId(null);
   };
@@ -480,16 +358,6 @@ function HomePageContent() {
       <div className="container mx-auto px-4 py-8 min-h-screen flex flex-col items-center justify-center">
         <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
         <p className="text-xl text-muted-foreground">Loading your ToonDos...</p>
-      </div>
-    );
-  }
-
-  if (tasksError) {
-    return (
-      <div className="container mx-auto px-4 py-8 min-h-screen text-center text-destructive">
-        <h2 className="text-2xl font-semibold mb-2">Oops! Something went wrong.</h2>
-        <p>Could not load your ToonDos. Please try refreshing the page.</p>
-        <p className="text-sm mt-2">Error: {tasksError.message}</p>
       </div>
     );
   }
@@ -584,10 +452,8 @@ function HomePageContent() {
 }
 
 export default function HomePage() {
+  // QueryClientProvider is removed as we are not using react-query with localStorage
   return (
-    <QueryClientProvider client={queryClient}>
       <HomePageContent />
-    </QueryClientProvider>
   );
 }
-

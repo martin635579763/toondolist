@@ -1,10 +1,11 @@
 
+// This file is intentionally left blank or with comments
+// as Firebase usage has been removed for localStorage persistence.
+
+/*
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-// import { getAuth } from 'firebase/auth'; // For when you add authentication
 
-// Your web app's Firebase configuration
-// Replace with your actual Firebase project config
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -14,18 +15,36 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
 let app: FirebaseApp;
 let db: Firestore;
-// let auth: Auth; // For when you add authentication
 
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
+if (typeof window !== 'undefined') { // Ensure Firebase is initialized only on the client-side
+  if (getApps().length === 0) {
+    if (
+        firebaseConfig.apiKey &&
+        firebaseConfig.authDomain &&
+        firebaseConfig.projectId
+    ) {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+    } else {
+        console.warn("Firebase config is missing. Firebase will not be initialized.");
+        // @ts-ignore
+        app = null; 
+        // @ts-ignore
+        db = null;
+    }
+  } else {
+    app = getApps()[0]!;
+    db = getFirestore(app);
+  }
 } else {
-  app = getApps()[0]!;
+    // @ts-ignore
+    app = null;
+    // @ts-ignore
+    db = null;
 }
 
-db = getFirestore(app);
-// auth = getAuth(app); // For when you add authentication
 
-export { app, db /*, auth */ };
+export { app, db };
+*/
