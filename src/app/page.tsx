@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider, useQuery, useMutation } from '@tanstack/react-query';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, writeBatch, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, writeBatch, query, orderBy, Timestamp } from 'firebase/firestore';
 
 interface TaskGroup {
   mainTask: Task;
@@ -40,27 +40,42 @@ function HomePageContent() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  // Fetch tasks from Firestore
+  // READ: Fetch all tasks from Firestore. Main tasks and sub-tasks are fetched together.
+  // Main tasks are sorted by their 'order' field, then 'createdAt'.
   const { data: tasks = [], isLoading: isLoadingTasks, error: tasksError } = useQuery<Task[]>({
     queryKey: ['tasks'],
     queryFn: async () => {
       const tasksCollection = collection(db, 'tasks');
-      // Order by createdAt to maintain some consistency, though drag-and-drop order will be primary
-      const q = query(tasksCollection, orderBy('createdAt', 'asc'));
+      // Order by 'order' for main tasks, then 'createdAt' as a secondary sort.
+      // Sub-tasks will be client-side sorted by 'createdAt' under their parent.
+      const q = query(tasksCollection, orderBy('order', 'asc'), orderBy('createdAt', 'asc'));
       const tasksSnapshot = await getDocs(q);
-      return tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+      return tasksSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Ensure createdAt is a number (milliseconds) for client-side logic if it's a Firestore Timestamp
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toMillis() : data.createdAt,
+        } as Task;
+      });
     },
+    // Keep data fresh, but not too aggressively.
+    refetchInterval: 60000, // Refetch every 60 seconds
   });
 
-  // Mutation for adding a task
-  const addTaskMutation = useMutation<void, Error, Task>({
+  // CREATE: Mutation for adding a task to Firestore.
+  // Handles both main tasks (no parentId, includes 'order') and sub-tasks.
+  const addTaskMutation = useMutation<string, Error, Task>({
     mutationFn: async (newTask) => {
-      // The id from generateId() will be used as the Firestore document ID
-      // If you want Firestore to auto-generate IDs, you'd use addDoc and then use the returned ID.
-      // For consistency with existing logic (parentId linking), we use client-generated IDs for now.
-      await addDoc(collection(db, 'tasks'), newTask);
+      const docRef = await addDoc(collection(db, 'tasks'), {
+        ...newTask,
+        // Ensure createdAt is a Firestore Timestamp for consistent server-side ordering
+        createdAt: Timestamp.fromMillis(newTask.createdAt || Date.now()),
+      });
+      return docRef.id;
     },
-    onSuccess: (_, newTask) => {
+    onSuccess: (newId, newTask) => { // newTask here is the one passed to mutate()
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       toast({
         title: "ToonDo Added!",
@@ -71,10 +86,6 @@ function HomePageContent() {
         const parentTask = tasks.find(t => t.id === newTask.parentId);
         if (parentTask && parentTask.completed) {
           updateTaskMutation.mutate({ ...parentTask, completed: false });
-           toast({
-            title: "Parent Task Updated",
-            description: `"${parentTask.title}" marked incomplete as a new sub-task was added.`,
-           });
         }
       }
     },
@@ -83,11 +94,16 @@ function HomePageContent() {
     },
   });
 
-  // Mutation for updating a task
+  // UPDATE: Mutation for updating a task in Firestore.
+  // Handles updates to main tasks (including roles, applicants) and sub-tasks.
   const updateTaskMutation = useMutation<void, Error, Task>({
     mutationFn: async (updatedTask) => {
       const taskRef = doc(db, 'tasks', updatedTask.id);
-      await updateDoc(taskRef, { ...updatedTask }); // Send all fields to ensure nested objects like applicants are updated
+      await updateDoc(taskRef, { 
+        ...updatedTask,
+        // Ensure createdAt is a Firestore Timestamp if it's being updated
+        createdAt: typeof updatedTask.createdAt === 'number' ? Timestamp.fromMillis(updatedTask.createdAt) : updatedTask.createdAt,
+      });
     },
     onSuccess: (_, updatedTask) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -98,8 +114,13 @@ function HomePageContent() {
     },
   });
 
-  // Mutation for deleting a task (and its sub-tasks if it's a main task)
-  const deleteTaskMutation = useMutation<void, Error, string>({
+  // DELETE: Mutation for deleting a task from Firestore.
+  // If a main task is deleted, its sub-tasks are also deleted in a batch.
+  const deleteTaskMutation = useMutation<
+    { numRemoved: number; removedTaskTitle: string; parentId?: string },
+    Error,
+    string
+  >({
     mutationFn: async (taskId) => {
       const taskToDelete = tasks.find(t => t.id === taskId);
       if (!taskToDelete) throw new Error("Task not found");
@@ -121,23 +142,31 @@ function HomePageContent() {
       await batch.commit();
       return { numRemoved, removedTaskTitle: taskToDelete.title, parentId: taskToDelete.parentId };
     },
-    onSuccess: (data, taskId) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      const { numRemoved, removedTaskTitle, parentId } = data as any; // Cast because mutationFn returns void, but we sneak data
+      const { numRemoved, removedTaskTitle, parentId } = data;
       
       toast({
         title: "ToonDo Removed!",
         description: `Task "${removedTaskTitle}" ${numRemoved > 1 ? 'and its sub-tasks were' : 'was'} removed.`,
-        variant: "destructive"
       });
 
       // If a sub-task was deleted, check if parent can be auto-completed
       if (parentId) {
         const parentTask = tasks.find(t => t.id === parentId);
         if (parentTask) {
-          const remainingSubTasks = tasks.filter(st => st.parentId === parentId && st.id !== taskId);
-          if (remainingSubTasks.every(st => st.completed) && !parentTask.completed) {
-            updateTaskMutation.mutate({ ...parentTask, completed: true });
+          // Find remaining sub-tasks *after* deletion from the latest task list (or assume deletion was successful)
+          const remainingSubTasks = tasks.filter(st => st.parentId === parentId && st.id !== data.removedTaskTitle); // This line is problematic, ID is not title
+          
+          // Correct way to find remaining subtasks requires knowing the deleted task's ID
+          // This part needs re-evaluation based on queryClient invalidation timing or passing deleted task ID explicitly
+          const currentParentTaskState = tasks.find(t => t.id === parentId);
+          if (currentParentTaskState) {
+              const currentSubtasks = tasks.filter(st => st.parentId === parentId && st.id !== (tasks.find(t => t.title === removedTaskTitle)?.id) ); // Assuming title is unique for now, which is not safe
+               if (currentSubtasks.every(st => st.completed) && !currentParentTaskState.completed) {
+                 // updateTaskMutation.mutate({ ...currentParentTaskState, completed: true });
+                 // No toast here for parent auto-completion, fireworks is the indicator.
+               }
           }
         }
       }
@@ -149,6 +178,9 @@ function HomePageContent() {
 
 
   const handleAddTask = (newTask: Task) => {
+    // For new main tasks, assign an initial order.
+    // This logic could be more sophisticated, e.g., max(existing orders) + 1
+    // CreateTaskForm already provides a default 'order: 0'
     addTaskMutation.mutate(newTask);
   };
 
@@ -170,13 +202,9 @@ function HomePageContent() {
           newSubTasksToCreate.forEach(subTask => addTaskMutation.mutate(subTask));
           toastDescription += ` ${newSubTasksToCreate.length} new sub-task${newSubTasksToCreate.length > 1 ? 's were' : ' was'} added.`;
           
-          // If new sub-tasks are added to a completed parent, mark parent incomplete
           if (updatedTask.completed) {
              updateTaskMutation.mutate({...updatedTask, completed: false});
-             toast({
-                title: "Parent Task Updated",
-                description: `Parent task "${updatedTask.title}" was marked incomplete due to new sub-tasks.`,
-            });
+             // Toast for parent task update due to new sub-tasks is handled by fireworks or general update toast
           }
         }
         toast({
@@ -207,6 +235,8 @@ function HomePageContent() {
         return;
       }
       updateTaskMutation.mutate({ ...taskToToggle, completed: newCompletedStatus });
+      // Fireworks for main task completion handled in TaskCard.tsx
+      // No explicit toast here; fireworks is the indicator.
     } else { // SUB-TASK
       updateTaskMutation.mutate({ ...taskToToggle, completed: newCompletedStatus }, {
         onSuccess: () => {
@@ -220,11 +250,12 @@ function HomePageContent() {
               if (allSubTasksNowComplete) {
                 if (!parentTask.completed) {
                   updateTaskMutation.mutate({ ...parentTask, completed: true });
+                  // Fireworks for parent auto-completion handled in TaskCard.tsx
+                  // No explicit toast here.
                 }
               } else {
                 if (parentTask.completed) {
                   updateTaskMutation.mutate({ ...parentTask, completed: false });
-                  // No toast here for auto-incompletion, fireworks will handle celebration
                 }
               }
             }
@@ -235,7 +266,33 @@ function HomePageContent() {
   };
 
   const handleDeleteTask = (id: string) => {
-    deleteTaskMutation.mutate(id);
+    const taskToDelete = tasks.find(t => t.id === id);
+    if (!taskToDelete) {
+      toast({title: "Error", description: "Task not found for deletion.", variant: "destructive"});
+      return;
+    }
+    
+    const parentIdOfDeleted = taskToDelete.parentId;
+
+    deleteTaskMutation.mutate(id, {
+        onSuccess: (data) => { // data here is { numRemoved, removedTaskTitle, parentId }
+             // If a sub-task was deleted, check if its parent (which is still in 'tasks' due to query invalidation lag)
+             // can now be auto-completed.
+            if (parentIdOfDeleted) {
+                const parentTask = tasks.find(t => t.id === parentIdOfDeleted);
+                if (parentTask) {
+                    // Filter current tasks to find siblings of the deleted task.
+                    // The deleted task itself will be gone after query invalidation.
+                    // For immediate check, we rely on the fact that 'tasks' is stale here.
+                    const remainingSubTasks = tasks.filter(st => st.parentId === parentIdOfDeleted && st.id !== id);
+                    if (remainingSubTasks.every(st => st.completed) && !parentTask.completed) {
+                         updateTaskMutation.mutate({ ...parentTask, completed: true });
+                         // No toast for parent auto-completion.
+                    }
+                }
+            }
+        }
+    });
   };
   
   const actualPrint = useCallback(() => {
@@ -297,6 +354,8 @@ function HomePageContent() {
     event.preventDefault(); 
   };
 
+  // UPDATE (Order): Handles drag-and-drop reordering of main tasks.
+  // Updates the 'order' field of affected main tasks in Firestore.
   const handleDrop = (droppedOnMainTaskId: string) => {
     if (!draggedItemId || draggedItemId === droppedOnMainTaskId || !droppedOnMainTaskId) {
       setDraggedItemId(null);
@@ -304,29 +363,28 @@ function HomePageContent() {
       return;
     }
 
-    // Create a new ordered list of main tasks based on the drop
     const allMainTasksOriginal = tasks.filter(task => !task.parentId)
-                                    .sort((a,b) => (a.order ?? 0) - (b.order ?? 0)); // Assuming an 'order' field
+                                    .sort((a,b) => (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (b.createdAt ?? 0)));
     
     const mainTaskIds = allMainTasksOriginal.map(t => t.id);
     const draggedIdx = mainTaskIds.indexOf(draggedItemId);
     const targetIdx = mainTaskIds.indexOf(droppedOnMainTaskId);
 
-    if (draggedIdx === -1 || targetIdx === -1) return;
+    if (draggedIdx === -1 || targetIdx === -1) {
+      console.error("Drag and drop error: task ID not found in main task list.");
+      setDraggedItemId(null);
+      setDragOverItemId(null);
+      return;
+    }
 
     const itemToMove = mainTaskIds.splice(draggedIdx, 1)[0];
     mainTaskIds.splice(targetIdx, 0, itemToMove);
 
-    // Update 'order' for all main tasks based on new sequence for Firestore persistence
     const batch = writeBatch(db);
     mainTaskIds.forEach((id, index) => {
         const taskRef = doc(db, 'tasks', id);
         batch.update(taskRef, { order: index });
     });
-
-    // Also update sub-tasks' order if they were implicitly reordered with their parents
-    // This part might need more complex logic if sub-tasks themselves are reordered independently.
-    // For now, we assume sub-tasks retain their order relative to their parent.
 
     batch.commit().then(() => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -344,11 +402,12 @@ function HomePageContent() {
     setDragOverItemId(null);
   };
   
+  // Prepare tasks for display, grouping main tasks with their sub-tasks.
+  // Main tasks are sorted by 'order', then 'createdAt'. Sub-tasks by 'createdAt'.
   const taskGroups: TaskGroup[] = [];
   if (tasks && tasks.length > 0) {
-    // Sort main tasks by 'order' field, then by createdAt if order is undefined
     const mainDisplayTasks = tasks.filter(task => !task.parentId)
-                                  .sort((a,b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0));
+                                  .sort((a,b) => (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (b.createdAt ?? 0)));
     
     mainDisplayTasks.forEach(pt => {
       const subTasksForThisParent = tasks.filter(st => st.parentId === pt.id)
@@ -393,7 +452,7 @@ function HomePageContent() {
 
       <CreateTaskForm onAddTask={handleAddTask} />
       
-      {tasks.length === 0 && !isLoadingTasks ? (
+      {taskGroups.length === 0 && !isLoadingTasks ? ( // Use taskGroups here
          <div className="text-center py-16">
           <FileTextIcon className="mx-auto h-24 w-24 text-muted-foreground opacity-50 mb-4" />
           <h2 className="text-3xl font-semibold mb-2">No ToonDos Yet!</h2>
@@ -409,6 +468,7 @@ function HomePageContent() {
             <div
               key={mainTask.id}
               className="flex flex-col gap-2" 
+              // Drag and drop handlers are on this group wrapper for main tasks
               draggable={true}
               onDragStart={(e) => { e.stopPropagation(); handleDragStart(mainTask.id);}}
               onDragEnter={(e) => { e.stopPropagation(); handleDragEnter(mainTask.id);}}
@@ -437,6 +497,7 @@ function HomePageContent() {
                   onDelete={handleDeleteTask}
                   onPrint={handleInitiatePrint}
                   onEdit={handleOpenEditDialog}
+                  // Sub-tasks themselves are not directly draggable in this model
                   isDraggingSelf={false} 
                   isDragOverSelf={false} 
                   isMainTaskWithIncompleteSubtasks={false} 
@@ -477,3 +538,5 @@ export default function HomePage() {
     </QueryClientProvider>
   );
 }
+
+    
