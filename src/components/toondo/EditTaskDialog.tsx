@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon, UsersIcon, UserPlusIcon, UserCheckIcon, UserXIcon, CheckIcon, XIcon } from "lucide-react";
+import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon, UsersIcon, UserPlusIcon, Trash2Icon, CheckIcon, XIcon } from "lucide-react"; // Removed UserCheckIcon, UserXIcon
 import { format, parseISO } from "date-fns";
 import { cn, generateId } from "@/lib/utils";
 import { suggestDueDate } from "@/ai/flows/suggest-due-date";
@@ -48,7 +48,7 @@ const editTaskFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(100, "Title too long"),
   description: z.string().max(500, "Description too long").optional(),
   dueDate: z.date().nullable().optional(),
-  assignedRoles: z.string().optional(), // Comma-separated roles
+  assignedRoles: z.string().optional(), 
 });
 
 type EditTaskFormData = z.infer<typeof editTaskFormSchema>;
@@ -66,7 +66,6 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
   const [suggestedDateReasoning, setSuggestedDateReasoning] = useState<string | null>(null);
   const [newSubTaskSteps, setNewSubTaskSteps] = useState<TaskBreakdownStep[]>([]);
   
-  // State for managing applicants within the dialog
   const [currentApplicants, setCurrentApplicants] = useState<Applicant[]>([]);
   const [newApplicantName, setNewApplicantName] = useState('');
   const [selectedRoleForApplicant, setSelectedRoleForApplicant] = useState<string>('');
@@ -74,13 +73,15 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
 
   const { toast } = useToast();
 
-  const { register, handleSubmit, setValue, watch, formState: { errors }, reset } = useForm<EditTaskFormData>({
+  const { register, handleSubmit, setValue, watch, formState: { errors }, reset, getValues } = useForm<EditTaskFormData>({
     resolver: zodResolver(editTaskFormSchema),
   });
 
   const taskDescriptionForAISuggestion = watch("description");
   const taskTitleForAISuggestion = watch("title");
   const currentDueDate = watch("dueDate");
+  const currentAssignedRolesString = watch("assignedRoles");
+
 
   useEffect(() => {
     if (taskToEdit) {
@@ -182,11 +183,10 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
         app.id === applicantId ? { ...app, status: newStatus } : app
       );
 
-      // If accepting, ensure only one is accepted per role
       if (newStatus === 'accepted') {
         updatedApplicants = updatedApplicants.map(app => {
           if (app.role === applicantToUpdate.role && app.id !== applicantId && app.status === 'accepted') {
-            return { ...app, status: 'pending' }; // Or 'rejected', depending on desired logic
+            return { ...app, status: 'pending' }; 
           }
           return app;
         });
@@ -207,17 +207,23 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
       ? data.assignedRoles.split(',').map(role => role.trim()).filter(role => role !== "")
       : [];
 
-    const updatedTask: Task = {
-      ...taskToEdit,
+    const updatedTaskData: Partial<Task> = { // Use Partial<Task> as not all fields are directly from form
       title: data.title,
       description: data.description || "",
       dueDate: data.dueDate ? data.dueDate.toISOString() : null,
       assignedRoles: rolesArray.length > 0 ? rolesArray : undefined,
-      applicants: currentApplicants, // Save the managed applicants
+      applicants: currentApplicants,
     };
 
-    const subTasksToCreate: Task[] = newSubTaskSteps.map(step => {
+    const updatedTask: Task = {
+      ...taskToEdit,
+      ...updatedTaskData,
+    };
+
+
+    const subTasksToCreate: Task[] = newSubTaskSteps.map((step, index) => {
       if (step.step.trim() === "") return null;
+      const currentTime = Date.now();
       return {
         id: generateId(),
         title: step.step,
@@ -225,8 +231,10 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
         completed: false,
         dueDate: null, 
         color: getRandomColor(),
-        createdAt: Date.now() + 1, 
+        createdAt: currentTime + index + 1, 
         parentId: taskToEdit.id,
+        applicants: [],
+        order: index,
       };
     }).filter(task => task !== null) as Task[];
     
@@ -244,6 +252,8 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
     onClose();
   };
 
+  const parsedAssignedRoles = currentAssignedRolesString?.split(',').map(r => r.trim()).filter(r => r) || [];
+
 
   if (!taskToEdit) return null;
 
@@ -259,7 +269,7 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
               </DialogDescription>
             </DialogHeader>
             
-            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-3 custom-scrollbar">
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-3 custom-scrollbar"> {/* Added custom-scrollbar if you have one defined */}
               <div className="space-y-2">
                 <Label htmlFor="edit-title" className="text-lg font-semibold">Task Title</Label>
                 <Input
@@ -343,7 +353,7 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
                   {errors.dueDate && <p className="text-sm text-destructive">{errors.dueDate.message}</p>}
                 </div>
 
-                {!taskToEdit.parentId && ( // Only for main tasks
+                {!taskToEdit.parentId && ( 
                   <div className="space-y-2">
                     <Label htmlFor="edit-assignedRoles" className="text-lg font-semibold flex items-center">
                        <UsersIcon className="mr-2 h-5 w-5" /> Needed Roles/People
@@ -362,7 +372,7 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
               </div>
 
 
-              {!taskToEdit.parentId && ( // Section for main tasks only
+              {!taskToEdit.parentId && ( 
                 <>
                   <Card className="border-dashed border-secondary/50 mt-4">
                     <CardHeader className="pb-3">
@@ -386,22 +396,22 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
                           <Select 
                             value={selectedRoleForApplicant} 
                             onValueChange={setSelectedRoleForApplicant}
-                            disabled={!taskToEdit.assignedRoles || taskToEdit.assignedRoles.length === 0}
+                            disabled={!parsedAssignedRoles || parsedAssignedRoles.length === 0}
                           >
                             <SelectTrigger className="text-sm">
                               <SelectValue placeholder="Select a role" />
                             </SelectTrigger>
                             <SelectContent>
-                              {taskToEdit.assignedRoles && taskToEdit.assignedRoles.map(role => (
+                              {parsedAssignedRoles.map(role => (
                                 <SelectItem key={role} value={role} className="text-sm">{role}</SelectItem>
                               ))}
-                              {(!taskToEdit.assignedRoles || taskToEdit.assignedRoles.length === 0) && (
+                              {(!parsedAssignedRoles || parsedAssignedRoles.length === 0) && (
                                  <div className="px-2 py-1.5 text-sm text-muted-foreground">Define roles first</div>
                               )}
                             </SelectContent>
                           </Select>
                         </div>
-                        <Button type="button" onClick={handleAddApplicant} size="sm" className="sm:self-end" disabled={!taskToEdit.assignedRoles || taskToEdit.assignedRoles.length === 0}>
+                        <Button type="button" onClick={handleAddApplicant} size="sm" className="sm:self-end" disabled={!parsedAssignedRoles || parsedAssignedRoles.length === 0}>
                           <UserPlusIcon className="mr-1.5 h-4 w-4"/>Add Applicant
                         </Button>
                       </div>
@@ -456,10 +466,10 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
                           ))}
                         </div>
                       )}
-                      {currentApplicants.length === 0 && (!taskToEdit.assignedRoles || taskToEdit.assignedRoles.length === 0) && (
+                      {currentApplicants.length === 0 && (!parsedAssignedRoles || parsedAssignedRoles.length === 0) && (
                          <p className="text-xs text-center text-muted-foreground py-2">Define needed roles for this task first to add applicants.</p>
                       )}
-                       {currentApplicants.length === 0 && (taskToEdit.assignedRoles && taskToEdit.assignedRoles.length > 0) && (
+                       {currentApplicants.length === 0 && (parsedAssignedRoles && parsedAssignedRoles.length > 0) && (
                          <p className="text-xs text-center text-muted-foreground py-2">No applicants yet for the defined roles.</p>
                       )}
                     </CardContent>

@@ -16,7 +16,7 @@ import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIc
 import { format, parseISO } from "date-fns";
 import { cn, generateId } from "@/lib/utils";
 import { getRandomColor } from "@/lib/colors";
-import type { Task, TaskBreakdownStep } from "@/types/task"; // TaskBreakdownStep is now mainly for form state
+import type { Task, TaskBreakdownStep } from "@/types/task";
 import { suggestDueDate } from "@/ai/flows/suggest-due-date";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -45,7 +45,7 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
   const [isSuggestingDate, setIsSuggestingDate] = useState(false);
   const [suggestedDateReasoning, setSuggestedDateReasoning] = useState<string | null>(null);
   
-  const [manualBreakdownSummaryText, setManualBreakdownSummaryText] = useState<string>(""); // For user notes, not saved on task directly
+  const [manualBreakdownSummaryText, setManualBreakdownSummaryText] = useState<string>("");
   const [manualBreakdownSteps, setManualBreakdownSteps] = useState<TaskBreakdownStep[]>([]);
 
   const { toast } = useToast();
@@ -123,10 +123,12 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
   };
 
   const onSubmit: SubmitHandler<TaskFormData> = (data) => {
-    const mainTaskId = generateId();
+    const mainTaskId = generateId(); // Client-generated ID for consistency
     const rolesArray = data.assignedRoles 
       ? data.assignedRoles.split(',').map(role => role.trim()).filter(role => role !== "") 
       : [];
+    
+    const currentTime = Date.now();
 
     const mainTask: Task = {
       id: mainTaskId,
@@ -135,25 +137,27 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       completed: false,
       dueDate: data.dueDate ? data.dueDate.toISOString() : null,
       color: getRandomColor(),
-      createdAt: Date.now(),
+      createdAt: currentTime,
       assignedRoles: rolesArray.length > 0 ? rolesArray : undefined,
-      // parentId will be undefined for the main task
+      applicants: [], // Initialize applicants
+      order: 0, // Default order, will be managed by parent list
     };
-    onAddTask(mainTask); // Add the main task
+    onAddTask(mainTask);
 
-    // Create and add sub-tasks
-    manualBreakdownSteps.forEach(step => {
-      if (step.step.trim() === "") return; // Skip empty steps
+    manualBreakdownSteps.forEach((step, index) => {
+      if (step.step.trim() === "") return; 
 
       const subTask: Task = {
         id: generateId(),
         title: step.step,
         description: `${step.details || ""}${step.requiredRole ? ` (Role: ${step.requiredRole})` : ""}`.trim(),
         completed: false,
-        dueDate: null, // Sub-tasks don't inherit due date by default
+        dueDate: null, 
         color: getRandomColor(),
-        createdAt: Date.now() + 1, // Ensure subtasks sort slightly after parent if created at same millisecond
+        createdAt: currentTime + index + 1, 
         parentId: mainTaskId,
+        applicants: [],
+        order: index,
       };
       onAddTask(subTask);
     });
@@ -267,7 +271,6 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       </div>
 
 
-      {/* Manual Task Breakdown Section */}
       <Card className="border-dashed border-primary/50">
         <CardHeader className="pb-3">
           <CardTitle className="text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Task Breakdown to Sub-Tasks</CardTitle>

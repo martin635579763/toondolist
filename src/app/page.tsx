@@ -1,14 +1,14 @@
 
 "use client";
 
-import type { ReactNode} from 'react';
+import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Task } from '@/types/task'; // Applicant type is also imported if Task uses it
+import type { Task } from '@/types/task';
 import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
 import { EditTaskDialog } from '@/components/toondo/EditTaskDialog';
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
-import { FileTextIcon } from 'lucide-react';
+import { FileTextIcon, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 import {
@@ -17,7 +17,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
+import { QueryClient, QueryClientProvider, useQuery, useMutation } from '@tanstack/react-query';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, writeBatch, query, orderBy } from 'firebase/firestore';
 
 interface TaskGroup {
   mainTask: Task;
@@ -25,11 +27,12 @@ interface TaskGroup {
   mainTaskHasIncompleteSubtasks: boolean;
 }
 
-export default function HomePage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [taskToPrint, setTaskToPrint] = useState<Task | null>(null);
+const queryClient = new QueryClient();
+
+function HomePageContent() {
   const { toast, dismiss } = useToast();
   const printableAreaRef = useRef<HTMLDivElement>(null);
+  const [taskToPrint, setTaskToPrint] = useState<Task | null>(null);
 
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
@@ -37,60 +40,116 @@ export default function HomePage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  useEffect(() => {
-    const savedTasks = localStorage.getItem('toondoTasks');
-    if (savedTasks) {
-      try {
-        const parsedTasks: Task[] = JSON.parse(savedTasks);
-        // Ensure applicants field is an array if it exists, or initialize if not
-        const validatedTasks = parsedTasks.map(task => ({
-          ...task,
-          applicants: Array.isArray(task.applicants) ? task.applicants : []
-        }));
-        if (Array.isArray(validatedTasks)) {
-          setTasks(validatedTasks);
-        } else {
-          localStorage.removeItem('toondoTasks');
-        }
-      } catch (e) {
-        console.error("Failed to parse tasks from localStorage", e);
-        localStorage.removeItem('toondoTasks');
-      }
-    }
-  }, []);
+  // Fetch tasks from Firestore
+  const { data: tasks = [], isLoading: isLoadingTasks, error: tasksError } = useQuery<Task[]>({
+    queryKey: ['tasks'],
+    queryFn: async () => {
+      const tasksCollection = collection(db, 'tasks');
+      // Order by createdAt to maintain some consistency, though drag-and-drop order will be primary
+      const q = query(tasksCollection, orderBy('createdAt', 'asc'));
+      const tasksSnapshot = await getDocs(q);
+      return tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+    },
+  });
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (tasks.length > 0 || localStorage.getItem('toondoTasks') !== null) {
-         localStorage.setItem('toondoTasks', JSON.stringify(tasks));
+  // Mutation for adding a task
+  const addTaskMutation = useMutation<void, Error, Task>({
+    mutationFn: async (newTask) => {
+      // The id from generateId() will be used as the Firestore document ID
+      // If you want Firestore to auto-generate IDs, you'd use addDoc and then use the returned ID.
+      // For consistency with existing logic (parentId linking), we use client-generated IDs for now.
+      await addDoc(collection(db, 'tasks'), newTask);
+    },
+    onSuccess: (_, newTask) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast({
+        title: "ToonDo Added!",
+        description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
+      });
+       // If a new sub-task is added to a completed parent, mark parent incomplete
+      if (newTask.parentId) {
+        const parentTask = tasks.find(t => t.id === newTask.parentId);
+        if (parentTask && parentTask.completed) {
+          updateTaskMutation.mutate({ ...parentTask, completed: false });
+           toast({
+            title: "Parent Task Updated",
+            description: `"${parentTask.title}" marked incomplete as a new sub-task was added.`,
+           });
+        }
       }
-    }
-  }, [tasks]);
+    },
+    onError: (error) => {
+      toast({ title: "Error adding task", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Mutation for updating a task
+  const updateTaskMutation = useMutation<void, Error, Task>({
+    mutationFn: async (updatedTask) => {
+      const taskRef = doc(db, 'tasks', updatedTask.id);
+      await updateDoc(taskRef, { ...updatedTask }); // Send all fields to ensure nested objects like applicants are updated
+    },
+    onSuccess: (_, updatedTask) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      // Toast is handled by the calling function for more specific messages
+    },
+    onError: (error) => {
+      toast({ title: "Error updating task", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Mutation for deleting a task (and its sub-tasks if it's a main task)
+  const deleteTaskMutation = useMutation<void, Error, string>({
+    mutationFn: async (taskId) => {
+      const taskToDelete = tasks.find(t => t.id === taskId);
+      if (!taskToDelete) throw new Error("Task not found");
+
+      const batch = writeBatch(db);
+      const taskRef = doc(db, 'tasks', taskId);
+      batch.delete(taskRef);
+
+      let numRemoved = 1;
+      // If it's a main task, delete its sub-tasks
+      if (!taskToDelete.parentId) {
+        const subTasksToDelete = tasks.filter(t => t.parentId === taskId);
+        subTasksToDelete.forEach(subTask => {
+          const subTaskRef = doc(db, 'tasks', subTask.id);
+          batch.delete(subTaskRef);
+          numRemoved++;
+        });
+      }
+      await batch.commit();
+      return { numRemoved, removedTaskTitle: taskToDelete.title, parentId: taskToDelete.parentId };
+    },
+    onSuccess: (data, taskId) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      const { numRemoved, removedTaskTitle, parentId } = data as any; // Cast because mutationFn returns void, but we sneak data
+      
+      toast({
+        title: "ToonDo Removed!",
+        description: `Task "${removedTaskTitle}" ${numRemoved > 1 ? 'and its sub-tasks were' : 'was'} removed.`,
+        variant: "destructive"
+      });
+
+      // If a sub-task was deleted, check if parent can be auto-completed
+      if (parentId) {
+        const parentTask = tasks.find(t => t.id === parentId);
+        if (parentTask) {
+          const remainingSubTasks = tasks.filter(st => st.parentId === parentId && st.id !== taskId);
+          if (remainingSubTasks.every(st => st.completed) && !parentTask.completed) {
+            updateTaskMutation.mutate({ ...parentTask, completed: true });
+          }
+        }
+      }
+    },
+    onError: (error) => {
+      toast({ title: "Error deleting task", description: error.message, variant: "destructive" });
+    },
+  });
 
 
   const handleAddTask = (newTask: Task) => {
-    let affectedParentTitleForToast = "";
-    setTasks(prevTasks => {
-        let newTasksList = [...prevTasks, newTask];
-        if (newTask.parentId) { 
-            const parentIndex = newTasksList.findIndex(t => t.id === newTask.parentId);
-            if (parentIndex !== -1 && newTasksList[parentIndex].completed) {
-                newTasksList[parentIndex] = { ...newTasksList[parentIndex], completed: false };
-                affectedParentTitleForToast = newTasksList[parentIndex].title;
-            }
-        }
-        return newTasksList;
-    });
-    toast({
-      title: "ToonDo Added!",
-      description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
-    });
-    if (affectedParentTitleForToast) {
-        toast({
-            title: "Parent Task Updated",
-            description: `"${affectedParentTitleForToast}" marked incomplete as a new sub-task was added.`,
-        });
-    }
+    addTaskMutation.mutate(newTask);
   };
 
   const handleOpenEditDialog = (task: Task) => {
@@ -104,158 +163,79 @@ export default function HomePage() {
   };
 
   const handleUpdateTask = (updatedTask: Task, newSubTasksToCreate?: Task[]) => {
-    let mainTaskUpdated = false;
-    let subTasksAddedCount = 0;
-    let parentTaskAffectedByNewSubtasks = false;
-    let affectedParentTitle = "";
-
-    setTasks(prevTasks => {
-      let newTasks = prevTasks.map(task =>
-        task.id === updatedTask.id ? { ...task, ...updatedTask } : task
-      );
-      mainTaskUpdated = true;
-
-      if (newSubTasksToCreate && newSubTasksToCreate.length > 0) {
-        newTasks = [...newTasks, ...newSubTasksToCreate];
-        subTasksAddedCount = newSubTasksToCreate.length;
-
-        const parentIndex = newTasks.findIndex(t => t.id === updatedTask.id); 
-        if (parentIndex !== -1 && newTasks[parentIndex].completed) {
-          newTasks[parentIndex] = { ...newTasks[parentIndex], completed: false };
-          parentTaskAffectedByNewSubtasks = true;
-          affectedParentTitle = newTasks[parentIndex].title;
+    updateTaskMutation.mutate(updatedTask, {
+      onSuccess: () => {
+        let toastDescription = `"${updatedTask.title}" has been saved.`;
+        if (newSubTasksToCreate && newSubTasksToCreate.length > 0) {
+          newSubTasksToCreate.forEach(subTask => addTaskMutation.mutate(subTask));
+          toastDescription += ` ${newSubTasksToCreate.length} new sub-task${newSubTasksToCreate.length > 1 ? 's were' : ' was'} added.`;
+          
+          // If new sub-tasks are added to a completed parent, mark parent incomplete
+          if (updatedTask.completed) {
+             updateTaskMutation.mutate({...updatedTask, completed: false});
+             toast({
+                title: "Parent Task Updated",
+                description: `Parent task "${updatedTask.title}" was marked incomplete due to new sub-tasks.`,
+            });
+          }
         }
-      }
-      return newTasks;
-    });
-    
-    let toastDescription = `"${updatedTask.title}" has been saved.`;
-    if (subTasksAddedCount > 0) {
-      toastDescription += ` ${subTasksAddedCount} new sub-task${subTasksAddedCount > 1 ? 's were' : ' was'} added.`;
-    }
-    
-    if (mainTaskUpdated || subTasksAddedCount > 0) {
-      toast({
-        title: "ToonDo Updated!",
-        description: toastDescription,
-      });
-    }
-     if (parentTaskAffectedByNewSubtasks) {
         toast({
-            title: "Parent Task Updated",
-            description: `Parent task "${affectedParentTitle}" was marked incomplete due to new sub-tasks.`,
+          title: "ToonDo Updated!",
+          description: toastDescription,
         });
-    }
+      }
+    });
     handleCloseEditDialog();
   };
 
   const handleToggleComplete = (id: string) => {
-    let parentMarkedIncompleteTitle = "";
-    let taskThatTriggeredParentChange: Task | null = null;
-    
-    setTasks(prevTasks => {
-        const taskToToggle = prevTasks.find(t => t.id === id);
-        if (!taskToToggle) return prevTasks;
+    const taskToToggle = tasks.find(t => t.id === id);
+    if (!taskToToggle) return;
 
-        let newTasksState = [...prevTasks];
-        const taskIndex = newTasksState.findIndex(t => t.id === id);
+    const newCompletedStatus = !taskToToggle.completed;
 
-        if (!taskToToggle.parentId) { // MAIN TASK
-            const subTasks = newTasksState.filter(t => t.parentId === id);
-            const hasIncompleteSubtasks = subTasks.some(st => !st.completed);
+    if (!taskToToggle.parentId) { // MAIN TASK
+      const subTasks = tasks.filter(t => t.parentId === id);
+      const hasIncompleteSubtasks = subTasks.some(st => !st.completed);
 
-            if (!taskToToggle.completed && hasIncompleteSubtasks) { 
-                taskThatTriggeredParentChange = taskToToggle; 
-                return prevTasks; 
-            }
-            if (taskIndex !== -1) {
-                newTasksState[taskIndex] = { ...newTasksState[taskIndex], completed: !taskToToggle.completed };
-            }
-        } else { // SUB-TASK
-            if (taskIndex !== -1) {
-                newTasksState[taskIndex] = { ...newTasksState[taskIndex], completed: !taskToToggle.completed };
-                const parentId = newTasksState[taskIndex].parentId;
-                if (parentId) {
-                    const parentTaskIndex = newTasksState.findIndex(t => t.id === parentId);
-                    if (parentTaskIndex !== -1) {
-                        const parentTask = newTasksState[parentTaskIndex];
-                        const siblingSubTasks = newTasksState.filter(t => t.parentId === parentId);
-                        const allSubTasksNowComplete = siblingSubTasks.every(st => st.completed);
-
-                        if (allSubTasksNowComplete) {
-                            if (!parentTask.completed) { 
-                                newTasksState[parentTaskIndex] = { ...parentTask, completed: true };
-                            }
-                        } else { 
-                            if (parentTask.completed) { 
-                                newTasksState[parentTaskIndex] = { ...parentTask, completed: false };
-                                parentMarkedIncompleteTitle = parentTask.title;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return newTasksState;
-    });
-
-    if (taskThatTriggeredParentChange) {
-         toast({
-            title: "Still have work to do!",
-            description: `"${taskThatTriggeredParentChange.title}" cannot be completed until all its sub-tasks are done.`,
-            variant: "default",
+      if (newCompletedStatus && hasIncompleteSubtasks) {
+        toast({
+          title: "Still have work to do!",
+          description: `"${taskToToggle.title}" cannot be completed until all its sub-tasks are done.`,
+          variant: "default",
         });
-    }
-    if (parentMarkedIncompleteTitle) {
-        // This toast is intentionally forbidden when main task auto-incompletes due to sub-task change
-        // toast({ title: "Heads up!", description: `Main task "${parentMarkedIncompleteTitle}" marked incomplete as a sub-task was updated.` });
-    }
-};
+        return;
+      }
+      updateTaskMutation.mutate({ ...taskToToggle, completed: newCompletedStatus });
+    } else { // SUB-TASK
+      updateTaskMutation.mutate({ ...taskToToggle, completed: newCompletedStatus }, {
+        onSuccess: () => {
+          const parentId = taskToToggle.parentId;
+          if (parentId) {
+            const parentTask = tasks.find(t => t.id === parentId);
+            if (parentTask) {
+              const siblingSubTasks = tasks.filter(t => t.parentId === parentId);
+              const allSubTasksNowComplete = siblingSubTasks.every(st => st.id === id ? newCompletedStatus : st.completed);
 
+              if (allSubTasksNowComplete) {
+                if (!parentTask.completed) {
+                  updateTaskMutation.mutate({ ...parentTask, completed: true });
+                }
+              } else {
+                if (parentTask.completed) {
+                  updateTaskMutation.mutate({ ...parentTask, completed: false });
+                  // No toast here for auto-incompletion, fireworks will handle celebration
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+  };
 
   const handleDeleteTask = (id: string) => {
-    const taskToDelete = tasks.find(t => t.id === id);
-    if (!taskToDelete) return;
-
-    let numRemoved = 0;
-    let removedTaskTitle = taskToDelete.title;
-    
-    setTasks(prevTasks => {
-        const tasksToRemoveBasedOnCurrentState = new Set<string>([id]);
-        if (!taskToDelete.parentId) { 
-            prevTasks.forEach(t => {
-                if (t.parentId === id) {
-                    tasksToRemoveBasedOnCurrentState.add(t.id);
-                }
-            });
-        }
-        numRemoved = tasksToRemoveBasedOnCurrentState.size;
-        
-        let remainingTasks = prevTasks.filter(task => !tasksToRemoveBasedOnCurrentState.has(task.id));
-        
-        if (taskToDelete.parentId) {
-            const parentId = taskToDelete.parentId;
-            const parentTaskIndex = remainingTasks.findIndex(t => t.id === parentId);
-            if (parentTaskIndex !== -1) {
-                const parentTask = remainingTasks[parentTaskIndex];
-                const siblingSubTasks = remainingTasks.filter(t => t.parentId === parentId);
-                const allRemainingSubTasksComplete = siblingSubTasks.length === 0 || siblingSubTasks.every(st => st.completed);
-
-                if (allRemainingSubTasksComplete && !parentTask.completed) { 
-                    remainingTasks[parentTaskIndex] = { ...parentTask, completed: true };
-                }
-            }
-        }
-        return remainingTasks;
-    });
-    
-    const fullToastDescription = `Task "${removedTaskTitle}" ${numRemoved > 1 ? 'and its sub-tasks were' : 'was'} removed.`;
-
-    toast({
-      title: "ToonDo Removed!",
-      description: fullToastDescription,
-      variant: "destructive"
-    });
+    deleteTaskMutation.mutate(id);
   };
   
   const actualPrint = useCallback(() => {
@@ -324,47 +304,37 @@ export default function HomePage() {
       return;
     }
 
-    setTasks(prevTasks => {
-      const allMainTasksOriginal = prevTasks.filter(task => !task.parentId);
-      const mainTaskIds = allMainTasksOriginal.map(t => t.id);
+    // Create a new ordered list of main tasks based on the drop
+    const allMainTasksOriginal = tasks.filter(task => !task.parentId)
+                                    .sort((a,b) => (a.order ?? 0) - (b.order ?? 0)); // Assuming an 'order' field
+    
+    const mainTaskIds = allMainTasksOriginal.map(t => t.id);
+    const draggedIdx = mainTaskIds.indexOf(draggedItemId);
+    const targetIdx = mainTaskIds.indexOf(droppedOnMainTaskId);
 
-      const draggedIdx = mainTaskIds.indexOf(draggedItemId);
-      let targetIdx = mainTaskIds.indexOf(droppedOnMainTaskId);
+    if (draggedIdx === -1 || targetIdx === -1) return;
 
-      if (draggedIdx === -1 || targetIdx === -1) {
-        return prevTasks; 
-      }
+    const itemToMove = mainTaskIds.splice(draggedIdx, 1)[0];
+    mainTaskIds.splice(targetIdx, 0, itemToMove);
 
-      const itemToMove = mainTaskIds.splice(draggedIdx, 1)[0];
-      mainTaskIds.splice(targetIdx, 0, itemToMove);
-
-      const newFullTasksArray: Task[] = [];
-      const processedIds = new Set<string>();
-
-      mainTaskIds.forEach(id => {
-        const mainTask = prevTasks.find(t => t.id === id && !t.parentId);
-        if (mainTask) {
-          newFullTasksArray.push(mainTask);
-          processedIds.add(mainTask.id);
-          const subTasksOfThisParent = prevTasks
-            .filter(st => st.parentId === id)
-            .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); 
-          subTasksOfThisParent.forEach(st => {
-            newFullTasksArray.push(st);
-            processedIds.add(st.id);
-          });
-        }
-      });
-      
-      prevTasks.forEach(t => {
-        if (!processedIds.has(t.id)) {
-          newFullTasksArray.push(t);
-        }
-      });
-
-      return newFullTasksArray;
+    // Update 'order' for all main tasks based on new sequence for Firestore persistence
+    const batch = writeBatch(db);
+    mainTaskIds.forEach((id, index) => {
+        const taskRef = doc(db, 'tasks', id);
+        batch.update(taskRef, { order: index });
     });
 
+    // Also update sub-tasks' order if they were implicitly reordered with their parents
+    // This part might need more complex logic if sub-tasks themselves are reordered independently.
+    // For now, we assume sub-tasks retain their order relative to their parent.
+
+    batch.commit().then(() => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast({ title: "Tasks Reordered!", description: "Your ToonDos have a new sequence."});
+    }).catch(error => {
+      toast({ title: "Error reordering", description: error.message, variant: "destructive"});
+    });
+    
     setDraggedItemId(null);
     setDragOverItemId(null);
   };
@@ -375,14 +345,10 @@ export default function HomePage() {
   };
   
   const taskGroups: TaskGroup[] = [];
-  if (tasks.length > 0) {
-    const mainTaskOrderMap = new Map<string, number>();
-    tasks.filter(task => !task.parentId).forEach((task, index) => {
-        mainTaskOrderMap.set(task.id, index);
-    });
-    
+  if (tasks && tasks.length > 0) {
+    // Sort main tasks by 'order' field, then by createdAt if order is undefined
     const mainDisplayTasks = tasks.filter(task => !task.parentId)
-     .sort((a,b) => (mainTaskOrderMap.get(a.id) ?? Infinity) - (mainTaskOrderMap.get(b.id) ?? Infinity)); 
+                                  .sort((a,b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0));
     
     mainDisplayTasks.forEach(pt => {
       const subTasksForThisParent = tasks.filter(st => st.parentId === pt.id)
@@ -396,6 +362,24 @@ export default function HomePage() {
     });
   }
 
+  if (isLoadingTasks) {
+    return (
+      <div className="container mx-auto px-4 py-8 min-h-screen flex flex-col items-center justify-center">
+        <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+        <p className="text-xl text-muted-foreground">Loading your ToonDos...</p>
+      </div>
+    );
+  }
+
+  if (tasksError) {
+    return (
+      <div className="container mx-auto px-4 py-8 min-h-screen text-center text-destructive">
+        <h2 className="text-2xl font-semibold mb-2">Oops! Something went wrong.</h2>
+        <p>Could not load your ToonDos. Please try refreshing the page.</p>
+        <p className="text-sm mt-2">Error: {tasksError.message}</p>
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider>
@@ -409,7 +393,7 @@ export default function HomePage() {
 
       <CreateTaskForm onAddTask={handleAddTask} />
       
-      {tasks.length === 0 ? (
+      {tasks.length === 0 && !isLoadingTasks ? (
          <div className="text-center py-16">
           <FileTextIcon className="mx-auto h-24 w-24 text-muted-foreground opacity-50 mb-4" />
           <h2 className="text-3xl font-semibold mb-2">No ToonDos Yet!</h2>
@@ -483,5 +467,13 @@ export default function HomePage() {
       </footer>
     </div>
     </TooltipProvider>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <HomePageContent />
+    </QueryClientProvider>
   );
 }

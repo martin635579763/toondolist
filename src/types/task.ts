@@ -13,7 +13,7 @@ export interface Applicant {
 }
 
 export interface Task {
-  id: string;
+  id: string; // This will be the Firestore document ID
   title: string;
   description: string;
   completed: boolean;
@@ -23,4 +23,5 @@ export interface Task {
   parentId?: string; // ID of the parent task, if this is a sub-task
   assignedRoles?: string[]; // Optional array of strings for assigned roles/people (for main tasks)
   applicants?: Applicant[]; // Optional array of applicants for roles (for main tasks)
+  order?: number; // Optional field for drag-and-drop ordering
 }
