@@ -14,4 +14,5 @@ export interface Task {
   color: string; // Hex color string for card background
   createdAt: number; // Timestamp for sorting
   parentId?: string; // ID of the parent task, if this is a sub-task
+  assignedRoles?: string[]; // Optional array of strings for assigned roles/people
 }

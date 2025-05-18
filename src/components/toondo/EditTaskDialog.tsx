@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon } from "lucide-react";
+import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon, UsersIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn, generateId } from "@/lib/utils";
 import { suggestDueDate } from "@/ai/flows/suggest-due-date";
@@ -32,7 +32,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; // Added CardTitle
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getRandomColor } from "@/lib/colors";
 
 
@@ -40,6 +40,7 @@ const editTaskFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(100, "Title too long"),
   description: z.string().max(500, "Description too long").optional(),
   dueDate: z.date().nullable().optional(),
+  assignedRoles: z.string().optional(), // Comma-separated roles
 });
 
 type EditTaskFormData = z.infer<typeof editTaskFormSchema>;
@@ -48,7 +49,7 @@ interface EditTaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
   taskToEdit: Task | null;
-  onSaveTask: (updatedTask: Task, newSubTasksToCreate?: Task[]) => void; // Updated signature
+  onSaveTask: (updatedTask: Task, newSubTasksToCreate?: Task[]) => void;
 }
 
 export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: EditTaskDialogProps) {
@@ -72,11 +73,12 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
         title: taskToEdit.title,
         description: taskToEdit.description || "",
         dueDate: taskToEdit.dueDate ? parseISO(taskToEdit.dueDate) : null,
+        assignedRoles: taskToEdit.assignedRoles ? taskToEdit.assignedRoles.join(', ') : "",
       });
       setSuggestedDateReasoning(null);
-      setNewSubTaskSteps([]); // Clear any pending new sub-tasks
+      setNewSubTaskSteps([]);
     } else {
-      reset({ title: "", description: "", dueDate: null });
+      reset({ title: "", description: "", dueDate: null, assignedRoles: "" });
        setSuggestedDateReasoning(null);
        setNewSubTaskSteps([]);
     }
@@ -142,15 +144,20 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
   const onSubmit: SubmitHandler<EditTaskFormData> = (data) => {
     if (!taskToEdit) return;
 
+    const rolesArray = data.assignedRoles
+      ? data.assignedRoles.split(',').map(role => role.trim()).filter(role => role !== "")
+      : [];
+
     const updatedTask: Task = {
       ...taskToEdit,
       title: data.title,
       description: data.description || "",
       dueDate: data.dueDate ? data.dueDate.toISOString() : null,
+      assignedRoles: rolesArray.length > 0 ? rolesArray : undefined,
     };
 
     const subTasksToCreate: Task[] = newSubTaskSteps.map(step => {
-      if (step.step.trim() === "") return null; // Skip empty steps
+      if (step.step.trim() === "") return null;
       return {
         id: generateId(),
         title: step.step,
@@ -164,11 +171,11 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
     }).filter(task => task !== null) as Task[];
     
     onSaveTask(updatedTask, subTasksToCreate.length > 0 ? subTasksToCreate : undefined);
-    setNewSubTaskSteps([]); // Clear after saving
+    setNewSubTaskSteps([]); 
   };
   
   const handleDialogClose = () => {
-    reset({ title: "", description: "", dueDate: null }); 
+    reset({ title: "", description: "", dueDate: null, assignedRoles: "" }); 
     setSuggestedDateReasoning(null);
     setNewSubTaskSteps([]);
     onClose();
@@ -212,67 +219,87 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
                 {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="edit-dueDate" className="text-lg font-semibold">Due Date (Optional)</Label>
-                <div className="flex items-center gap-2">
-                  <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal h-10 text-base",
-                          !currentDueDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-5 w-5" />
-                        {currentDueDate ? format(currentDueDate, "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={currentDueDate || undefined}
-                        onSelect={(date) => {
-                          setValue("dueDate", date || null, { shouldValidate: true });
-                          setShowDatePicker(false);
-                          setSuggestedDateReasoning(null);
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        onClick={handleSuggestDueDate}
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 shrink-0"
-                        disabled={isSuggestingDate}
-                        aria-label="Suggest Due Date"
-                      >
-                        {isSuggestingDate ? <Loader2 className="h-5 w-5 animate-spin" /> : <SparklesIcon className="h-5 w-5 text-primary" />}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Suggest Due Date with AI</TooltipContent>
-                  </Tooltip>
-                  {suggestedDateReasoning && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <InfoIcon className="h-5 w-5 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p className="text-sm font-medium">AI Suggestion Reasoning:</p>
-                          <p className="text-xs">{suggestedDateReasoning}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-dueDate" className="text-lg font-semibold">Due Date (Optional)</Label>
+                  <div className="flex items-center gap-2">
+                    <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal h-10 text-base",
+                            !currentDueDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-5 w-5" />
+                          {currentDueDate ? format(currentDueDate, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={currentDueDate || undefined}
+                          onSelect={(date) => {
+                            setValue("dueDate", date || null, { shouldValidate: true });
+                            setShowDatePicker(false);
+                            setSuggestedDateReasoning(null);
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          onClick={handleSuggestDueDate}
+                          variant="ghost"
+                          size="icon"
+                          className="h-10 w-10 shrink-0"
+                          disabled={isSuggestingDate}
+                          aria-label="Suggest Due Date"
+                        >
+                          {isSuggestingDate ? <Loader2 className="h-5 w-5 animate-spin" /> : <SparklesIcon className="h-5 w-5 text-primary" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Suggest Due Date with AI</TooltipContent>
+                    </Tooltip>
+                    {suggestedDateReasoning && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <InfoIcon className="h-5 w-5 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm font-medium">AI Suggestion Reasoning:</p>
+                            <p className="text-xs">{suggestedDateReasoning}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                  </div>
+                  {errors.dueDate && <p className="text-sm text-destructive">{errors.dueDate.message}</p>}
                 </div>
-                {errors.dueDate && <p className="text-sm text-destructive">{errors.dueDate.message}</p>}
+
+                {!taskToEdit.parentId && (
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-assignedRoles" className="text-lg font-semibold flex items-center">
+                       <UsersIcon className="mr-2 h-5 w-5" /> Assign Roles/People
+                    </Label>
+                    <Input
+                      id="edit-assignedRoles"
+                      {...register("assignedRoles")}
+                      placeholder="e.g., Designer, Bass Player"
+                      className="text-base"
+                      aria-describedby="edit-roles-description"
+                    />
+                    <p id="edit-roles-description" className="text-xs text-muted-foreground">Comma-separated list of roles or names.</p>
+                    {errors.assignedRoles && <p className="text-sm text-destructive">{errors.assignedRoles.message}</p>}
+                  </div>
+                )}
               </div>
 
-              {!taskToEdit.parentId && ( // Only show for main tasks
+
+              {!taskToEdit.parentId && (
                 <Card className="border-dashed border-primary/50 mt-4">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Add New Sub-Tasks</CardTitle>
@@ -348,5 +375,3 @@ export function EditTaskDialog({ isOpen, onClose, taskToEdit, onSaveTask }: Edit
     </Dialog>
   );
 }
-
-    

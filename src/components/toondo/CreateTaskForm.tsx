@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon } from "lucide-react";
+import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon, UsersIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn, generateId } from "@/lib/utils";
 import { getRandomColor } from "@/lib/colors";
@@ -31,6 +31,7 @@ const taskFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(100, "Title too long"),
   description: z.string().max(500, "Description too long").optional(),
   dueDate: z.date().nullable().optional(),
+  assignedRoles: z.string().optional(), // Comma-separated roles
 });
 
 type TaskFormData = z.infer<typeof taskFormSchema>;
@@ -55,6 +56,7 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       title: "",
       description: "",
       dueDate: null,
+      assignedRoles: "",
     },
   });
 
@@ -92,9 +94,6 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       }
     } catch (error) {
       console.error("Error suggesting due date:", error);
-      // Check if genkit is configured, if not, provide a more specific message.
-      // This requires a way to check genkit configuration status from here, which might be tricky.
-      // For now, a generic error is shown.
       let description = "Could not suggest a due date. Please try again or set it manually.";
       if (error instanceof Error && (error.message.includes('plugin not configured') || error.message.includes('GOOGLE_API_KEY'))) {
         description = "Could not suggest a due date. AI features may not be configured (e.g., API key missing).";
@@ -125,6 +124,10 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
 
   const onSubmit: SubmitHandler<TaskFormData> = (data) => {
     const mainTaskId = generateId();
+    const rolesArray = data.assignedRoles 
+      ? data.assignedRoles.split(',').map(role => role.trim()).filter(role => role !== "") 
+      : [];
+
     const mainTask: Task = {
       id: mainTaskId,
       title: data.title,
@@ -133,6 +136,7 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       dueDate: data.dueDate ? data.dueDate.toISOString() : null,
       color: getRandomColor(),
       createdAt: Date.now(),
+      assignedRoles: rolesArray.length > 0 ? rolesArray : undefined,
       // parentId will be undefined for the main task
     };
     onAddTask(mainTask); // Add the main task
@@ -185,65 +189,83 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
         {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
       </div>
       
-      <div className="space-y-2 flex-grow">
-        <Label htmlFor="dueDate" className="text-lg font-semibold">Due Date (Optional)</Label>
-        <div className="flex items-center gap-2">
-          <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={cn(
-                  "w-full justify-start text-left font-normal h-10 text-base",
-                  !currentDueDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-5 w-5" />
-                {currentDueDate ? format(currentDueDate, "PPP") : <span>Pick a date</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={currentDueDate || undefined}
-                onSelect={(date) => {
-                  setValue("dueDate", date || null, { shouldValidate: true });
-                  setShowDatePicker(false);
-                  setSuggestedDateReasoning(null); 
-                }}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                onClick={handleSuggestDueDate}
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 shrink-0"
-                disabled={isSuggestingDate}
-                aria-label="Suggest Due Date"
-              >
-                {isSuggestingDate ? <Loader2 className="h-5 w-5 animate-spin" /> : <SparklesIcon className="h-5 w-5 text-primary" />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Suggest Due Date with AI</TooltipContent>
-          </Tooltip>
-            {suggestedDateReasoning && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <InfoIcon className="h-5 w-5 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p className="text-sm font-medium">AI Suggestion Reasoning:</p>
-                  <p className="text-xs">{suggestedDateReasoning}</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2 flex-grow">
+          <Label htmlFor="dueDate" className="text-lg font-semibold">Due Date (Optional)</Label>
+          <div className="flex items-center gap-2">
+            <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal h-10 text-base",
+                    !currentDueDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-5 w-5" />
+                  {currentDueDate ? format(currentDueDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={currentDueDate || undefined}
+                  onSelect={(date) => {
+                    setValue("dueDate", date || null, { shouldValidate: true });
+                    setShowDatePicker(false);
+                    setSuggestedDateReasoning(null); 
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  onClick={handleSuggestDueDate}
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                  disabled={isSuggestingDate}
+                  aria-label="Suggest Due Date"
+                >
+                  {isSuggestingDate ? <Loader2 className="h-5 w-5 animate-spin" /> : <SparklesIcon className="h-5 w-5 text-primary" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Suggest Due Date with AI</TooltipContent>
+            </Tooltip>
+              {suggestedDateReasoning && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <InfoIcon className="h-5 w-5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-sm font-medium">AI Suggestion Reasoning:</p>
+                    <p className="text-xs">{suggestedDateReasoning}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+          </div>
+          {errors.dueDate && <p className="text-sm text-destructive">{errors.dueDate.message}</p>}
         </div>
-        {errors.dueDate && <p className="text-sm text-destructive">{errors.dueDate.message}</p>}
+
+        <div className="space-y-2">
+          <Label htmlFor="assignedRoles" className="text-lg font-semibold flex items-center">
+            <UsersIcon className="mr-2 h-5 w-5" /> Assign Roles/People (Optional)
+          </Label>
+          <Input
+            id="assignedRoles"
+            {...register("assignedRoles")}
+            placeholder="e.g., Designer, Bass Player, Coder"
+            className="text-base"
+            aria-describedby="roles-description"
+          />
+           <p id="roles-description" className="text-xs text-muted-foreground">Comma-separated list of roles or names.</p>
+          {errors.assignedRoles && <p className="text-sm text-destructive">{errors.assignedRoles.message}</p>}
+        </div>
       </div>
+
 
       {/* Manual Task Breakdown Section */}
       <Card className="border-dashed border-primary/50">

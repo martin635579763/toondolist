@@ -5,7 +5,7 @@ import type { Task } from "@/types/task";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon, UsersIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getContrastingTextColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -71,9 +71,9 @@ export function TaskCard({
   const prevCompleted = useRef(task.completed);
 
   useEffect(() => {
-    if (task.completed && !prevCompleted.current && isMainTask) { // Main task just completed
+    if (task.completed && !prevCompleted.current && isMainTask) { 
       setShowFireworks(true);
-      const timer = setTimeout(() => setShowFireworks(false), 4000); // Increased animation duration to 4 seconds
+      const timer = setTimeout(() => setShowFireworks(false), 4000); 
       return () => clearTimeout(timer); 
     }
     prevCompleted.current = task.completed;
@@ -140,20 +140,20 @@ export function TaskCard({
         <div className="flex items-start justify-between">
           <CardTitle className={cn(
             "font-bold break-words",
-            isSubTask ? "text-base" : "text-2xl"
+            isSubTask ? "text-base" : "text-2xl" // Sub-task title size
           )} style={textStyle}>
             {task.title}
           </CardTitle>
           {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0", isSubTask ? "h-3.5 w-3.5 mt-0.5": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
         </div>
         {parentTask && isSubTask && (
-          <Badge variant="outline" className="mt-0.5 text-sm py-0 px-0.5 w-fit leading-tight" style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}>
+          <Badge variant="outline" className={cn("mt-0.5 py-0 px-0.5 w-fit leading-tight", isSubTask ? "text-sm" : "text-sm")} style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}>
             <Link2Icon className="mr-0.5 h-2.5 w-2.5" />
             Parent: {parentTask.title.length > 15 ? parentTask.title.substring(0, 12) + '...' : parentTask.title}
           </Badge>
         )}
         {task.description && (isSubTask ? (
-            <CardDescription className={cn("mt-0.5 break-words text-sm leading-snug max-h-10 overflow-y-auto")} style={{color: textColor, opacity: 0.85}}>
+            <CardDescription className={cn("mt-0.5 break-words leading-snug max-h-10 overflow-y-auto", isSubTask ? "text-sm" : "text-sm")} style={{color: textColor, opacity: 0.85}}>
                 {task.description.length > 50 ? task.description.substring(0, 47) + "..." : task.description}
             </CardDescription>
         ) : (
@@ -170,6 +170,22 @@ export function TaskCard({
           <div className={cn("flex items-center", isSubTask ? "text-sm" : "text-sm")} style={{color: textColor, opacity: 0.9}}>
             <CalendarDaysIcon className={cn("mr-0.5", isSubTask ? "h-3.5 w-3.5" : "h-3.5 w-3.5")} style={textStyle} />
             Due: {format(new Date(task.dueDate), "PP")}
+          </div>
+        )}
+
+        {isMainTask && task.assignedRoles && task.assignedRoles.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-dashed" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}}>
+            <h4 className="text-xs font-semibold uppercase flex items-center mb-1" style={mutedTextStyle}>
+              <UsersIcon className="mr-1.5 h-3.5 w-3.5" />
+              Assigned Roles:
+            </h4>
+            <div className="flex flex-wrap gap-1">
+              {task.assignedRoles.map((role, index) => (
+                <Badge key={index} variant="secondary" className="text-xs py-0.5 px-1.5" style={{backgroundColor: 'rgba(0,0,0,0.15)', color: textColor}}>
+                  {role}
+                </Badge>
+              ))}
+            </div>
           </div>
         )}
 
@@ -202,7 +218,7 @@ export function TaskCard({
 
         <div className={cn("flex items-center", isSubTask ? "pt-0.5 space-x-1" : "pt-2 space-x-2")}>
           <Tooltip>
-            <TooltipTrigger asChild disabled={!checkboxDisabled}>
+            <TooltipTrigger asChild disabled={checkboxDisabled}>
                 <Checkbox
                     id={`complete-${task.id}`}
                     checked={task.completed}
@@ -215,7 +231,7 @@ export function TaskCard({
                     disabled={checkboxDisabled}
                     className={cn(
                     "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white",
-                    isSubTask ? "h-3.5 w-3.5" : "h-5 w-5",
+                    isSubTask ? "h-3.5 w-3.5" : "h-5 w-5", // Sub-task checkbox size
                     textColor === '#FFFFFF' ? "border-white/70" : "border-black/50",
                     checkboxDisabled && "cursor-not-allowed opacity-70"
                     )}
@@ -234,7 +250,7 @@ export function TaskCard({
             id={`label-complete-${task.id}`}
             className={cn(
               "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-              isSubTask ? "text-sm" : "text-sm",
+              isSubTask ? "text-sm" : "text-sm", // Sub-task label size
               task.completed && "line-through",
               checkboxDisabled && "cursor-not-allowed opacity-70"
             )}
@@ -251,7 +267,7 @@ export function TaskCard({
       )}>
         <Button
           variant="ghost"
-          size={isSubTask ? "icon" : "icon"}
+          size={isSubTask ? "icon" : "icon"} // Sub-task button size
           onClick={(e) => { e.stopPropagation(); onEdit(task);}}
           className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
           style={{color: textColor}}
@@ -261,7 +277,7 @@ export function TaskCard({
         </Button>
         <Button
           variant="ghost"
-          size={isSubTask ? "icon" : "icon"}
+          size={isSubTask ? "icon" : "icon"} // Sub-task button size
           onClick={(e) => { e.stopPropagation(); onPrint(task);}}
           className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
           style={{color: textColor}}
@@ -271,7 +287,7 @@ export function TaskCard({
         </Button>
         <Button
           variant="ghost"
-          size={isSubTask ? "icon" : "icon"}
+          size={isSubTask ? "icon" : "icon"} // Sub-task button size
           onClick={(e) => { e.stopPropagation(); onDelete(task.id);}}
           className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
           style={{color: textColor}}
@@ -283,6 +299,3 @@ export function TaskCard({
     </Card>
   );
 }
-
-
-  
