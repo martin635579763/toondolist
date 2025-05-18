@@ -5,7 +5,7 @@ import type { Task, Applicant } from "@/types/task";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, GitForkIcon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getContrastingTextColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ interface TaskCardProps {
   task: Task;
   allTasks: Task[];
   onToggleComplete: (id: string) => void;
-  onDelete: (task: Task) => void; // Changed to accept full Task object
+  onDelete: (task: Task) => void;
   onPrint: (task: Task) => void;
   onEdit: (task: Task) => void;
   isDraggingSelf: boolean;
@@ -47,19 +47,18 @@ export function TaskCard({
   const parentTask = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
   const childTasks = allTasks.filter(t => t.parentId === task.id);
 
-  const polylineColor = "#000000"; 
-
   const cardStyle: React.CSSProperties = {
     backgroundColor: task.color,
     color: textColor,
     borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
   };
 
-  if (isSubTask) {
-    cardStyle.borderLeftWidth = '4px';
-    cardStyle.borderLeftColor = polylineColor;
-    cardStyle.borderLeftStyle = 'solid';
-  }
+  // Removed specific left border styling for sub-tasks
+  // if (isSubTask) {
+  //   cardStyle.borderLeftWidth = '4px';
+  //   cardStyle.borderLeftColor = '#000000'; // Hardcoded black polyline
+  //   cardStyle.borderLeftStyle = 'solid';
+  // }
 
   const textStyle = { color: textColor };
   const mutedTextStyle = { color: textColor, opacity: 0.8 };
@@ -126,14 +125,15 @@ export function TaskCard({
         </div>
       )}
 
-      {isSubTask && parentTask && (
+      {/* Removed GitForkIcon for sub-tasks */}
+      {/* {isSubTask && parentTask && (
          <GitForkIcon
             className="absolute top-2 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90" 
-            stroke={polylineColor}
+            stroke={'#000000'} // Hardcoded black
             strokeWidth={2.5}
             aria-hidden="true"
           />
-      )}
+      )} */}
       <CardHeader className={cn(
         isSubTask ? "p-1 pt-0.5 pb-0" : "p-6 pb-3" 
       )}>
@@ -228,7 +228,7 @@ export function TaskCard({
                     </div>
                      <ArrowRightIcon
                       className="ml-2 h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
-                      stroke={"#000000"} 
+                      stroke={"#000000"} // Hardcoded black
                     />
                   </li>
                 );
@@ -310,7 +310,7 @@ export function TaskCard({
         <Button
           variant="ghost"
           size={isSubTask ? "icon" : "icon"} 
-          onClick={(e) => { e.stopPropagation(); onDelete(task);}} // Pass full task object
+          onClick={(e) => { e.stopPropagation(); onDelete(task);}}
           className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
           style={{color: textColor}}
           aria-label="Delete task"
@@ -321,3 +321,4 @@ export function TaskCard({
     </Card>
   );
 }
+
