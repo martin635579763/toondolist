@@ -8,8 +8,9 @@ export interface TaskBreakdownStep {
 export interface Applicant {
   id: string;
   role: string; 
-  name: string;
+  name: string; // Name of the person applying
   status: 'pending' | 'accepted' | 'rejected';
+  applicantUserId: string; // ID of the user who applied
 }
 
 export interface Task {
@@ -25,8 +26,9 @@ export interface Task {
   applicants?: Applicant[]; 
   order?: number; // Optional field for drag-and-drop ordering
   
-  // User association
+  // User association (owner of the task)
   userId: string;
   userDisplayName: string;
   userAvatarUrl?: string;
 }
+

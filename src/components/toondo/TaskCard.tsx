@@ -1,11 +1,12 @@
 
 "use client";
 
-import type { Task } from "@/types/task";
+import type { Task, Applicant } from "@/types/task";
+import type { User } from "@/types/user";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getContrastingTextColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -15,17 +16,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
 interface TaskCardProps {
   task: Task;
   allTasks: Task[];
+  currentUser: User | null; // Pass current user for role application logic
   onToggleComplete: (id: string) => void;
   onDelete: (task: Task) => void;
   onPrint: (task: Task) => void;
   onEdit: (task: Task) => void;
+  onApplyForRole: (taskId: string, roleName: string) => void; // New handler for applying
   isDraggingSelf: boolean;
   isDragOverSelf: boolean;
   isMainTaskWithIncompleteSubtasks: boolean;
@@ -34,10 +36,12 @@ interface TaskCardProps {
 export function TaskCard({
   task,
   allTasks,
+  currentUser,
   onToggleComplete,
   onDelete,
   onPrint,
   onEdit,
+  onApplyForRole,
   isDraggingSelf,
   isDragOverSelf,
   isMainTaskWithIncompleteSubtasks
@@ -54,7 +58,7 @@ export function TaskCard({
     color: textColor,
     borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
   };
-
+  
   const textStyle = { color: textColor };
   const mutedTextStyle = { color: textColor, opacity: 0.8 };
   const veryMutedTextStyle = { color: textColor, opacity: 0.6 };
@@ -127,7 +131,7 @@ export function TaskCard({
           <div className="flex-grow">
             <CardTitle className={cn(
               "font-bold break-words",
-              isSubTask ? "text-base" : "text-2xl" 
+              isSubTask ? "text-base" : "text-2xl"  // Made sub-task title larger
             )} style={textStyle}>
               {task.title}
             </CardTitle>
@@ -185,37 +189,60 @@ export function TaskCard({
               <UsersIcon className="mr-1.5 h-3.5 w-3.5" />
               Needed Roles:
             </h4>
-            <div className="flex flex-col gap-1 text-xs">
+            <div className="flex flex-col gap-1.5 text-xs">
               {task.assignedRoles.map((role, index) => {
                 const acceptedApplicant = task.applicants?.find(app => app.role === role && app.status === 'accepted');
-                const pendingApplicants = task.applicants?.filter(app => app.role === role && app.status === 'pending') || [];
+                const currentUserApplication = currentUser ? task.applicants?.find(app => app.role === role && app.applicantUserId === currentUser.id) : null;
+                const pendingApplicantsCount = task.applicants?.filter(app => app.role === role && app.status === 'pending' && (!currentUser || app.applicantUserId !== currentUser.id)).length || 0;
+
                 return (
-                  <div key={index} className="flex items-center" style={textStyle}>
+                  <div key={index} className="flex items-center justify-between" style={textStyle}>
                     <span className="mr-1.5">- {role}:</span>
                     {acceptedApplicant ? (
                       <Badge variant="default" className="py-0 px-1.5 text-[10px] bg-green-500/80 hover:bg-green-500 text-white">
                         <UserCheckIcon className="h-3 w-3 mr-1"/> Filled by {acceptedApplicant.name}
                       </Badge>
-                    ) : pendingApplicants.length > 0 ? (
-                       <Badge variant="secondary" className="py-0 px-1.5 text-[10px]">
-                        <ClockIcon className="h-3 w-3 mr-1"/> {pendingApplicants.length} pending
-                      </Badge>
+                    ) : currentUserApplication ? (
+                       <Badge variant={currentUserApplication.status === 'pending' ? 'secondary' : 'destructive'} className="py-0 px-1.5 text-[10px]">
+                         <ClockIcon className="h-3 w-3 mr-1"/> Applied ({currentUserApplication.status})
+                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="py-0 px-1.5 text-[10px]" style={{borderColor: textColor, color: textColor}}>
-                        Open
-                      </Badge>
+                      <div className="flex items-center gap-1">
+                        {pendingApplicantsCount > 0 && (
+                           <Badge variant="secondary" className="py-0 px-1.5 text-[10px]">
+                             {pendingApplicantsCount} Pending
+                           </Badge>
+                        )}
+                        {currentUser && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-6 px-1.5 py-0 text-[10px]" 
+                            style={{
+                              backgroundColor: 'rgba(255,255,255,0.15)', 
+                              borderColor: textColor, 
+                              color: textColor,
+                              lineHeight: 'normal'
+                            }}
+                            onClick={(e) => { e.stopPropagation(); onApplyForRole(task.id, role); }}
+                          >
+                            <ApplyIcon className="h-3 w-3 mr-0.5"/> Apply
+                          </Button>
+                        )}
+                        {!currentUser && pendingApplicantsCount === 0 && (
+                            <Badge variant="outline" className="py-0 px-1.5 text-[10px]" style={{borderColor: textColor, color: textColor}}>
+                                Open
+                            </Badge>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
               })}
-               {(task.applicants?.length || 0) > 0 && (
-                <Button variant="link" size="sm" className="p-0 h-auto text-xs mt-1" style={{color: textColor}} onClick={(e) => { e.stopPropagation(); onEdit(task); }}>
-                    Manage Applicants...
-                </Button>
-              )}
             </div>
           </div>
         )}
+
 
         {isMainTask && childTasks.length > 0 && (
            <div className="mt-2 pt-2 border-t border-dashed" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}}>
@@ -233,7 +260,7 @@ export function TaskCard({
                       <span className={cn(subTaskFull?.completed && "line-through", "truncate max-w-[150px] sm:max-w-[200px]")}>{st.title}</span>
                     </div>
                      <ArrowRightIcon
-                      className="ml-2 h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
+                      className="ml-2 h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                       stroke={"#000000"} 
                     />
                   </li>
@@ -327,3 +354,4 @@ export function TaskCard({
     </Card>
   );
 }
+
