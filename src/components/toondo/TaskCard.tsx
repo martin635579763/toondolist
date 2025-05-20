@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Task, Applicant } from "@/types/task";
+import type { Task } from "@/types/task";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +15,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
 interface TaskCardProps {
@@ -52,13 +54,6 @@ export function TaskCard({
     color: textColor,
     borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
   };
-
-  // Removed specific left border styling for sub-tasks
-  // if (isSubTask) {
-  //   cardStyle.borderLeftWidth = '4px';
-  //   cardStyle.borderLeftColor = '#000000'; // Hardcoded black polyline
-  //   cardStyle.borderLeftStyle = 'solid';
-  // }
 
   const textStyle = { color: textColor };
   const mutedTextStyle = { color: textColor, opacity: 0.8 };
@@ -125,27 +120,38 @@ export function TaskCard({
         </div>
       )}
 
-      {/* Removed GitForkIcon for sub-tasks */}
-      {/* {isSubTask && parentTask && (
-         <GitForkIcon
-            className="absolute top-2 left-[-12px] h-4 w-4 transform -translate-x-1/2 rotate-90" 
-            stroke={'#000000'} // Hardcoded black
-            strokeWidth={2.5}
-            aria-hidden="true"
-          />
-      )} */}
       <CardHeader className={cn(
         isSubTask ? "p-1 pt-0.5 pb-0" : "p-6 pb-3" 
       )}>
         <div className="flex items-start justify-between">
-          <CardTitle className={cn(
-            "font-bold break-words",
-            isSubTask ? "text-base" : "text-2xl" 
-          )} style={textStyle}>
-            {task.title}
-          </CardTitle>
-          {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0", isSubTask ? "h-3.5 w-3.5 mt-0.5": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
+          <div className="flex-grow">
+            <CardTitle className={cn(
+              "font-bold break-words",
+              isSubTask ? "text-base" : "text-2xl" 
+            )} style={textStyle}>
+              {task.title}
+            </CardTitle>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0">
+            {isMainTask && task.userAvatarUrl && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Avatar className="h-8 w-8 border-2" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)'}}>
+                      <AvatarImage src={task.userAvatarUrl} alt={task.userDisplayName} data-ai-hint="user portrait" />
+                      <AvatarFallback style={{backgroundColor: task.color, color: textColor, borderStyle: 'solid', borderWidth: '1px', borderColor: textColor}}>
+                          {task.userDisplayName?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                  </Avatar>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">Quest Giver: {task.userDisplayName}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0", isSubTask ? "h-3.5 w-3.5 mt-0.5": "h-8 w-8" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
+          </div>
         </div>
+
         {parentTask && isSubTask && (
           <Badge variant="outline" className={cn("mt-0.5 py-0 px-0.5 w-fit leading-tight", isSubTask ? "text-sm" : "text-sm")} style={{ backgroundColor: 'rgba(0,0,0,0.1)', color: textColor }}>
             <Link2Icon className="mr-0.5 h-2.5 w-2.5" />
@@ -228,7 +234,7 @@ export function TaskCard({
                     </div>
                      <ArrowRightIcon
                       className="ml-2 h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
-                      stroke={"#000000"} // Hardcoded black
+                      stroke={"#000000"} 
                     />
                   </li>
                 );
@@ -321,4 +327,3 @@ export function TaskCard({
     </Card>
   );
 }
-

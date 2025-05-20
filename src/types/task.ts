@@ -24,4 +24,9 @@ export interface Task {
   assignedRoles?: string[]; 
   applicants?: Applicant[]; 
   order?: number; // Optional field for drag-and-drop ordering
+  
+  // User association
+  userId: string;
+  userDisplayName: string;
+  userAvatarUrl?: string;
 }

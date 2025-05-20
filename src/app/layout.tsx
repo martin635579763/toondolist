@@ -1,8 +1,10 @@
+
 import type {Metadata} from 'next';
 import { MedievalSharp } from 'next/font/google'; // Changed font
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
+import { AuthProvider } from '@/contexts/AuthContext';
 
 const medievalSharp = MedievalSharp({ // Changed font
   weight: ["400"], // MedievalSharp typically only has a 400 weight
@@ -23,8 +25,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={cn("min-h-screen bg-background font-sans antialiased", medievalSharp.variable)}>
-        <main>{children}</main>
-        <Toaster />
+        <AuthProvider>
+          <main>{children}</main>
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

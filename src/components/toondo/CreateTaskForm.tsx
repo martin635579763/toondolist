@@ -26,6 +26,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
 
 const taskFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(100, "Title too long"),
@@ -41,6 +42,7 @@ interface CreateTaskFormProps {
 }
 
 export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
+  const { currentUser } = useAuth();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSuggestingDate, setIsSuggestingDate] = useState(false);
   const [suggestedDateReasoning, setSuggestedDateReasoning] = useState<string | null>(null);
@@ -125,6 +127,11 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
   };
 
   const onSubmit: SubmitHandler<TaskFormData> = (data) => {
+    if (!currentUser) {
+      toast({ title: "Not Logged In", description: "You must be logged in to create tasks.", variant: "destructive" });
+      return;
+    }
+
     const mainTaskId = generateId(); 
     const rolesArray = data.assignedRoles 
       ? data.assignedRoles.split(',').map(role => role.trim()).filter(role => role !== "") 
@@ -142,7 +149,10 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       createdAt: currentTime,
       assignedRoles: rolesArray.length > 0 ? rolesArray : undefined,
       applicants: [], 
-      order: 0, 
+      order: 0, // Will be set properly in page.tsx based on current tasks count for user
+      userId: currentUser.id,
+      userDisplayName: currentUser.displayName,
+      userAvatarUrl: currentUser.avatarUrl,
     };
     onAddTask(mainTask);
 
@@ -159,6 +169,9 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
         createdAt: currentTime + index + 1, 
         parentId: mainTaskId,
         applicants: [],
+        userId: currentUser.id, // Sub-tasks also belong to the user
+        userDisplayName: currentUser.displayName,
+        userAvatarUrl: currentUser.avatarUrl,
         // order is not set for sub-tasks directly, they follow parent
       };
       onAddTask(subTask);
@@ -169,6 +182,15 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
     setManualBreakdownSummaryText("");
     setManualBreakdownSteps([]);
   };
+
+  if (!currentUser) {
+    return (
+      <Card className="p-6 bg-card shadow-xl rounded-xl mb-8 border border-border text-center">
+        <CardTitle className="text-xl">Welcome, Adventurer!</CardTitle>
+        <CardDescription className="mt-2">Please log in or register to create and manage your ToonDo quests.</CardDescription>
+      </Card>
+    );
+  }
 
   return (
     <TooltipProvider>
