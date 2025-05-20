@@ -54,8 +54,6 @@ function HomePageContent() {
 
   // Load tasks from localStorage on initial render
   useEffect(() => {
-    // No specific user filtering needed here for initial load from a global 'toondo-tasks'
-    // Filtering will happen when displaying or creating tasks
     const storedTasks = localStorage.getItem('toondo-tasks');
     let parsedTasks: Task[] = [];
     if (storedTasks) {
@@ -72,8 +70,8 @@ function HomePageContent() {
       ...task,
       applicants: task.applicants || [],
       assignedRoles: task.assignedRoles || [],
-      order: task.order ?? (task.parentId ? undefined : index),
-      userId: task.userId || 'unknown_user', // Default if tasks predate user system
+      order: task.order ?? (task.parentId ? undefined : index), // Default order for old tasks
+      userId: task.userId || 'unknown_user', 
       userDisplayName: task.userDisplayName || 'Unknown User',
       userAvatarUrl: task.userAvatarUrl || '',
     }));
@@ -84,7 +82,7 @@ function HomePageContent() {
 
   // Save tasks to localStorage whenever they change
   useEffect(() => {
-    if (!isLoadingTasks) { // Only save if initial load is done
+    if (!isLoadingTasks) { 
       localStorage.setItem('toondo-tasks', JSON.stringify(tasks));
     }
   }, [tasks, isLoadingTasks]);
@@ -112,9 +110,8 @@ function HomePageContent() {
     setTasks(prevTasks => {
       const updatedTasks = [...prevTasks, taskWithUserAndDefaults];
       if (newTask.parentId) {
-        // If a sub-task is added, and its parent was completed, un-complete the parent.
         const parentTask = updatedTasks.find(t => t.id === newTask.parentId);
-        if (parentTask && parentTask.completed) {
+        if (parentTask && parentTask.completed && !taskWithUserAndDefaults.completed) {
           toast({
             title: "Parent Task Updated",
             description: `"${parentTask.title}" marked as incomplete due to new sub-task.`,
@@ -150,49 +147,51 @@ function HomePageContent() {
     }
 
     let toastDescription = `"${updatedTask.title}" has been updated.`;
+    let shouldMarkParentIncomplete = false;
 
     setTasks(prevTasks => {
         let newTasksList = prevTasks.map(task =>
           task.id === updatedTask.id ? { 
             ...task, 
             ...updatedTask, 
-            applicants: updatedTask.applicants || [], // Ensure applicants array exists
+            applicants: updatedTask.applicants || [], 
             assignedRoles: updatedTask.assignedRoles || [],
-            userId: task.userId, // Preserve original owner
+            // userId, userDisplayName, userAvatarUrl are preserved from original task if not explicitly updated
+            userId: task.userId, 
             userDisplayName: task.userDisplayName,
             userAvatarUrl: task.userAvatarUrl,
           } : task
         );
 
         if (newSubTasksToCreate && newSubTasksToCreate.length > 0) {
+           const mainTaskInListForSubs = newTasksList.find(t => t.id === updatedTask.id);
+           if (!mainTaskInListForSubs) {
+             console.error("Parent task for new sub-tasks not found in list during update.");
+             return newTasksList; // Should not happen
+           }
+
           const subTasksWithParentAndUser = newSubTasksToCreate.map((subTask, index) => ({
             ...subTask,
             id: subTask.id || generateId(),
             parentId: updatedTask.id,
-            createdAt: Date.now() + index + 1, // Ensure unique createdAt for sorting sub-tasks
+            createdAt: Date.now() + index + 1, 
             applicants: [],
             assignedRoles: [],
             color: subTask.color || '#CCCCCC',
-            order: undefined, // Sub-tasks don't have main order
-            userId: updatedTask.userId, // Sub-tasks belong to the main task's owner
-            userDisplayName: updatedTask.userDisplayName,
-            userAvatarUrl: updatedTask.userAvatarUrl,
+            order: undefined, 
+            userId: mainTaskInListForSubs.userId, 
+            userDisplayName: mainTaskInListForSubs.userDisplayName,
+            userAvatarUrl: mainTaskInListForSubs.userAvatarUrl,
+            completed: subTask.completed || false, // Ensure completion status is set
           }));
           newTasksList = [...newTasksList, ...subTasksWithParentAndUser];
           toastDescription += ` ${newSubTasksToCreate.length} new sub-task${newSubTasksToCreate.length > 1 ? 's were' : ' was'} added.`;
-
-          // If new sub-tasks are added and the parent task was complete, mark parent as incomplete
-          const mainTaskInList = newTasksList.find(t => t.id === updatedTask.id);
-          if (mainTaskInList && mainTaskInList.completed && !mainTaskInList.parentId) {
-             newTasksList = newTasksList.map(t =>
-                t.id === updatedTask.id ? { ...t, completed: false } : t
-              );
-              if(newSubTasksToCreate.some(st => !st.completed)){
-                 toast({
-                    title: "Parent Task Updated",
-                    description: `"${updatedTask.title}" marked as incomplete due to new sub-task(s).`,
-                 });
-              }
+          
+          if (mainTaskInListForSubs && mainTaskInListForSubs.completed && subTasksWithParentAndUser.some(st => !st.completed)) {
+            shouldMarkParentIncomplete = true;
+            newTasksList = newTasksList.map(t =>
+              t.id === updatedTask.id ? { ...t, completed: false } : t
+            );
           }
         }
         return newTasksList;
@@ -202,6 +201,12 @@ function HomePageContent() {
       title: "ToonDo Updated!",
       description: toastDescription,
     });
+    if (shouldMarkParentIncomplete) {
+        toast({
+            title: "Parent Task Updated",
+            description: `"${updatedTask.title}" marked as incomplete due to new incomplete sub-task(s).`,
+        });
+    }
     handleCloseEditDialog();
   };
 
@@ -225,7 +230,6 @@ function HomePageContent() {
         task.id === id ? { ...task, completed: newCompletedStatus } : task
       );
 
-      // If a sub-task is toggled, check parent completion
       if (taskToToggle.parentId) {
         const parentId = taskToToggle.parentId;
         const parentTask = newTasks.find(t => t.id === parentId);
@@ -234,10 +238,8 @@ function HomePageContent() {
             const allSubTasksNowComplete = siblingSubTasks.every(st => st.completed);
 
             if (newCompletedStatus && allSubTasksNowComplete && !parentTask.completed) {
-                 // Parent auto-completes, fireworks handled by TaskCard
                  newTasks = newTasks.map(t => t.id === parentId ? { ...t, completed: true } : t);
             } else if (!newCompletedStatus && parentTask.completed) {
-                 // If a sub-task becomes incomplete, parent becomes incomplete
                  newTasks = newTasks.map(t => t.id === parentId ? { ...t, completed: false } : t);
                  toast({
                      title: "Parent Task Updated",
@@ -245,9 +247,6 @@ function HomePageContent() {
                  });
             }
         }
-      } else if (newCompletedStatus && !taskToToggle.parentId) {
-          // Main task completed directly (no sub-tasks or all were complete)
-          // Fireworks handled by TaskCard. No separate toast needed here for main task completion.
       }
       return newTasks;
     });
@@ -261,6 +260,8 @@ function HomePageContent() {
 
     let tasksToRemoveIds = [taskToDelete.id];
     let parentIdOfDeletedSubTask: string | undefined = undefined;
+    let deletedSubTaskWasIncomplete = !taskToDelete.completed && !!taskToDelete.parentId;
+
 
     if (!taskToDelete.parentId) { // Main task
       const subTasksOfDeletedMain = tasks.filter(t => t.parentId === taskToDelete.id).map(st => st.id);
@@ -276,7 +277,6 @@ function HomePageContent() {
         if (parentTask && !parentTask.completed) {
           const remainingSubTasks = updatedTasks.filter(st => st.parentId === parentIdOfDeletedSubTask);
           if (remainingSubTasks.length === 0 || remainingSubTasks.every(st => st.completed)) {
-            // Parent auto-completes, fireworks handled by TaskCard. No separate toast needed here for main task completion via sub-task deletion.
             updatedTasks = updatedTasks.map(t => t.id === parentIdOfDeletedSubTask ? { ...t, completed: true } : t);
           }
         }
@@ -374,12 +374,20 @@ function HomePageContent() {
   }, []);
 
   const handleDragStart = (mainTaskId: string) => {
-    setDraggedItemId(mainTaskId);
+    if (!currentUser) return; // Only allow dragging if current user owns the task.
+    const taskToDrag = tasks.find(t => t.id === mainTaskId);
+    if (taskToDrag && taskToDrag.userId === currentUser.id) {
+      setDraggedItemId(mainTaskId);
+    } else {
+      toast({title: "Cannot Reorder", description: "You can only reorder your own tasks.", variant: "default"});
+    }
   };
 
   const handleDragEnter = (mainTaskId: string) => {
-    if (mainTaskId !== draggedItemId) {
-      setDragOverItemId(mainTaskId);
+     if (!currentUser) return;
+    const taskToDragOver = tasks.find(t => t.id === mainTaskId);
+    if (taskToDragOver && taskToDragOver.userId === currentUser.id && mainTaskId !== draggedItemId) {
+        setDragOverItemId(mainTaskId);
     }
   };
   
@@ -397,18 +405,29 @@ function HomePageContent() {
       setDragOverItemId(null);
       return;
     }
+    
+    const draggedTask = tasks.find(t => t.id === draggedItemId);
+    const droppedOnTask = tasks.find(t => t.id === droppedOnMainTaskId);
+
+    if (!draggedTask || !droppedOnTask || draggedTask.userId !== currentUser.id || droppedOnTask.userId !== currentUser.id) {
+      toast({title: "Cannot Reorder", description: "You can only reorder your own tasks within your own task list.", variant: "default"});
+      setDraggedItemId(null);
+      setDragOverItemId(null);
+      return;
+    }
+
 
     setTasks(prevTasks => {
-      const allMainTasksOriginal = prevTasks
+      const allMainTasksForCurrentUser = prevTasks
         .filter(task => !task.parentId && task.userId === currentUser.id) 
         .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
 
-      const mainTaskIds = allMainTasksOriginal.map(t => t.id);
+      const mainTaskIds = allMainTasksForCurrentUser.map(t => t.id);
       const draggedIdx = mainTaskIds.indexOf(draggedItemId);
       const targetIdx = mainTaskIds.indexOf(droppedOnMainTaskId);
 
       if (draggedIdx === -1 || targetIdx === -1) {
-        console.error("Drag and drop error: task ID not found in main task list.");
+        console.error("Drag and drop error: task ID not found in current user's main task list.");
         return prevTasks;
       }
 
@@ -425,15 +444,17 @@ function HomePageContent() {
         return task; 
       });
       
+      // This sort ensures all user's tasks are grouped and ordered, then others.
       return newTasks.sort((a, b) => { 
+        if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
+        if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
+
         if (a.userId === currentUser.id && b.userId === currentUser.id) {
             if (!a.parentId && !b.parentId) return (a.order ?? Infinity) - (b.order ?? Infinity);
-            if (a.parentId && b.parentId && a.parentId === b.parentId) return (a.createdAt ?? 0) - (b.createdAt ?? 0);
-            if (a.parentId && !b.parentId) return a.parentId === b.id ? 1 : -1; 
-            if (!a.parentId && b.parentId) return a.id === b.parentId ? -1 : 1;
         }
-        // Fallback for tasks not belonging to current user or mixed types (should be rare with current filtering)
-        if (!a.parentId && !b.parentId) return (a.order ?? Infinity) - (b.order ?? Infinity); // Sort other users' main tasks by order
+        // Fallback sort for non-user tasks or mixed types
+        if (!a.parentId && !b.parentId) return (a.order ?? Infinity) - (b.order ?? Infinity);
+        if (a.parentId && b.parentId && a.parentId === b.parentId) return (a.createdAt ?? 0) - (b.createdAt ?? 0);
         return (a.createdAt ?? 0) - (b.createdAt ?? 0); // Default sort
       });
     });
@@ -453,13 +474,20 @@ function HomePageContent() {
     return subTasksForMain.some(st => !st.completed);
   };
 
+  // Prepare task groups for display. Now shows ALL main tasks.
   const taskGroups: TaskGroup[] = [];
-  if (currentUser && tasks && tasks.length > 0) {
-    const mainDisplayTasks = tasks.filter(task => !task.parentId && task.userId === currentUser.id)
-                                  .sort((a,b) => ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number));
+  if (tasks && tasks.length > 0) {
+    const allMainDisplayTasks = tasks.filter(task => !task.parentId) // Show all main tasks
+                                  .sort((a,b) => { // Sort primarily by user, then by order/createdAt
+                                      if (currentUser) {
+                                        if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
+                                        if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
+                                      }
+                                      return ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number);
+                                  });
     
-    mainDisplayTasks.forEach(pt => {
-      const subTasksForThisParent = tasks.filter(st => st.parentId === pt.id && st.userId === currentUser.id)
+    allMainDisplayTasks.forEach(pt => {
+      const subTasksForThisParent = tasks.filter(st => st.parentId === pt.id) // Show all sub-tasks for this parent
                                       .sort((a,b) => ((a.createdAt || 0) as number) - ((b.createdAt || 0) as number)); 
       const group: TaskGroup = {
         mainTask: pt,
@@ -566,7 +594,7 @@ function HomePageContent() {
                         <div
                           key={mainTask.id}
                           className="flex flex-col gap-2" 
-                          draggable={true} 
+                          draggable={currentUser && mainTask.userId === currentUser.id} // Only current user's tasks are draggable
                           onDragStart={(e) => { e.stopPropagation(); handleDragStart(mainTask.id);}}
                           onDragEnter={(e) => { e.stopPropagation(); handleDragEnter(mainTask.id);}}
                           onDragLeave={(e) => { e.stopPropagation(); handleDragLeave();}}
@@ -597,7 +625,7 @@ function HomePageContent() {
                               onDelete={handleDeleteTask} 
                               onPrint={handleInitiatePrint}
                               onEdit={handleOpenEditDialog}
-                              onApplyForRole={handleApplyForRole} // Sub-tasks won't use this, but prop must be passed
+                              onApplyForRole={handleApplyForRole} 
                               isDraggingSelf={false} 
                               isDragOverSelf={false}
                               isMainTaskWithIncompleteSubtasks={false} 
@@ -637,9 +665,7 @@ function HomePageContent() {
 }
 
 export default function HomePage() {
-  // AuthProvider is now in RootLayout
   return (
       <HomePageContent />
   );
 }
-
