@@ -2,7 +2,7 @@
 "use client";
 
 import type { Task, Applicant } from "@/types/task";
-import type { User } from "@/types/user";
+import type { User } from "@/types/user"; // Ensure User type is imported
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,12 +22,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 interface TaskCardProps {
   task: Task;
   allTasks: Task[];
-  currentUser: User | null; // Pass current user for role application logic
+  currentUser: User | null;
   onToggleComplete: (id: string) => void;
   onDelete: (task: Task) => void;
   onPrint: (task: Task) => void;
   onEdit: (task: Task) => void;
-  onApplyForRole: (taskId: string, roleName: string) => void; // New handler for applying
+  onApplyForRole: (taskId: string, roleName: string) => void;
   isDraggingSelf: boolean;
   isDragOverSelf: boolean;
   isMainTaskWithIncompleteSubtasks: boolean;
@@ -77,6 +77,20 @@ export function TaskCard({
     prevCompleted.current = task.completed;
   }, [task.completed, isMainTask]);
 
+  // Helper to get all users from localStorage, specific to this component's needs for applicant avatars
+  const getAllUsersFromStorage = (): User[] => {
+    if (typeof window !== 'undefined') {
+      const storedUsers = localStorage.getItem('toondo-users'); // Key used in AuthContext
+      try {
+        return storedUsers ? JSON.parse(storedUsers) : [];
+      } catch (e) {
+        console.error("Error parsing users from localStorage in TaskCard:", e);
+        return [];
+      }
+    }
+    return [];
+  };
+
 
   return (
     <Card
@@ -86,7 +100,7 @@ export function TaskCard({
         isSubTask && "ml-8 max-w-sm", 
         isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2",
         isDragOverSelf && "ring-2 ring-primary ring-offset-1 scale-102 shadow-2xl z-10",
-        !isDraggingSelf && isMainTask && "cursor-grab" 
+        !isDraggingSelf && isMainTask && currentUser && task.userId === currentUser.id && "cursor-grab" // Only owner can drag main task
       )}
       style={cardStyle}
     >
@@ -131,7 +145,7 @@ export function TaskCard({
           <div className="flex-grow">
             <CardTitle className={cn(
               "font-bold break-words",
-              isSubTask ? "text-base" : "text-2xl"  // Made sub-task title larger
+              isSubTask ? "text-base" : "text-2xl"
             )} style={textStyle}>
               {task.title}
             </CardTitle>
@@ -141,7 +155,7 @@ export function TaskCard({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Avatar className="h-8 w-8 border-2" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)'}}>
-                      <AvatarImage src={task.userAvatarUrl} alt={task.userDisplayName} data-ai-hint="user portrait" />
+                      <AvatarImage src={task.userAvatarUrl} alt={task.userDisplayName} data-ai-hint="user portrait"/>
                       <AvatarFallback style={{backgroundColor: task.color, color: textColor, borderStyle: 'solid', borderWidth: '1px', borderColor: textColor}}>
                           {task.userDisplayName?.charAt(0).toUpperCase()}
                       </AvatarFallback>
@@ -199,8 +213,26 @@ export function TaskCard({
                   <div key={index} className="flex items-center justify-between" style={textStyle}>
                     <span className="mr-1.5">- {role}:</span>
                     {acceptedApplicant ? (
-                      <Badge variant="default" className="py-0 px-1.5 text-[10px] bg-green-500/80 hover:bg-green-500 text-white">
-                        <UserCheckIcon className="h-3 w-3 mr-1"/> Filled by {acceptedApplicant.name}
+                      <Badge variant="default" className="py-0 px-1.5 text-[10px] bg-green-500/80 hover:bg-green-500 text-white flex items-center gap-1">
+                        <UserCheckIcon className="h-3 w-3"/>
+                        {(() => {
+                          const allUsers = getAllUsersFromStorage();
+                          const applicantUser = allUsers.find(u => u.id === acceptedApplicant.applicantUserId);
+                          if (applicantUser) {
+                            return (
+                              <>
+                                <Avatar className="h-4 w-4 border-white/50">
+                                  <AvatarImage src={applicantUser.avatarUrl} alt={applicantUser.displayName} data-ai-hint="user portrait"/>
+                                  <AvatarFallback className="text-[8px] bg-transparent text-white">
+                                    {applicantUser.displayName?.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                {applicantUser.displayName}
+                              </>
+                            );
+                          }
+                          return acceptedApplicant.name; // Fallback if user details not found
+                        })()}
                       </Badge>
                     ) : currentUserApplication ? (
                        <Badge variant={currentUserApplication.status === 'pending' ? 'secondary' : 'destructive'} className="py-0 px-1.5 text-[10px]">
@@ -213,7 +245,7 @@ export function TaskCard({
                              {pendingApplicantsCount} Pending
                            </Badge>
                         )}
-                        {currentUser && (
+                        {currentUser && task.userId !== currentUser.id && ( // User cannot apply for roles on their own tasks
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -232,6 +264,11 @@ export function TaskCard({
                         {!currentUser && pendingApplicantsCount === 0 && (
                             <Badge variant="outline" className="py-0 px-1.5 text-[10px]" style={{borderColor: textColor, color: textColor}}>
                                 Open
+                            </Badge>
+                        )}
+                         {currentUser && task.userId === currentUser.id && pendingApplicantsCount === 0 && !acceptedApplicant &&(
+                             <Badge variant="outline" className="py-0 px-1.5 text-[10px]" style={{borderColor: textColor, color: textColor}}>
+                                Open (Your Task)
                             </Badge>
                         )}
                       </div>
@@ -259,9 +296,9 @@ export function TaskCard({
                       {subTaskFull?.completed ? <CheckCircle2 className="mr-1.5 h-3 w-3 text-green-400 opacity-90" /> : <CircleDot className="mr-1.5 h-3 w-3 opacity-70" />}
                       <span className={cn(subTaskFull?.completed && "line-through", "truncate max-w-[150px] sm:max-w-[200px]")}>{st.title}</span>
                     </div>
-                     <ArrowRightIcon
+                    <ArrowRightIcon
                       className="ml-2 h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                      stroke={"#000000"} 
+                      stroke="#000000"
                     />
                   </li>
                 );
@@ -354,4 +391,3 @@ export function TaskCard({
     </Card>
   );
 }
-
