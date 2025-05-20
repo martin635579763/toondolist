@@ -145,7 +145,7 @@ export function TaskCard({
           <div className="flex-grow">
             <CardTitle className={cn(
               "font-bold break-words",
-              isSubTask ? "text-base" : "text-2xl"
+              isSubTask ? "text-base" : "text-2xl" // Title size for sub-tasks
             )} style={textStyle}>
               {task.title}
             </CardTitle>
@@ -208,6 +208,8 @@ export function TaskCard({
                 const acceptedApplicant = task.applicants?.find(app => app.role === role && app.status === 'accepted');
                 const currentUserApplication = currentUser ? task.applicants?.find(app => app.role === role && app.applicantUserId === currentUser.id) : null;
                 const pendingApplicantsCount = task.applicants?.filter(app => app.role === role && app.status === 'pending' && (!currentUser || app.applicantUserId !== currentUser.id)).length || 0;
+                const totalPendingForRole = task.applicants?.filter(app => app.role === role && app.status === 'pending').length || 0;
+
 
                 return (
                   <div key={index} className="flex items-center justify-between" style={textStyle}>
@@ -216,17 +218,20 @@ export function TaskCard({
                       <Badge variant="default" className="py-0 px-1.5 text-[10px] bg-green-500/80 hover:bg-green-500 text-white flex items-center gap-1">
                         <UserCheckIcon className="h-3 w-3"/>
                         {(() => {
+                          if (!acceptedApplicant.applicantUserId) return acceptedApplicant.name; // Manual applicant
                           const allUsers = getAllUsersFromStorage();
                           const applicantUser = allUsers.find(u => u.id === acceptedApplicant.applicantUserId);
                           if (applicantUser) {
                             return (
                               <>
-                                <Avatar className="h-4 w-4 border-white/50">
-                                  <AvatarImage src={applicantUser.avatarUrl} alt={applicantUser.displayName} data-ai-hint="user portrait"/>
-                                  <AvatarFallback className="text-[8px] bg-transparent text-white">
-                                    {applicantUser.displayName?.charAt(0).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
+                                {applicantUser.avatarUrl && (
+                                  <Avatar className="h-4 w-4 border-white/50">
+                                    <AvatarImage src={applicantUser.avatarUrl} alt={applicantUser.displayName} data-ai-hint="user portrait"/>
+                                    <AvatarFallback className="text-[8px] bg-transparent text-white">
+                                      {applicantUser.displayName?.charAt(0).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                )}
                                 {applicantUser.displayName}
                               </>
                             );
@@ -234,18 +239,29 @@ export function TaskCard({
                           return acceptedApplicant.name; // Fallback if user details not found
                         })()}
                       </Badge>
-                    ) : currentUserApplication ? (
+                    ) : currentUserApplication ? ( // Current user has applied for this role
                        <Badge variant={currentUserApplication.status === 'pending' ? 'secondary' : 'destructive'} className="py-0 px-1.5 text-[10px]">
                          <ClockIcon className="h-3 w-3 mr-1"/> Applied ({currentUserApplication.status})
                        </Badge>
-                    ) : (
+                    ) : ( // Role is open for the current user to apply for, or has other pending applicants
                       <div className="flex items-center gap-1">
-                        {pendingApplicantsCount > 0 && (
+                        {totalPendingForRole > 0 && (
                            <Badge variant="secondary" className="py-0 px-1.5 text-[10px]">
-                             {pendingApplicantsCount} Pending
+                             {totalPendingForRole} Pending
                            </Badge>
                         )}
-                        {currentUser && task.userId !== currentUser.id && ( // User cannot apply for roles on their own tasks
+                        {currentUser && task.userId === currentUser.id && totalPendingForRole > 0 && (
+                             <Button
+                                variant="link"
+                                size="sm"
+                                className="h-auto px-1 py-0 text-[10px] underline"
+                                style={{color: textColor}}
+                                onClick={(e) => { e.stopPropagation(); onEdit(task); }}
+                             >
+                                Manage
+                             </Button>
+                        )}
+                        {currentUser && task.userId !== currentUser.id && !currentUserApplication && ( // Current user can apply
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -261,14 +277,19 @@ export function TaskCard({
                             <ApplyIcon className="h-3 w-3 mr-0.5"/> Apply
                           </Button>
                         )}
-                        {!currentUser && pendingApplicantsCount === 0 && (
+                        {!currentUser && totalPendingForRole === 0 && ( // Not logged in, no pending
                             <Badge variant="outline" className="py-0 px-1.5 text-[10px]" style={{borderColor: textColor, color: textColor}}>
                                 Open
                             </Badge>
                         )}
-                         {currentUser && task.userId === currentUser.id && pendingApplicantsCount === 0 && !acceptedApplicant &&(
+                         {currentUser && task.userId === currentUser.id && totalPendingForRole === 0 && ( // Owner, no pending
                              <Badge variant="outline" className="py-0 px-1.5 text-[10px]" style={{borderColor: textColor, color: textColor}}>
                                 Open (Your Task)
+                            </Badge>
+                        )}
+                         {currentUser && task.userId !== currentUser.id && totalPendingForRole > 0 && !currentUserApplication && ( // Not owner, other pending, can't apply yet
+                            <Badge variant="outline" className="py-0 px-1.5 text-[10px]" style={{borderColor: textColor, color: textColor}}>
+                                Open
                             </Badge>
                         )}
                       </div>
@@ -296,7 +317,7 @@ export function TaskCard({
                       {subTaskFull?.completed ? <CheckCircle2 className="mr-1.5 h-3 w-3 text-green-400 opacity-90" /> : <CircleDot className="mr-1.5 h-3 w-3 opacity-70" />}
                       <span className={cn(subTaskFull?.completed && "line-through", "truncate max-w-[150px] sm:max-w-[200px]")}>{st.title}</span>
                     </div>
-                    <ArrowRightIcon
+                     <ArrowRightIcon
                       className="ml-2 h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                       stroke="#000000"
                     />
@@ -391,3 +412,4 @@ export function TaskCard({
     </Card>
   );
 }
+
