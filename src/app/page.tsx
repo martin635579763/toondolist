@@ -28,6 +28,9 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+// Import PrintableTaskCard if you're using it, or remove if not.
+// For this example, assuming it's used for a print feature not directly related to this auth change.
+// import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
 
 
 interface TaskGroup {
@@ -38,7 +41,7 @@ interface TaskGroup {
 
 function HomePageContent() {
   const { currentUser, logout, isLoading: authIsLoading } = useAuth();
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast(); // Added dismiss from useToast
   const printableAreaRef = useRef<HTMLDivElement>(null);
   const [taskToPrint, setTaskToPrint] = useState<Task | null>(null);
 
@@ -93,14 +96,14 @@ function HomePageContent() {
       return;
     }
 
-    const mainTasks = tasks.filter(t => !t.parentId && t.userId === currentUser.id);
+    const mainTasksForCurrentUser = tasks.filter(t => !t.parentId && t.userId === currentUser.id);
     const taskWithUserAndDefaults: Task = {
       ...newTask,
       id: newTask.id || generateId(),
       createdAt: newTask.createdAt || Date.now(),
       applicants: newTask.applicants || [],
       assignedRoles: newTask.assignedRoles || [],
-      order: newTask.parentId ? undefined : mainTasks.length,
+      order: newTask.parentId ? undefined : mainTasksForCurrentUser.length,
       userId: currentUser.id,
       userDisplayName: currentUser.displayName,
       userAvatarUrl: currentUser.avatarUrl,
@@ -113,7 +116,6 @@ function HomePageContent() {
         newTasksList = newTasksList.map(t =>
           t.id === parentTask.id ? { ...t, completed: false } : t
         );
-        // No toast here for parent auto-incompletion, fireworks on sub-task change should be enough
       }
     }
     setTasks(newTasksList);
@@ -162,7 +164,6 @@ function HomePageContent() {
           task.id === editingTask.id ? { 
             ...task, 
             ...updatedTaskData, 
-            // Ensure user-specific fields are from the original task if not part of updatedTaskData
             userId: task.userId, 
             userDisplayName: task.userDisplayName,
             userAvatarUrl: task.userAvatarUrl,
@@ -183,7 +184,7 @@ function HomePageContent() {
             createdAt: Date.now() + index + 1, 
             applicants: [],
             assignedRoles: [],
-            color: subTask.color || '#CCCCCC',
+            color: subTask.color || '#CCCCCC', // Ensure color exists
             order: undefined, 
             userId: mainTaskInListForSubs.userId, 
             userDisplayName: mainTaskInListForSubs.userDisplayName,
@@ -208,7 +209,7 @@ function HomePageContent() {
       description: toastDescription,
     });
     if (shouldMarkParentIncomplete) {
-        // No separate toast for parent auto-incompletion due to fireworks/main task completion handling
+        // Fireworks for main task will handle this, no separate toast
     }
     handleCloseEditDialog();
   };
@@ -238,7 +239,7 @@ function HomePageContent() {
         task.id === id ? { ...task, completed: newCompletedStatus } : task
       );
 
-      if (taskToToggle.parentId) { // If a sub-task was toggled
+      if (taskToToggle.parentId) { 
         const parentId = taskToToggle.parentId;
         const parentTask = newTasks.find(t => t.id === parentId);
         if (parentTask) {
@@ -247,17 +248,15 @@ function HomePageContent() {
 
             if (newCompletedStatus && allSubTasksNowComplete && !parentTask.completed) {
                  newTasks = newTasks.map(t => t.id === parentId ? { ...t, completed: true } : t);
-                 // Fireworks will handle main task completion celebration
+                 // Fireworks in TaskCard handles visual celebration for main task
             } else if (!newCompletedStatus && parentTask.completed) {
                  newTasks = newTasks.map(t => t.id === parentId ? { ...t, completed: false } : t);
-                 // No specific toast, parent is just incomplete now
+                 // Parent becomes incomplete, fireworks handles this if parent was completed
             }
         }
-      } else { // If a main task was toggled
-        if (newCompletedStatus) {
-           // Fireworks will handle celebration for main task completion in TaskCard
-        }
       }
+      // Main task completion/incompletion is handled by fireworks in TaskCard
+      // No specific toast here to avoid conflict with fireworks
       return newTasks;
     });
   };
@@ -274,11 +273,13 @@ function HomePageContent() {
 
     let tasksToRemoveIds = [taskToDelete.id];
     let parentIdOfDeletedSubTask: string | undefined = undefined;
+    let wasMainTaskCompletedDueToThisDelete = false;
 
-    if (!taskToDelete.parentId) { // Main task
+
+    if (!taskToDelete.parentId) { 
       const subTasksOfDeletedMain = tasks.filter(t => t.parentId === taskToDelete.id).map(st => st.id);
       tasksToRemoveIds = [...tasksToRemoveIds, ...subTasksOfDeletedMain];
-    } else { // Sub-task
+    } else { 
       parentIdOfDeletedSubTask = taskToDelete.parentId;
     }
 
@@ -290,16 +291,25 @@ function HomePageContent() {
           const remainingSubTasks = updatedTasks.filter(st => st.parentId === parentIdOfDeletedSubTask);
           if (remainingSubTasks.length === 0 || remainingSubTasks.every(st => st.completed)) {
             updatedTasks = updatedTasks.map(t => t.id === parentIdOfDeletedSubTask ? { ...t, completed: true } : t);
-            // Fireworks in TaskCard will handle celebration if parent completes
+            wasMainTaskCompletedDueToThisDelete = true;
           }
         }
       }
       return updatedTasks;
     });
     
+    let toastDescription = `Task "${taskToDelete.title}" ${tasksToRemoveIds.length > 1 ? 'and its sub-tasks were' : 'was'} removed.`;
+    // The toast about parent completion is removed to allow fireworks to be the primary feedback.
+    // if (wasMainTaskCompletedDueToThisDelete) {
+    //   const parent = tasks.find(t => t.id === parentIdOfDeletedSubTask);
+    //   if (parent) {
+    //      toastDescription += ` Parent task "${parent.title}" is now complete.`;
+    //   }
+    // }
+
     toast({
       title: "ToonDo Removed!",
-      description: `Task "${taskToDelete.title}" ${tasksToRemoveIds.length > 1 ? 'and its sub-tasks were' : 'was'} removed.`,
+      description: toastDescription,
     });
   };
 
@@ -337,8 +347,8 @@ function HomePageContent() {
       const newApplicant: Applicant = {
         id: generateId(),
         role: roleName,
-        name: currentUser.displayName,
-        applicantUserId: currentUser.id,
+        name: currentUser.displayName, // Applicant's display name
+        applicantUserId: currentUser.id, // Applicant's user ID
         status: 'pending',
       };
       taskToUpdate.applicants.push(newApplicant);
@@ -346,7 +356,10 @@ function HomePageContent() {
       const updatedTasks = [...prevTasks];
       updatedTasks[taskIndex] = taskToUpdate;
       
-      toast({ title: "Application Sent!", description: `You've applied for ${roleName} on "${taskToUpdate.title}".`});
+      toast({ 
+        title: "Application Submitted!", 
+        description: `Your application for the role of '${roleName}' on task "${taskToUpdate.title}" has been sent. The task owner will be notified.`
+      });
       return updatedTasks;
     });
   };
@@ -463,13 +476,14 @@ function HomePageContent() {
       });
       
       return newTasks.sort((a, b) => { 
-        if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
-        if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
-
-        if (a.userId === currentUser.id && b.userId === currentUser.id) {
-            if (!a.parentId && !b.parentId) return (a.order ?? Infinity) - (b.order ?? Infinity);
+        if (currentUser) { // Ensure currentUser is defined
+            if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
+            if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
+            if (a.userId === currentUser.id && b.userId === currentUser.id) {
+                if (!a.parentId && !b.parentId) return (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (b.createdAt ?? 0));
+            }
         }
-        if (!a.parentId && !b.parentId) return (a.order ?? Infinity) - (b.order ?? Infinity);
+        if (!a.parentId && !b.parentId) return (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (b.createdAt ?? 0));
         if (a.parentId && b.parentId && a.parentId === b.parentId) return (a.createdAt ?? 0) - (b.createdAt ?? 0);
         return (a.createdAt ?? 0) - (b.createdAt ?? 0); 
       });
@@ -657,7 +671,7 @@ function HomePageContent() {
               )}
             </main> 
             
-            <div id="printable-area" ref={printableAreaRef} className="hidden">
+            <div id="printable-area" ref={printableAreaRef} className="hidden print:block">
               {taskToPrint && <PrintableTaskCard task={taskToPrint} />}
             </div>
 
@@ -681,6 +695,29 @@ function HomePageContent() {
     </SidebarProvider>
   );
 }
+
+// Placeholder for PrintableTaskCard if it's defined elsewhere or not needed
+// Remove this if PrintableTaskCard is not used or define it properly.
+const PrintableTaskCard = ({ task }: {task: Task}) => (
+  <div className="printable-card-content p-6 border rounded-lg shadow-none" style={{ backgroundColor: task.color, color: '#000000', width: '18cm', height:'10cm', margin: '1cm auto', breakInside: 'avoid' }}>
+    <h2 className="text-3xl font-bold mb-2" style={{ color: '#000000' }}>{task.title}</h2>
+    {task.description && (
+      <p className="text-base mb-4" style={{ color: '#000000' }}>{task.description}</p>
+    )}
+    {task.dueDate && (
+      <p className="text-sm mb-2" style={{ color: '#000000' }}>
+        <strong>Due Date:</strong> {new Date(task.dueDate).toLocaleDateString()}
+      </p>
+    )}
+    <p className="text-sm" style={{ color: '#000000' }}>
+      <strong>Status:</strong> {task.completed ? "Completed" : "Pending"}
+    </p>
+     <div style={{ marginTop: '20px', borderTop: '1px dashed #666', paddingTop: '10px', textAlign: 'center' }}>
+      <p style={{ fontSize: '0.8em', color: '#333' }}>ToonDo List - Your Awesome Task!</p>
+    </div>
+  </div>
+);
+
 
 export default function HomePage() {
   // Wrap with QueryClientProvider if using react-query, otherwise remove.
