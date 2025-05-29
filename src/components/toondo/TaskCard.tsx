@@ -1,8 +1,8 @@
 
 "use client";
 
-import type { Task, Applicant } from "@/types/task";
-import type { User } from "@/types/user"; // Ensure User type is imported
+import type { Task } from "@/types/task";
+import type { User } from "@/types/user"; 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -49,6 +49,7 @@ export function TaskCard({
   const textColor = getContrastingTextColor(task.color);
   const isSubTask = !!task.parentId;
   const isMainTask = !task.parentId;
+  const isOwner = currentUser && currentUser.id === task.userId;
 
   const parentTask = task.parentId ? allTasks.find(t => t.id === task.parentId) : null;
   const childTasks = allTasks.filter(t => t.parentId === task.id);
@@ -63,7 +64,17 @@ export function TaskCard({
   const mutedTextStyle = { color: textColor, opacity: 0.8 };
   const veryMutedTextStyle = { color: textColor, opacity: 0.6 };
 
-  const checkboxDisabled = isMainTask && isMainTaskWithIncompleteSubtasks && !task.completed;
+  let checkboxDisabled = false;
+  let checkboxTooltipContent: React.ReactNode = null;
+
+  if (!isOwner) {
+    checkboxDisabled = true;
+    checkboxTooltipContent = <p className="flex items-center text-xs"><InfoIcon className="h-3 w-3 mr-1.5"/>Only the owner can change completion status.</p>;
+  } else if (isMainTask && isMainTaskWithIncompleteSubtasks && !task.completed) {
+    checkboxDisabled = true;
+    checkboxTooltipContent = <p className="flex items-center text-xs"><InfoIcon className="h-3 w-3 mr-1.5"/>Complete all sub-tasks first.</p>;
+  }
+
 
   const [showFireworks, setShowFireworks] = useState(false);
   const prevCompleted = useRef(task.completed);
@@ -77,10 +88,9 @@ export function TaskCard({
     prevCompleted.current = task.completed;
   }, [task.completed, isMainTask]);
 
-  // Helper to get all users from localStorage, specific to this component's needs for applicant avatars
   const getAllUsersFromStorage = (): User[] => {
     if (typeof window !== 'undefined') {
-      const storedUsers = localStorage.getItem('toondo-users'); // Key used in AuthContext
+      const storedUsers = localStorage.getItem('toondo-users'); 
       try {
         return storedUsers ? JSON.parse(storedUsers) : [];
       } catch (e) {
@@ -100,7 +110,7 @@ export function TaskCard({
         isSubTask && "ml-8 max-w-sm", 
         isDraggingSelf && "opacity-50 ring-2 ring-primary ring-offset-2",
         isDragOverSelf && "ring-2 ring-primary ring-offset-1 scale-102 shadow-2xl z-10",
-        !isDraggingSelf && isMainTask && currentUser && task.userId === currentUser.id && "cursor-grab" // Only owner can drag main task
+        !isDraggingSelf && isMainTask && isOwner && "cursor-grab" 
       )}
       style={cardStyle}
     >
@@ -145,13 +155,13 @@ export function TaskCard({
           <div className="flex-grow">
             <CardTitle className={cn(
               "font-bold break-words",
-              isSubTask ? "text-base" : "text-2xl" // Title size for sub-tasks
+              isSubTask ? "text-base" : "text-2xl" 
             )} style={textStyle}>
               {task.title}
             </CardTitle>
           </div>
           <div className="flex items-center space-x-2 shrink-0">
-            {isMainTask && task.userAvatarUrl && (
+            {isMainTask && (task.userAvatarUrl || task.userDisplayName) && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Avatar className="h-8 w-8 border-2" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)'}}>
@@ -207,7 +217,6 @@ export function TaskCard({
               {task.assignedRoles.map((role, index) => {
                 const acceptedApplicant = task.applicants?.find(app => app.role === role && app.status === 'accepted');
                 const currentUserApplication = currentUser ? task.applicants?.find(app => app.role === role && app.applicantUserId === currentUser.id) : null;
-                const pendingApplicantsCount = task.applicants?.filter(app => app.role === role && app.status === 'pending' && (!currentUser || app.applicantUserId !== currentUser.id)).length || 0;
                 const totalPendingForRole = task.applicants?.filter(app => app.role === role && app.status === 'pending').length || 0;
 
 
@@ -218,7 +227,7 @@ export function TaskCard({
                       <Badge variant="default" className="py-0 px-1.5 text-[10px] bg-green-500/80 hover:bg-green-500 text-white flex items-center gap-1">
                         <UserCheckIcon className="h-3 w-3"/>
                         {(() => {
-                          if (!acceptedApplicant.applicantUserId) return acceptedApplicant.name; // Manual applicant
+                          if (!acceptedApplicant.applicantUserId) return acceptedApplicant.name; 
                           const allUsers = getAllUsersFromStorage();
                           const applicantUser = allUsers.find(u => u.id === acceptedApplicant.applicantUserId);
                           if (applicantUser) {
@@ -236,21 +245,21 @@ export function TaskCard({
                               </>
                             );
                           }
-                          return acceptedApplicant.name; // Fallback if user details not found
+                          return acceptedApplicant.name; 
                         })()}
                       </Badge>
-                    ) : currentUserApplication ? ( // Current user has applied for this role
+                    ) : currentUserApplication ? ( 
                        <Badge variant={currentUserApplication.status === 'pending' ? 'secondary' : 'destructive'} className="py-0 px-1.5 text-[10px]">
                          <ClockIcon className="h-3 w-3 mr-1"/> Applied ({currentUserApplication.status})
                        </Badge>
-                    ) : ( // Role is open for the current user to apply for, or has other pending applicants
+                    ) : ( 
                       <div className="flex items-center gap-1">
                         {totalPendingForRole > 0 && (
                            <Badge variant="secondary" className="py-0 px-1.5 text-[10px]">
                              {totalPendingForRole} Pending
                            </Badge>
                         )}
-                        {currentUser && task.userId === currentUser.id && totalPendingForRole > 0 && (
+                        {isOwner && totalPendingForRole > 0 && (
                              <Button
                                 variant="link"
                                 size="sm"
@@ -261,7 +270,7 @@ export function TaskCard({
                                 Manage
                              </Button>
                         )}
-                        {currentUser && task.userId !== currentUser.id && !currentUserApplication && ( // Current user can apply
+                        {currentUser && !isOwner && !currentUserApplication && ( 
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -277,17 +286,17 @@ export function TaskCard({
                             <ApplyIcon className="h-3 w-3 mr-0.5"/> Apply
                           </Button>
                         )}
-                        {!currentUser && totalPendingForRole === 0 && ( // Not logged in, no pending
+                        {!currentUser && totalPendingForRole === 0 && ( 
                             <Badge variant="outline" className="py-0 px-1.5 text-[10px]" style={{borderColor: textColor, color: textColor}}>
                                 Open
                             </Badge>
                         )}
-                         {currentUser && task.userId === currentUser.id && totalPendingForRole === 0 && ( // Owner, no pending
+                         {isOwner && totalPendingForRole === 0 && ( 
                              <Badge variant="outline" className="py-0 px-1.5 text-[10px]" style={{borderColor: textColor, color: textColor}}>
-                                Open (Your Task)
+                                Open
                             </Badge>
                         )}
-                         {currentUser && task.userId !== currentUser.id && totalPendingForRole > 0 && !currentUserApplication && ( // Not owner, other pending, can't apply yet
+                         {currentUser && !isOwner && totalPendingForRole > 0 && !currentUserApplication && ( 
                             <Badge variant="outline" className="py-0 px-1.5 text-[10px]" style={{borderColor: textColor, color: textColor}}>
                                 Open
                             </Badge>
@@ -319,7 +328,7 @@ export function TaskCard({
                     </div>
                      <ArrowRightIcon
                       className="ml-2 h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                      stroke="#000000"
+                      stroke={textColor} 
                     />
                   </li>
                 );
@@ -352,9 +361,9 @@ export function TaskCard({
                     aria-labelledby={`label-complete-${task.id}`}
                 />
             </TooltipTrigger>
-            {checkboxDisabled && (
+            {checkboxTooltipContent && (
                 <TooltipContent>
-                    <p className="flex items-center text-xs"><InfoIcon className="h-3 w-3 mr-1.5"/>Complete all sub-tasks first.</p>
+                    {checkboxTooltipContent}
                 </TooltipContent>
             )}
           </Tooltip>
@@ -378,16 +387,18 @@ export function TaskCard({
         "flex justify-end space-x-0.5",
         isSubTask ? "p-1 pt-0.5 pb-0.5" : "p-6 pt-0 space-x-2" 
       )}>
-        <Button
-          variant="ghost"
-          size={isSubTask ? "icon" : "icon"} 
-          onClick={(e) => { e.stopPropagation(); onEdit(task);}}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
-          style={{color: textColor}}
-          aria-label="Edit task"
-        >
-          <PencilIcon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} />
-        </Button>
+        {isOwner && (
+            <Button
+            variant="ghost"
+            size={isSubTask ? "icon" : "icon"} 
+            onClick={(e) => { e.stopPropagation(); onEdit(task);}}
+            className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
+            style={{color: textColor}}
+            aria-label="Edit task"
+            >
+            <PencilIcon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} />
+            </Button>
+        )}
         <Button
           variant="ghost"
           size={isSubTask ? "icon" : "icon"} 
@@ -398,18 +409,21 @@ export function TaskCard({
         >
           <PrinterIcon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} />
         </Button>
-        <Button
-          variant="ghost"
-          size={isSubTask ? "icon" : "icon"} 
-          onClick={(e) => { e.stopPropagation(); onDelete(task);}}
-          className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
-          style={{color: textColor}}
-          aria-label="Delete task"
-        >
-          <Trash2Icon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} />
-        </Button>
+        {isOwner && (
+            <Button
+            variant="ghost"
+            size={isSubTask ? "icon" : "icon"} 
+            onClick={(e) => { e.stopPropagation(); onDelete(task);}}
+            className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-6 w-6 p-1" : "h-8 w-8")}
+            style={{color: textColor}}
+            aria-label="Delete task"
+            >
+            <Trash2Icon className={isSubTask ? "h-3.5 w-3.5" : "h-5 w-5"} />
+            </Button>
+        )}
       </CardFooter>
     </Card>
   );
 }
 
+    
