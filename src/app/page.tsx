@@ -7,7 +7,7 @@ import type { Task, Applicant } from '@/types/task';
 import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
 import { EditTaskDialog } from '@/components/toondo/EditTaskDialog';
 import { TaskCard } from '@/components/toondo/TaskCard';
-import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon } from 'lucide-react';
+import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, CaseSensitiveIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { cn, generateId } from '@/lib/utils';
 import {
@@ -28,9 +28,10 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-// Import PrintableTaskCard if you're using it, or remove if not.
-// For this example, assuming it's used for a print feature not directly related to this auth change.
-// import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { parseMarkdownToTasks, type ParseMarkdownInput, type ParseMarkdownOutput } from '@/ai/flows/parse-markdown-tasks-flow';
+import { getRandomColor } from '@/lib/colors';
 
 
 interface TaskGroup {
@@ -41,7 +42,7 @@ interface TaskGroup {
 
 function HomePageContent() {
   const { currentUser, logout, isLoading: authIsLoading } = useAuth();
-  const { toast, dismiss } = useToast(); // Added dismiss from useToast
+  const { toast, dismiss } = useToast();
   const printableAreaRef = useRef<HTMLDivElement>(null);
   const [taskToPrint, setTaskToPrint] = useState<Task | null>(null);
 
@@ -54,7 +55,10 @@ function HomePageContent() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  // Load tasks from localStorage on initial render
+  const [markdownInput, setMarkdownInput] = useState<string>('');
+  const [isParsingMarkdown, setIsParsingMarkdown] = useState<boolean>(false);
+
+
   useEffect(() => {
     setIsLoadingTasks(true);
     const storedTasks = localStorage.getItem('toondo-tasks');
@@ -82,7 +86,6 @@ function HomePageContent() {
   }, []);
 
 
-  // Save tasks to localStorage whenever they change
   useEffect(() => {
     if (!isLoadingTasks) { 
       localStorage.setItem('toondo-tasks', JSON.stringify(tasks));
@@ -107,6 +110,7 @@ function HomePageContent() {
       userId: currentUser.id,
       userDisplayName: currentUser.displayName,
       userAvatarUrl: currentUser.avatarUrl,
+      color: newTask.color || getRandomColor(), 
     };
 
     let newTasksList = [...tasks, taskWithUserAndDefaults];
@@ -125,6 +129,80 @@ function HomePageContent() {
       description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
     });
   };
+
+  const handleParseAndAddTasks = async () => {
+    if (!markdownInput.trim()) {
+      toast({ title: "Empty Input", description: "Please enter some markdown to parse.", variant: "default" });
+      return;
+    }
+    if (!currentUser) {
+      toast({ title: "Not Logged In", description: "You must be logged in to create tasks from markdown.", variant: "destructive" });
+      return;
+    }
+
+    setIsParsingMarkdown(true);
+    try {
+      const result: ParseMarkdownOutput = await parseMarkdownToTasks({ markdownContent: markdownInput });
+      if (result.parsedTasks && result.parsedTasks.length > 0) {
+        let tasksAddedCount = 0;
+        result.parsedTasks.forEach(parsedMainTask => {
+          const mainTaskId = generateId();
+          const mainTaskToAdd: Task = {
+            id: mainTaskId,
+            title: parsedMainTask.title,
+            description: parsedMainTask.description || "",
+            completed: false,
+            dueDate: null, // Due date from markdown might need further processing or manual setting
+            color: getRandomColor(),
+            createdAt: Date.now() + tasksAddedCount, // Stagger creation time slightly
+            assignedRoles: parsedMainTask.assignedRolesString ? parsedMainTask.assignedRolesString.split(',').map(r => r.trim()).filter(r => r) : [],
+            applicants: [],
+            userId: currentUser.id,
+            userDisplayName: currentUser.displayName,
+            userAvatarUrl: currentUser.avatarUrl,
+            // Order will be set by handleAddTask logic
+          };
+          handleAddTask(mainTaskToAdd);
+          tasksAddedCount++;
+
+          if (parsedMainTask.subTasks && parsedMainTask.subTasks.length > 0) {
+            parsedMainTask.subTasks.forEach(parsedSubTask => {
+              const subTaskToAdd: Task = {
+                id: generateId(),
+                title: parsedSubTask.title,
+                description: parsedSubTask.description || "",
+                completed: false,
+                dueDate: null,
+                color: getRandomColor(),
+                createdAt: Date.now() + tasksAddedCount,
+                parentId: mainTaskId,
+                applicants: [],
+                userId: currentUser.id,
+                userDisplayName: currentUser.displayName,
+                userAvatarUrl: currentUser.avatarUrl,
+              };
+              handleAddTask(subTaskToAdd);
+              tasksAddedCount++;
+            });
+          }
+        });
+        toast({ title: "Tasks Created!", description: `${tasksAddedCount} task(s) were created from your markdown.` });
+        setMarkdownInput(''); // Clear the input
+      } else {
+        toast({ title: "No Tasks Found", description: "The AI couldn't find any tasks in your markdown, or there was an issue.", variant: "default" });
+      }
+    } catch (error) {
+      console.error("Error parsing markdown to tasks:", error);
+      let description = "Could not parse markdown. Please try again or check the AI configuration.";
+       if (error instanceof Error && (error.message.includes('plugin not configured') || error.message.includes('GOOGLE_API_KEY') || error.message.includes('GENKIT_API_KEY'))) {
+        description = "AI features may not be configured (e.g., API key missing). Markdown parsing failed.";
+      }
+      toast({ title: "Parsing Error", description, variant: "destructive" });
+    } finally {
+      setIsParsingMarkdown(false);
+    }
+  };
+
 
   const handleOpenEditDialog = (task: Task) => {
     if (!currentUser) {
@@ -155,7 +233,6 @@ function HomePageContent() {
       return;
     }
 
-
     let toastDescription = `"${updatedTaskData.title}" has been updated.`;
     let shouldMarkParentIncomplete = false;
 
@@ -184,7 +261,7 @@ function HomePageContent() {
             createdAt: Date.now() + index + 1, 
             applicants: [],
             assignedRoles: [],
-            color: subTask.color || '#CCCCCC', // Ensure color exists
+            color: subTask.color || getRandomColor(),
             order: undefined, 
             userId: mainTaskInListForSubs.userId, 
             userDisplayName: mainTaskInListForSubs.userDisplayName,
@@ -248,15 +325,11 @@ function HomePageContent() {
 
             if (newCompletedStatus && allSubTasksNowComplete && !parentTask.completed) {
                  newTasks = newTasks.map(t => t.id === parentId ? { ...t, completed: true } : t);
-                 // Fireworks in TaskCard handles visual celebration for main task
             } else if (!newCompletedStatus && parentTask.completed) {
                  newTasks = newTasks.map(t => t.id === parentId ? { ...t, completed: false } : t);
-                 // Parent becomes incomplete, fireworks handles this if parent was completed
             }
         }
       }
-      // Main task completion/incompletion is handled by fireworks in TaskCard
-      // No specific toast here to avoid conflict with fireworks
       return newTasks;
     });
   };
@@ -273,8 +346,6 @@ function HomePageContent() {
 
     let tasksToRemoveIds = [taskToDelete.id];
     let parentIdOfDeletedSubTask: string | undefined = undefined;
-    let wasMainTaskCompletedDueToThisDelete = false;
-
 
     if (!taskToDelete.parentId) { 
       const subTasksOfDeletedMain = tasks.filter(t => t.parentId === taskToDelete.id).map(st => st.id);
@@ -291,7 +362,6 @@ function HomePageContent() {
           const remainingSubTasks = updatedTasks.filter(st => st.parentId === parentIdOfDeletedSubTask);
           if (remainingSubTasks.length === 0 || remainingSubTasks.every(st => st.completed)) {
             updatedTasks = updatedTasks.map(t => t.id === parentIdOfDeletedSubTask ? { ...t, completed: true } : t);
-            wasMainTaskCompletedDueToThisDelete = true;
           }
         }
       }
@@ -299,14 +369,6 @@ function HomePageContent() {
     });
     
     let toastDescription = `Task "${taskToDelete.title}" ${tasksToRemoveIds.length > 1 ? 'and its sub-tasks were' : 'was'} removed.`;
-    // The toast about parent completion is removed to allow fireworks to be the primary feedback.
-    // if (wasMainTaskCompletedDueToThisDelete) {
-    //   const parent = tasks.find(t => t.id === parentIdOfDeletedSubTask);
-    //   if (parent) {
-    //      toastDescription += ` Parent task "${parent.title}" is now complete.`;
-    //   }
-    // }
-
     toast({
       title: "ToonDo Removed!",
       description: toastDescription,
@@ -347,8 +409,8 @@ function HomePageContent() {
       const newApplicant: Applicant = {
         id: generateId(),
         role: roleName,
-        name: currentUser.displayName, // Applicant's display name
-        applicantUserId: currentUser.id, // Applicant's user ID
+        name: currentUser.displayName,
+        applicantUserId: currentUser.id,
         status: 'pending',
       };
       taskToUpdate.applicants.push(newApplicant);
@@ -476,7 +538,7 @@ function HomePageContent() {
       });
       
       return newTasks.sort((a, b) => { 
-        if (currentUser) { // Ensure currentUser is defined
+        if (currentUser) {
             if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
             if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
             if (a.userId === currentUser.id && b.userId === currentUser.id) {
@@ -515,6 +577,7 @@ function HomePageContent() {
                                             return ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number);
                                         }
                                       }
+                                      // Fallback sort for non-user specific tasks or if currentUser is not available
                                       return ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number);
                                   });
     
@@ -609,8 +672,43 @@ function HomePageContent() {
               ) : (
                 <>
                   <CreateTaskForm onAddTask={handleAddTask} />
+
+                  <Card className="p-6 bg-card shadow-xl rounded-xl mb-8 border border-border">
+                    <CardHeader className="p-0 pb-4">
+                      <CardTitle className="text-xl flex items-center">
+                        <CaseSensitiveIcon className="mr-2 h-6 w-6 text-primary" />
+                        Create Tasks from Markdown
+                      </CardTitle>
+                      <CardDescription>
+                        Paste your structured markdown below. The AI will try to create main tasks and sub-tasks.
+                        Example: "# Main Task Title\n- Subtask 1\n- Subtask 2\n## Another Main Task"
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0 space-y-3">
+                      <Textarea
+                        placeholder="Paste your markdown here..."
+                        value={markdownInput}
+                        onChange={(e) => setMarkdownInput(e.target.value)}
+                        rows={6}
+                        className="text-sm"
+                        disabled={isParsingMarkdown}
+                      />
+                      <Button
+                        onClick={handleParseAndAddTasks}
+                        disabled={isParsingMarkdown || !markdownInput.trim()}
+                        className="w-full"
+                      >
+                        {isParsingMarkdown ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <CaseSensitiveIcon className="mr-2 h-4 w-4" />
+                        )}
+                        Create from Markdown
+                      </Button>
+                    </CardContent>
+                  </Card>
                   
-                  {taskGroups.length === 0 && !isLoadingTasks ? (
+                  {taskGroups.length === 0 && !isLoadingTasks && !markdownInput ? (
                      <div className="text-center py-16">
                       <FileTextIcon className="mx-auto h-24 w-24 text-muted-foreground opacity-50 mb-4" />
                       <h2 className="text-3xl font-semibold mb-2">No ToonDos Yet, {currentUser.displayName}!</h2>
@@ -696,8 +794,6 @@ function HomePageContent() {
   );
 }
 
-// Placeholder for PrintableTaskCard if it's defined elsewhere or not needed
-// Remove this if PrintableTaskCard is not used or define it properly.
 const PrintableTaskCard = ({ task }: {task: Task}) => (
   <div className="printable-card-content p-6 border rounded-lg shadow-none" style={{ backgroundColor: task.color, color: '#000000', width: '18cm', height:'10cm', margin: '1cm auto', breakInside: 'avoid' }}>
     <h2 className="text-3xl font-bold mb-2" style={{ color: '#000000' }}>{task.title}</h2>
@@ -720,8 +816,6 @@ const PrintableTaskCard = ({ task }: {task: Task}) => (
 
 
 export default function HomePage() {
-  // Wrap with QueryClientProvider if using react-query, otherwise remove.
-  // For localStorage, no QueryClientProvider is needed at this level.
   return (
       <HomePageContent />
   );
