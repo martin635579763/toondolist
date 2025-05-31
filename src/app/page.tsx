@@ -7,7 +7,7 @@ import type { Task, Applicant } from '@/types/task';
 import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
 import { EditTaskDialog } from '@/components/toondo/EditTaskDialog';
 import { TaskCard } from '@/components/toondo/TaskCard';
-import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, CaseSensitiveIcon } from 'lucide-react';
+import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, CaseSensitiveIcon, UserCircleIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { cn, generateId } from '@/lib/utils';
 import {
@@ -152,15 +152,14 @@ function HomePageContent() {
             title: parsedMainTask.title,
             description: parsedMainTask.description || "",
             completed: false,
-            dueDate: null, // Due date from markdown might need further processing or manual setting
+            dueDate: null, 
             color: getRandomColor(),
-            createdAt: Date.now() + tasksAddedCount, // Stagger creation time slightly
+            createdAt: Date.now() + tasksAddedCount, 
             assignedRoles: parsedMainTask.assignedRolesString ? parsedMainTask.assignedRolesString.split(',').map(r => r.trim()).filter(r => r) : [],
             applicants: [],
             userId: currentUser.id,
             userDisplayName: currentUser.displayName,
             userAvatarUrl: currentUser.avatarUrl,
-            // Order will be set by handleAddTask logic
           };
           handleAddTask(mainTaskToAdd);
           tasksAddedCount++;
@@ -187,16 +186,13 @@ function HomePageContent() {
           }
         });
         toast({ title: "Tasks Created!", description: `${tasksAddedCount} task(s) were created from your markdown.` });
-        setMarkdownInput(''); // Clear the input
+        setMarkdownInput(''); 
       } else {
-        toast({ title: "No Tasks Found", description: "The AI couldn't find any tasks in your markdown, or there was an issue.", variant: "default" });
+        toast({ title: "No Tasks Found", description: "The parser couldn't find any tasks in your markdown, or there was an issue.", variant: "default" });
       }
     } catch (error) {
       console.error("Error parsing markdown to tasks:", error);
-      let description = "Could not parse markdown. Please try again or check the AI configuration.";
-       if (error instanceof Error && (error.message.includes('plugin not configured') || error.message.includes('GOOGLE_API_KEY') || error.message.includes('GENKIT_API_KEY'))) {
-        description = "AI features may not be configured (e.g., API key missing). Markdown parsing failed.";
-      }
+      let description = "Could not parse markdown. Please try again.";
       toast({ title: "Parsing Error", description, variant: "destructive" });
     } finally {
       setIsParsingMarkdown(false);
@@ -286,7 +282,6 @@ function HomePageContent() {
       description: toastDescription,
     });
     if (shouldMarkParentIncomplete) {
-        // Fireworks for main task will handle this, no separate toast
     }
     handleCloseEditDialog();
   };
@@ -577,7 +572,6 @@ function HomePageContent() {
                                             return ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number);
                                         }
                                       }
-                                      // Fallback sort for non-user specific tasks or if currentUser is not available
                                       return ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number);
                                   });
     
@@ -634,6 +628,11 @@ function HomePageContent() {
                              <p className="text-xs">Logged in as {currentUser.displayName}</p>
                           </TooltipContent>
                        </Tooltip>
+                       <Button variant="ghost" size="sm" asChild>
+                         <Link href="/profile">
+                           <UserCircleIcon className="mr-2 h-4 w-4" /> Profile
+                         </Link>
+                       </Button>
                       <Button variant="ghost" onClick={logout} size="sm">
                         <LogOutIcon className="mr-2 h-4 w-4" /> Logout
                       </Button>
@@ -680,8 +679,8 @@ function HomePageContent() {
                         Create Tasks from Markdown
                       </CardTitle>
                       <CardDescription>
-                        Paste your structured markdown below. The AI will try to create main tasks and sub-tasks.
-                        Example: "# Main Task Title\n- Subtask 1\n- Subtask 2\n## Another Main Task"
+                        Paste your structured markdown below. The parser will try to create main tasks and sub-tasks.
+                        Example: "# Main Task Title\\n- Subtask 1\\n- Subtask 2\\n## Another Main Task"
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="p-0 space-y-3">
