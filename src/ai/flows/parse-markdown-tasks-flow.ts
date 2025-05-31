@@ -26,7 +26,7 @@ const ParsedTaskSchema = z.object({
   description: z.string().optional().describe('The description of the main task.'),
   dueDateString: z.string().optional().describe('A textual representation of a due date found in the markdown (e.g., "next Friday", "2024-12-25", "in 2 weeks"). The AI should extract this if present but not attempt to convert it to ISO format.'),
   assignedRolesString: z.string().optional().describe('Comma-separated list of roles or people mentioned for this task (e.g., "designer, developer", "needs a writer").'),
-  subTasks: z.array(SubTaskSchema).optional().describe('An array of sub-tasks for this main task. Sub-tasks are typically bullet points under a main task.'),
+  subTasks: z.array(SubTaskSchema).optional().describe('An array of sub-tasks for this main task. Sub-tasks are typically bullet points under a main task heading (before the next main task heading) should be considered direct sub-tasks of that main task.'),
 });
 
 const ParseMarkdownOutputSchema = z.object({
@@ -37,8 +37,8 @@ export type ParseMarkdownOutput = z.infer<typeof ParseMarkdownOutputSchema>;
 export async function parseMarkdownToTasks(
   input: ParseMarkdownInput
 ): Promise<ParseMarkdownOutput> {
-  if (ai.plugins.length === 0) {
-    console.warn("AI plugin not configured. Markdown parsing will be skipped.");
+  if (!ai || !ai.plugins || ai.plugins.length === 0) {
+    console.warn("AI plugin not configured or unavailable. Markdown parsing will be skipped.");
     return {
         parsedTasks: [],
     };
