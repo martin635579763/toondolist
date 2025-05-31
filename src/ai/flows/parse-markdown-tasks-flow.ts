@@ -52,54 +52,87 @@ export async function parseMarkdownToTasks(
   for (const token of tokens) {
     if (token.type === 'heading' && (token.depth === 1 || token.depth === 2 || token.depth === 3)) {
       if (currentMainTask) {
+        if (currentMainTask.description) {
+          currentMainTask.description = currentMainTask.description.trim();
+        }
         resultingTasks.push(currentMainTask);
       }
       currentMainTask = {
         title: token.text.trim(),
         subTasks: [],
       };
-      collectingDescriptionForMainTask = true; // Start collecting description for this new main task
+      collectingDescriptionForMainTask = true;
     } else if (currentMainTask) {
       if (collectingDescriptionForMainTask && (token.type === 'paragraph' || token.type === 'text' || token.type === 'space')) {
         if (token.type === 'paragraph' || token.type === 'text') {
            currentMainTask.description = (currentMainTask.description || '') + token.text.trim() + ' ';
         }
-        // If it's just a space token, we continue, description might span multiple text/paragraph tokens separated by space.
       } else if (token.type === 'list') {
-        collectingDescriptionForMainTask = false; // Stop collecting description once a list starts
+        collectingDescriptionForMainTask = false;
         if (!currentMainTask.subTasks) {
           currentMainTask.subTasks = [];
         }
         for (const item of token.items) {
-          // item.text often contains the core content for simple list items.
-          // For items with nested paragraphs, item.tokens is more reliable.
           let subTaskTitle = '';
+          let subTaskDescription = '';
+          let titleFound = false;
+
           if (item.tokens && item.tokens.length > 0) {
-            // Concatenate text from all paragraph/text tokens within the list item's direct children
-            // This aims to capture multi-line list items as a single title.
-            let textContent = '';
-            function extractTextFromTokens(subTokens: Tokens.Token[]) {
-              for (const subToken of subTokens) {
-                if (subToken.type === 'text' || subToken.type === 'paragraph') {
-                   textContent += (subToken as Tokens.Text | Tokens.Paragraph).text + ' ';
-                } else if ('tokens' in subToken && subToken.tokens) { // Recurse for nested structures like blockquotes in list items
-                    extractTextFromTokens(subToken.tokens);
+            let firstTextContent = '';
+            // Process item.tokens to separate title and description
+            for (let i = 0; i < item.tokens.length; i++) {
+              const subToken = item.tokens[i];
+              if (subToken.type === 'text' || subToken.type === 'paragraph') {
+                const tokenText = (subToken as Tokens.Text | Tokens.Paragraph).text;
+                if (!titleFound) {
+                  // The first non-empty text or paragraph block is part of the title
+                  firstTextContent += tokenText;
+                  // If the token text contains newlines, only the first line is title
+                  const lines = firstTextContent.trim().split('\n');
+                  if (lines[0].trim()) {
+                    subTaskTitle = lines[0].trim();
+                    titleFound = true;
+                    if (lines.length > 1) {
+                      subTaskDescription += lines.slice(1).join('\n').trim() + ' ';
+                    }
+                    // If the current token had more lines, they are description.
+                    // Any subsequent text/paragraph tokens are also description.
+                    for (let j = i + 1; j < item.tokens.length; j++) {
+                        const descToken = item.tokens[j];
+                        if (descToken.type === 'text' || descToken.type === 'paragraph') {
+                            subTaskDescription += (descToken as Tokens.Text | Tokens.Paragraph).text.trim() + ' ';
+                        } else if (descToken.type === 'space' && subTaskDescription.length > 0 && !subTaskDescription.endsWith(' ')) {
+                            subTaskDescription += ' ';
+                        }
+                    }
+                    break; // Broke out of inner loop processing item.tokens
+                  }
                 }
               }
             }
-            extractTextFromTokens(item.tokens);
-            subTaskTitle = textContent.trim();
-          } else {
-             subTaskTitle = item.text.trim(); // Fallback for very simple list items
+             // If title was found this way, description is already populated or empty
+          }
+
+          if (!titleFound) {
+            // Fallback: use item.text, split by newline for title and description
+            const lines = item.text.trim().split('\n');
+            subTaskTitle = lines[0].trim();
+            if (lines.length > 1) {
+              subTaskDescription = lines.slice(1).join('\n').trim();
+            }
           }
           
+          subTaskTitle = subTaskTitle.trim();
+          subTaskDescription = subTaskDescription.trim();
+
           if (subTaskTitle) {
-            currentMainTask.subTasks.push({ title: subTaskTitle });
+            currentMainTask.subTasks.push({ 
+              title: subTaskTitle, 
+              description: subTaskDescription || undefined 
+            });
           }
         }
       } else if (token.type !== 'space') {
-        // If we encounter something other than a heading, list, paragraph, text, or space after a main task,
-        // stop collecting description for the current main task.
         collectingDescriptionForMainTask = false;
       }
       if (currentMainTask.description) {
@@ -117,3 +150,4 @@ export async function parseMarkdownToTasks(
   
   return { parsedTasks: resultingTasks };
 }
+
