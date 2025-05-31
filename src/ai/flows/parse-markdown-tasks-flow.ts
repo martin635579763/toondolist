@@ -9,7 +9,7 @@
  */
 
 import { marked, type Tokens } from 'marked';
-import { z } from 'genkit/zod'; // Using genkit's Zod for consistency if other flows use it
+import { z } from 'zod'; // Using Zod directly
 
 const ParseMarkdownInputSchema = z.object({
   markdownContent: z.string().describe('The markdown string containing task definitions.'),
