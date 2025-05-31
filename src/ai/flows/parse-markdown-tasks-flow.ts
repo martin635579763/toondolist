@@ -1,15 +1,15 @@
 
 'use server';
 /**
- * @fileOverview An AI agent that parses markdown text to extract structured task information.
+ * @fileOverview Parses markdown text to extract structured task information using the 'marked' library.
  *
  * - parseMarkdownToTasks - A function that takes markdown and returns structured tasks.
  * - ParseMarkdownInput - The input type for the parseMarkdownToTasks function.
  * - ParseMarkdownOutput - The return type for the parseMarkdownToTasks function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { marked, type Tokens } from 'marked';
+import { z } from 'genkit/zod'; // Using genkit's Zod for consistency if other flows use it
 
 const ParseMarkdownInputSchema = z.object({
   markdownContent: z.string().describe('The markdown string containing task definitions.'),
@@ -20,14 +20,16 @@ const SubTaskSchema = z.object({
   title: z.string().describe('The title of the sub-task.'),
   description: z.string().optional().describe('The description of the sub-task.'),
 });
+export type SubTask = z.infer<typeof SubTaskSchema>;
 
 const ParsedTaskSchema = z.object({
   title: z.string().describe('The title of the main task.'),
   description: z.string().optional().describe('The description of the main task.'),
-  dueDateString: z.string().optional().describe('A textual representation of a due date found in the markdown (e.g., "next Friday", "2024-12-25", "in 2 weeks"). The AI should extract this if present but not attempt to convert it to ISO format.'),
-  assignedRolesString: z.string().optional().describe('Comma-separated list of roles or people mentioned for this task (e.g., "designer, developer", "needs a writer").'),
-  subTasks: z.array(SubTaskSchema).optional().describe('An array of sub-tasks for this main task. Sub-tasks are typically bullet points under a main task heading (before the next main task heading) should be considered direct sub-tasks of that main task.'),
+  dueDateString: z.string().optional().describe('This field will not be populated by the non-AI parser.'),
+  assignedRolesString: z.string().optional().describe('This field will not be populated by the non-AI parser.'),
+  subTasks: z.array(SubTaskSchema).optional().describe('An array of sub-tasks for this main task.'),
 });
+export type ParsedTask = z.infer<typeof ParsedTaskSchema>;
 
 const ParseMarkdownOutputSchema = z.object({
   parsedTasks: z.array(ParsedTaskSchema).describe('An array of parsed main tasks and their sub-tasks.'),
@@ -37,88 +39,81 @@ export type ParseMarkdownOutput = z.infer<typeof ParseMarkdownOutputSchema>;
 export async function parseMarkdownToTasks(
   input: ParseMarkdownInput
 ): Promise<ParseMarkdownOutput> {
-  if (!ai || !ai.plugins || ai.plugins.length === 0) {
-    console.warn("AI plugin not configured or unavailable. Markdown parsing will be skipped.");
-    return {
-        parsedTasks: [],
-    };
+  const { markdownContent } = input;
+  if (!markdownContent || markdownContent.trim() === "") {
+    return { parsedTasks: [] };
   }
-  return parseMarkdownToTasksFlow(input);
-}
 
-const parseMarkdownPrompt = ai.definePrompt({
-  name: 'parseMarkdownPrompt',
-  input: {schema: ParseMarkdownInputSchema},
-  output: {schema: ParseMarkdownOutputSchema},
-  prompt: `You are an expert at parsing markdown text to extract structured task information.
-The user will provide markdown text. Your goal is to identify main tasks and any associated sub-tasks.
+  const tokens = marked.lexer(markdownContent);
+  const resultingTasks: ParsedTask[] = [];
+  let currentMainTask: ParsedTask | null = null;
+  let collectingDescriptionForMainTask = false;
 
-Guidelines for identification:
-- Main Tasks: Often start with H1, H2, H3 headings (e.g., "# Task Title"), or could be simple lines of text intended as a main task.
-- Sub-Tasks: Typically bullet points (e.g., "- Sub-task 1", "* Sub-task 2") appearing under a main task. All identified bullet points under a main task heading (before the next main task heading) should be considered direct sub-tasks of that main task.
-- Descriptions: Text following a task/sub-task title, or on subsequent lines before the next distinct task/sub-task, should be captured as its description.
-- Due Dates: Look for phrases like "due by tomorrow", "deadline next Monday", "due Dec 25", "in 3 days". Extract the textual phrase as 'dueDateString'. Do not attempt to convert it to a specific date format.
-- Roles: Look for mentions of roles or assignments like "needs a designer", "assign to dev team", "requires a proofreader", or lists of people. Extract these as a comma-separated string for 'assignedRolesString' for the main task. Sub-tasks generally do not have roles parsed separately in this simplified context.
-
-Output Format:
-Return a JSON object that conforms to the output schema.
-Specifically, provide an array called 'parsedTasks'. Each element in this array should be a main task object.
-Each main task object can have a 'subTasks' array for its corresponding sub-tasks.
-If no tasks are found, return an empty 'parsedTasks' array.
-
-Example Markdown:
-# Project Alpha
-This is the main project.
-- Design phase
-  - Create mockups for UI
-- Development phase (needs a developer, designer)
-  - Build frontend due next Friday
-  - Develop backend
-## Quick errand
-Pick up dry cleaning due by 5 PM
-
-Expected Output Structure (Conceptual - AI should fill values):
-{
-  "parsedTasks": [
-    {
-      "title": "Project Alpha",
-      "description": "This is the main project.",
-      "assignedRolesString": "developer, designer",
-      "subTasks": [
-        { "title": "Design phase" },
-        { "title": "Create mockups for UI" },
-        { "title": "Development phase" },
-        { "title": "Build frontend", "dueDateString": "next Friday" },
-        { "title": "Develop backend" }
-      ]
-    },
-    {
-      "title": "Quick errand",
-      "description": "Pick up dry cleaning",
-      "dueDateString": "by 5 PM"
+  for (const token of tokens) {
+    if (token.type === 'heading' && (token.depth === 1 || token.depth === 2 || token.depth === 3)) {
+      if (currentMainTask) {
+        resultingTasks.push(currentMainTask);
+      }
+      currentMainTask = {
+        title: token.text.trim(),
+        subTasks: [],
+      };
+      collectingDescriptionForMainTask = true; // Start collecting description for this new main task
+    } else if (currentMainTask) {
+      if (collectingDescriptionForMainTask && (token.type === 'paragraph' || token.type === 'text' || token.type === 'space')) {
+        if (token.type === 'paragraph' || token.type === 'text') {
+           currentMainTask.description = (currentMainTask.description || '') + token.text.trim() + ' ';
+        }
+        // If it's just a space token, we continue, description might span multiple text/paragraph tokens separated by space.
+      } else if (token.type === 'list') {
+        collectingDescriptionForMainTask = false; // Stop collecting description once a list starts
+        if (!currentMainTask.subTasks) {
+          currentMainTask.subTasks = [];
+        }
+        for (const item of token.items) {
+          // item.text often contains the core content for simple list items.
+          // For items with nested paragraphs, item.tokens is more reliable.
+          let subTaskTitle = '';
+          if (item.tokens && item.tokens.length > 0) {
+            // Concatenate text from all paragraph/text tokens within the list item's direct children
+            // This aims to capture multi-line list items as a single title.
+            let textContent = '';
+            function extractTextFromTokens(subTokens: Tokens.Token[]) {
+              for (const subToken of subTokens) {
+                if (subToken.type === 'text' || subToken.type === 'paragraph') {
+                   textContent += (subToken as Tokens.Text | Tokens.Paragraph).text + ' ';
+                } else if ('tokens' in subToken && subToken.tokens) { // Recurse for nested structures like blockquotes in list items
+                    extractTextFromTokens(subToken.tokens);
+                }
+              }
+            }
+            extractTextFromTokens(item.tokens);
+            subTaskTitle = textContent.trim();
+          } else {
+             subTaskTitle = item.text.trim(); // Fallback for very simple list items
+          }
+          
+          if (subTaskTitle) {
+            currentMainTask.subTasks.push({ title: subTaskTitle });
+          }
+        }
+      } else if (token.type !== 'space') {
+        // If we encounter something other than a heading, list, paragraph, text, or space after a main task,
+        // stop collecting description for the current main task.
+        collectingDescriptionForMainTask = false;
+      }
+      if (currentMainTask.description) {
+        currentMainTask.description = currentMainTask.description.trim();
+      }
     }
-  ]
-}
-
-Markdown Input:
-{{{markdownContent}}}
-`,
-});
-
-
-const parseMarkdownToTasksFlow = ai.defineFlow(
-  {
-    name: 'parseMarkdownToTasksFlow',
-    inputSchema: ParseMarkdownInputSchema,
-    outputSchema: ParseMarkdownOutputSchema,
-  },
-  async (input: ParseMarkdownInput) => {
-    const {output} = await parseMarkdownPrompt(input);
-    if (!output) {
-        // If the model returns nothing or an unexpected format, provide an empty valid response.
-        return { parsedTasks: [] };
-    }
-    return output;
   }
-);
 
+  if (currentMainTask) {
+    if (currentMainTask.description) {
+      currentMainTask.description = currentMainTask.description.trim();
+    }
+    resultingTasks.push(currentMainTask);
+  }
+  
+  return { parsedTasks: resultingTasks };
+}
