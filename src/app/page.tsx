@@ -61,6 +61,7 @@ function HomePageContent() {
           description: `Tasks to do ${title.toLowerCase()}.`,
           completed: false,
           dueDate: null,
+          backgroundImageUrl: undefined,
           createdAt: Date.now() + index, 
           applicants: [],
           checklistItems: [],
@@ -76,6 +77,9 @@ function HomePageContent() {
 
     const tasksWithDefaults = tasksToProcess.map((task, index) => ({
       ...task,
+      description: task.description || "",
+      dueDate: task.dueDate || null,
+      backgroundImageUrl: task.backgroundImageUrl || undefined,
       applicants: task.applicants || [],
       assignedRoles: task.assignedRoles || [],
       checklistItems: task.checklistItems || [],
@@ -83,7 +87,7 @@ function HomePageContent() {
       userId: task.userId || 'unknown_user',
       userDisplayName: task.userDisplayName || 'Unknown User',
       userAvatarUrl: task.userAvatarUrl || '',
-      completed: task.completed || false, // Ensure completed status has a default
+      completed: task.completed || false, 
     }));
 
     setTasks(tasksWithDefaults);
@@ -115,6 +119,7 @@ function HomePageContent() {
       description: "", 
       completed: false,
       dueDate: null, 
+      backgroundImageUrl: undefined,
       createdAt: Date.now(),
       assignedRoles: [], 
       applicants: [],
@@ -169,7 +174,7 @@ function HomePageContent() {
           return {
             ...task,
             checklistItems: updatedChecklistItems,
-            completed: false, // Adding an item makes the task incomplete
+            completed: false, 
           };
         }
         return task;
@@ -218,7 +223,10 @@ function HomePageContent() {
           let newCompletedStatus = false;
           if (updatedChecklistItems.length > 0 && updatedChecklistItems.every(item => item.completed)) {
             newCompletedStatus = true;
+          } else if (updatedChecklistItems.length === 0) {
+            newCompletedStatus = false; // No items means not complete by this logic
           }
+
 
           return { 
             ...task, 
@@ -229,6 +237,32 @@ function HomePageContent() {
         return task;
       })
     );
+  };
+  
+  const handleUpdateChecklistItemTitle = (taskId: string, itemId: string, newTitle: string) => {
+    if (!currentUser) {
+      toast({ title: "Permission Denied", description: "You must be logged in to update items.", variant: "destructive" });
+      return;
+    }
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        if (task.id === taskId) {
+          if (currentUser.id !== task.userId) {
+            toast({ title: "Permission Denied", description: "You can only update items in your own tasks.", variant: "destructive" });
+            return task;
+          }
+          const updatedChecklistItems = (task.checklistItems || []).map(item =>
+            item.id === itemId ? { ...item, title: newTitle } : item
+          );
+          return { ...task, checklistItems: updatedChecklistItems };
+        }
+        return task;
+      })
+    );
+    toast({
+      title: "Checklist Item Updated!",
+      description: "The item title has been changed.",
+    });
   };
 
 
@@ -306,6 +340,33 @@ function HomePageContent() {
       description: "The task title has been changed.",
     });
   };
+
+  const handleSetTaskDueDate = (taskId: string, date: Date | null) => {
+    if (!currentUser) return;
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        if (task.id === taskId && task.userId === currentUser.id) {
+          return { ...task, dueDate: date ? date.toISOString() : null };
+        }
+        return task;
+      })
+    );
+    toast({ title: "Due Date Updated!", description: date ? `Due date set to ${format(date, "PPP")}.` : "Due date removed." });
+  };
+
+  const handleSetTaskBackgroundImage = (taskId: string, imageUrl: string | null) => {
+     if (!currentUser) return;
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        if (task.id === taskId && task.userId === currentUser.id) {
+          return { ...task, backgroundImageUrl: imageUrl || undefined };
+        }
+        return task;
+      })
+    );
+    toast({ title: "Background Image Updated!", description: imageUrl ? "New background image applied." : "Background image removed." });
+  };
+
 
   const actualPrint = useCallback(() => {
     if (printableAreaRef.current) {
@@ -594,8 +655,11 @@ function HomePageContent() {
                         onAddChecklistItem={handleAddChecklistItem}
                         onToggleChecklistItem={handleToggleChecklistItem}
                         onDeleteChecklistItem={handleDeleteChecklistItem}
+                        onUpdateChecklistItemTitle={handleUpdateChecklistItemTitle}
                         onApplyForRole={handleApplyForRole}
                         onUpdateTaskTitle={handleUpdateTaskTitle}
+                        onSetDueDate={handleSetTaskDueDate}
+                        onSetBackgroundImage={handleSetTaskBackgroundImage}
                       />
                     </div>
                   ))
@@ -620,15 +684,15 @@ function HomePageContent() {
 }
 
 function defaultTasksAddedForUser(userId: string, allTasks?: Task[]): boolean {
-  if (!allTasks) return false; // Should not happen if called after tasks are loaded
+  if (!allTasks) return false; 
   const userTasks = allTasks.filter(t => t.userId === userId);
-  // Check if the only tasks present are the default ones
+  
   if (userTasks.length === 3) {
     const titles = userTasks.map(t => t.title).sort();
     const defaultTitles = ["Later", "This Week", "Today"].sort();
     return JSON.stringify(titles) === JSON.stringify(defaultTitles);
   }
-  return false;
+  return userTasks.length > 0 && userTasks.length < 3; // if some defaults were deleted, still true
 }
 
 

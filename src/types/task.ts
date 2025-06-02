@@ -17,6 +17,8 @@ export interface ChecklistItem {
   id: string;
   title: string;
   completed: boolean;
+  // dueDate?: string | null; // Example for future extension
+  // assignedUserId?: string | null; // Example for future extension
 }
 
 export interface Task {
@@ -25,10 +27,11 @@ export interface Task {
   description: string;
   completed: boolean;
   dueDate: string | null; // ISO date string or null
+  backgroundImageUrl?: string; // For card background image
   createdAt: number; // Timestamp (number) for sorting for localStorage
   assignedRoles?: string[];
   applicants?: Applicant[];
-  checklistItems?: ChecklistItem[]; // Added: For internal to-do items within a card
+  checklistItems?: ChecklistItem[]; 
   order?: number; // Optional field for drag-and-drop ordering
 
   // User association (owner of the task)
