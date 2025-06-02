@@ -4,7 +4,8 @@
 import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Task, ChecklistItem } from '@/types/task';
-import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
+// CreateTaskForm is no longer used directly here, its logic is inlined
+// import { CreateTaskForm } from '@/components/toondo/CreateTaskForm'; 
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, UserCircleIcon, PlusSquareIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -16,10 +17,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input'; // Added Input
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+// Popover is removed for task creation
+// import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; 
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
 
 function HomePageContent() {
@@ -34,7 +37,8 @@ function HomePageContent() {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
 
-  const [isCreateTaskPopoverOpen, setIsCreateTaskPopoverOpen] = useState(false);
+  // State for the new inline task title input
+  const [newTaskTitle, setNewTaskTitle] = useState('');
 
 
   useEffect(() => {
@@ -62,7 +66,7 @@ function HomePageContent() {
           description: `Tasks to do ${title.toLowerCase()}.`,
           completed: false,
           dueDate: null,
-          createdAt: Date.now() + index, // Stagger createdAt slightly for stable sort fallback
+          createdAt: Date.now() + index, 
           applicants: [],
           checklistItems: [],
           assignedRoles: [],
@@ -80,7 +84,7 @@ function HomePageContent() {
       applicants: task.applicants || [],
       assignedRoles: task.assignedRoles || [],
       checklistItems: task.checklistItems || [],
-      order: task.order ?? index, // Ensure order is present
+      order: task.order ?? index, 
       userId: task.userId || 'unknown_user',
       userDisplayName: task.userDisplayName || 'Unknown User',
       userAvatarUrl: task.userAvatarUrl || '',
@@ -97,8 +101,39 @@ function HomePageContent() {
     }
   }, [tasks, isLoadingTasks]);
 
+  // This function is now effectively replaced by handleDirectAddTask
+  // const handleAddTask = (newTaskData: Omit<Task, 'id' | 'createdAt' | 'order' | 'userId' | 'userDisplayName' | 'userAvatarUrl' | 'applicants' | 'checklistItems'>) => {
+  //   if (!currentUser) {
+  //     toast({ title: "Not Logged In", description: "You must be logged in to add tasks.", variant: "destructive" });
+  //     return;
+  //   }
 
-  const handleAddTask = (newTaskData: Omit<Task, 'id' | 'createdAt' | 'order' | 'userId' | 'userDisplayName' | 'userAvatarUrl' | 'applicants' | 'checklistItems'>) => {
+  //   const tasksForCurrentUser = tasks.filter(t => t.userId === currentUser.id);
+  //   const taskWithUserAndDefaults: Task = {
+  //     ...newTaskData,
+  //     id: generateId(),
+  //     createdAt: Date.now(),
+  //     applicants: [],
+  //     checklistItems: [],
+  //     order: tasksForCurrentUser.length, 
+  //     userId: currentUser.id,
+  //     userDisplayName: currentUser.displayName,
+  //     userAvatarUrl: currentUser.avatarUrl,
+  //   };
+
+  //   setTasks(prevTasks => [...prevTasks, taskWithUserAndDefaults]);
+
+  //   toast({
+  //     title: "ToonDo Added!",
+  //     description: `"${newTaskData.title}" is ready to be tackled!`,
+  //   });
+  // };
+
+  const handleDirectAddTask = () => {
+    if (!newTaskTitle.trim()) {
+      toast({ title: "Title Required", description: "Please enter a title for the ToonDo.", variant: "destructive" });
+      return;
+    }
     if (!currentUser) {
       toast({ title: "Not Logged In", description: "You must be logged in to add tasks.", variant: "destructive" });
       return;
@@ -106,28 +141,29 @@ function HomePageContent() {
 
     const tasksForCurrentUser = tasks.filter(t => t.userId === currentUser.id);
     const taskWithUserAndDefaults: Task = {
-      ...newTaskData,
       id: generateId(),
+      title: newTaskTitle.trim(),
+      description: "", // Default empty description
+      completed: false,
+      dueDate: null, // Default null due date
       createdAt: Date.now(),
+      assignedRoles: [], // Default empty roles
       applicants: [],
-      checklistItems: [],
-      order: tasksForCurrentUser.length, // New tasks go to the end of the user's list
+      checklistItems: [], // Default empty checklist
+      order: tasksForCurrentUser.length,
       userId: currentUser.id,
       userDisplayName: currentUser.displayName,
       userAvatarUrl: currentUser.avatarUrl,
     };
 
     setTasks(prevTasks => [...prevTasks, taskWithUserAndDefaults]);
-
+    setNewTaskTitle(''); // Clear input after adding
     toast({
       title: "ToonDo Added!",
-      description: `"${newTaskData.title}" is ready to be tackled!`,
+      description: `"${taskWithUserAndDefaults.title}" is ready to be tackled!`,
     });
   };
 
-  const handleTaskCreatedInPopover = () => {
-    setIsCreateTaskPopoverOpen(false);
-  };
 
   const taskHasIncompleteChecklistItems = (taskId: string): boolean => {
     const task = tasks.find(t => t.id === taskId);
@@ -193,7 +229,6 @@ function HomePageContent() {
             completed: false,
           };
           const updatedChecklistItems = [...(task.checklistItems || []), newItem];
-          // If task was complete, and we're adding an incomplete item, mark task as incomplete
           const taskNowIncomplete = task.completed;
           return {
             ...task,
@@ -213,7 +248,6 @@ function HomePageContent() {
           const updatedChecklistItems = (task.checklistItems || []).map(item =>
             item.id === itemId ? { ...item, completed: !item.completed } : item
           );
-          // If an item becomes incomplete, and the task was complete, mark task incomplete
           const becomesIncomplete = updatedChecklistItems.some(item => !item.completed && task.completed);
 
           return {
@@ -419,7 +453,6 @@ function HomePageContent() {
             if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
             if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
         }
-        // Fallback sort for tasks not belonging to current user, or if no user
         const orderA = typeof a.order === 'number' ? a.order : (typeof a.createdAt === 'number' ? a.createdAt : Infinity);
         const orderB = typeof b.order === 'number' ? b.order : (typeof b.createdAt === 'number' ? b.createdAt : Infinity);
         return orderA - orderB;
@@ -436,7 +469,6 @@ function HomePageContent() {
     setDragOverItemId(null);
   };
 
-  // Sort tasks for display
   const displayTasks = [...tasks].sort((a,b) => {
       if (currentUser) {
         if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
@@ -447,7 +479,6 @@ function HomePageContent() {
              return orderA - orderB;
         }
       }
-      // Fallback sort for tasks not belonging to current user, or if no user
       const orderA = typeof a.order === 'number' ? a.order : (typeof a.createdAt === 'number' ? a.createdAt : Infinity);
       const orderB = typeof b.order === 'number' ? b.order : (typeof b.createdAt === 'number' ? b.createdAt : Infinity);
       return orderA - orderB;
@@ -531,39 +562,50 @@ function HomePageContent() {
             </div>
           ) : (
             <>
-              <div className="mb-8">
-                <Popover open={isCreateTaskPopoverOpen} onOpenChange={setIsCreateTaskPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="default" size="lg" className="shadow-lg hover:shadow-xl transition-shadow">
-                      <PlusSquareIcon className="mr-2 h-5 w-5" /> Add New ToonDo
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full max-w-lg p-0" side="bottom" align="start">
-                    <CreateTaskForm
-                      onAddTask={handleAddTask}
-                      onTaskCreated={handleTaskCreatedInPopover}
+              {/* Removed Popover for CreateTaskForm, replaced with inline input area */}
+              <div
+                className={cn(
+                  'flex overflow-x-auto space-x-6 py-4 items-start' // Keep this for the list of tasks
+                )}
+              >
+                 {/* Inline Task Creation Area */}
+                <div className="flex-shrink-0 w-80 bg-card shadow-lg rounded-xl border border-border p-4 sticky left-4 z-10 self-start"> {/* Made sticky */}
+                  <h3 className="text-xl font-semibold mb-4 text-primary">Add New ToonDo</h3>
+                  <div className="space-y-3">
+                    <Input
+                      placeholder="Enter task title..."
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && newTaskTitle.trim()) {
+                          handleDirectAddTask();
+                        }
+                      }}
+                      className="text-base"
+                      aria-label="New task title"
                     />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {displayTasks.length === 0 && !isLoadingTasks ? (
-                 <div className="text-center py-16">
-                  <FileTextIcon className="mx-auto h-24 w-24 text-muted-foreground opacity-50 mb-4" />
-                  <h2 className="text-3xl font-semibold mb-2">No ToonDos Yet, {currentUser.displayName}!</h2>
-                  <p className="text-muted-foreground text-lg">Time to add some epic quests to your list.</p>
+                    <Button
+                      onClick={handleDirectAddTask}
+                      disabled={!newTaskTitle.trim()}
+                      className="w-full text-lg py-3"
+                    >
+                      <PlusSquareIcon className="mr-2 h-5 w-5" /> Add Card
+                    </Button>
+                  </div>
                 </div>
-              ) : (
-                <div
-                  className={cn(
-                    'flex overflow-x-auto space-x-6 py-4 items-start'
-                  )}
-                >
-                  {displayTasks.map(task => (
+
+                {displayTasks.length === 0 && !isLoadingTasks && !defaultTasksAddedForUser(currentUser.id) ? (
+                  <div className="text-center py-16 pl-6"> {/* Added pl-6 to account for sticky adder */}
+                    <FileTextIcon className="mx-auto h-24 w-24 text-muted-foreground opacity-50 mb-4" />
+                    <h2 className="text-3xl font-semibold mb-2">No ToonDos Yet, {currentUser.displayName}!</h2>
+                    <p className="text-muted-foreground text-lg">Time to add some epic quests to your list.</p>
+                  </div>
+                ) : (
+                  displayTasks.map(task => (
                     <div
                       key={task.id}
                       className={cn(
-                        "flex-shrink-0 w-80 space-y-4 rounded-lg group/card", // Added group/card for hover effects
+                        "flex-shrink-0 w-80 space-y-4 rounded-lg group/card",
                         currentUser && task.userId === currentUser.id && "cursor-grab",
                         draggedItemId === task.id && "opacity-50 ring-2 ring-primary ring-offset-2",
                         dragOverItemId === task.id && draggedItemId !== task.id && "ring-2 ring-accent ring-offset-1 scale-102 shadow-xl z-10"
@@ -590,9 +632,9 @@ function HomePageContent() {
                         onUpdateTaskTitle={handleUpdateTaskTitle}
                       />
                     </div>
-                  ))}
-                </div>
-              )}
+                  ))
+                )}
+              </div>
             </>
           )}
         </main>
@@ -611,13 +653,20 @@ function HomePageContent() {
   );
 }
 
+// Helper function to check if default tasks were the only ones added
+function defaultTasksAddedForUser(userId: string, allTasks?: Task[]): boolean {
+  if (!allTasks) return false;
+  const userTasks = allTasks.filter(t => t.userId === userId);
+  if (userTasks.length === 3) {
+    const titles = userTasks.map(t => t.title).sort();
+    return titles[0] === "Later" && titles[1] === "This Week" && titles[2] === "Today";
+  }
+  return false;
+}
+
 
 export default function HomePage() {
   return (
       <HomePageContent />
   );
 }
-
-    
-
-      
