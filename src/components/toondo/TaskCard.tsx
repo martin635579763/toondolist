@@ -341,20 +341,32 @@ export function TaskCard({
             <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
               {task.checklistItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between group/checklist text-sm text-card-foreground">
-                  <div className="flex items-center flex-grow">
+                  <div className="flex items-center flex-grow min-w-0 relative"> {/* Parent is relative */}
                     <Checkbox
                       id={`checklist-${task.id}-${item.id}`}
                       checked={item.completed}
                       onCheckedChange={() => onToggleChecklistItem(task.id, item.id)}
                       disabled={!isOwner}
                       className={cn(
-                        "h-3.5 w-3.5 mr-2 border-2 data-[state=checked]:bg-green-400 data-[state=checked]:text-primary-foreground border-muted-foreground rounded-full transition-opacity duration-150",
-                         isOwner ? "opacity-0 group-hover/checklist:opacity-100 focus:opacity-100 group-focus-within/checklist:opacity-100" : "opacity-50 cursor-not-allowed"
+                        "h-3.5 w-3.5 border-2 rounded-full data-[state=checked]:bg-green-400 data-[state=checked]:text-primary-foreground border-muted-foreground shrink-0", // Base style
+                        "transition-opacity duration-200 ease-in-out", // Transition
+                        "absolute left-0 top-1/2 -translate-y-1/2 z-10", // Positioning
+                        isOwner 
+                          ? "opacity-0 group-hover/checklist:opacity-100 group-focus-within/checklist:opacity-100" // Owner visibility
+                          : "opacity-50 cursor-not-allowed" // Non-owner visibility
                       )}
                     />
                     <label
                       htmlFor={`checklist-${task.id}-${item.id}`}
-                      className={cn("flex-grow break-all", item.completed && "line-through opacity-70", !isOwner && "cursor-not-allowed")}
+                      className={cn(
+                        "flex-grow break-all truncate", // Base style
+                        "transition-all duration-200 ease-in-out", // Transition for padding
+                        isOwner 
+                          ? "pl-0 group-hover/checklist:pl-[calc(0.875rem+0.5rem)] group-focus-within/checklist:pl-[calc(0.875rem+0.5rem)]" // Owner padding: 0.875rem (checkbox width w-3.5) + 0.5rem (gap like mr-2)
+                          : "pl-[calc(0.875rem+0.5rem)]", // Non-owner padding
+                        item.completed && "line-through opacity-70",
+                        !isOwner && "cursor-not-allowed"
+                      )}
                     >
                       {item.title}
                     </label>
@@ -363,7 +375,7 @@ export function TaskCard({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 p-0 opacity-0 group-hover/checklist:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-opacity duration-150"
+                      className="h-5 w-5 p-0 opacity-0 group-hover/checklist:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-opacity duration-150 shrink-0"
                       onClick={() => onDeleteChecklistItem(task.id, item.id)}
                       aria-label="Delete checklist item"
                     >
@@ -469,4 +481,7 @@ export function TaskCard({
     </Card>
   );
 }
+    
+
+
     
