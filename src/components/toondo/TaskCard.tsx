@@ -532,6 +532,36 @@ export function TaskCard({
                      />
                   </div>
 
+                  {/* Assigned User Section */}
+                  <div className="pt-2 border-t border-border/50">
+                    <div>
+                        <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Assigned User</Label>
+                        {dialogTempAssignedUserId && dialogTempAssignedUserName ? (
+                        <div className="flex items-center space-x-2 text-sm p-2 rounded-md border bg-muted/50 border-muted">
+                            <Avatar className="h-6 w-6">
+                                <AvatarImage src={dialogTempAssignedUserAvatarUrl || undefined} alt={dialogTempAssignedUserName} data-ai-hint="user portrait"/>
+                                <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{dialogTempAssignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <span>{dialogTempAssignedUserName}</span>
+                        </div>
+                        ) : (
+                        <p className={cn("text-sm p-2 rounded-md border bg-muted/50 border-muted", task.backgroundImageUrl ? "text-gray-300 bg-white/5 border-white/20" : "text-muted-foreground")}>Not assigned.</p>
+                        )}
+                        <div className="mt-1.5 space-y-1.5">
+                            {currentUser && dialogTempAssignedUserId !== currentUser.id && (
+                                <Button onClick={handleDialogAssignToMe} className={cn("w-full text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}>
+                                    <UserCircleIcon className="mr-2 h-3.5 w-3.5" /> Assign to Me
+                                </Button>
+                            )}
+                            {dialogTempAssignedUserId && (
+                                <Button variant="outline" onClick={handleDialogUnassign} className={cn("w-full text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-transparent border-white/40 hover:bg-white/10 text-white")}>
+                                    Unassign
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                  </div>
+
                   {/* Attachment Section */}
                   <div className="space-y-2 pt-2 border-t border-border/50">
                     <h4 className={cn("text-sm font-medium mb-1", task.backgroundImageUrl && "text-gray-200")}>Attachment</h4>
@@ -616,35 +646,6 @@ export function TaskCard({
                     />
                   </div>
 
-                  {/* Assigned User Section */}
-                  <div className="pt-2 border-t border-border/50">
-                    <div>
-                        <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Assigned User</Label>
-                        {dialogTempAssignedUserId && dialogTempAssignedUserName ? (
-                        <div className="flex items-center space-x-2 text-sm p-2 rounded-md border bg-muted/50 border-muted">
-                            <Avatar className="h-6 w-6">
-                                <AvatarImage src={dialogTempAssignedUserAvatarUrl || undefined} alt={dialogTempAssignedUserName} data-ai-hint="user portrait"/>
-                                <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{dialogTempAssignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                            <span>{dialogTempAssignedUserName}</span>
-                        </div>
-                        ) : (
-                        <p className={cn("text-sm p-2 rounded-md border bg-muted/50 border-muted", task.backgroundImageUrl ? "text-gray-300 bg-white/5 border-white/20" : "text-muted-foreground")}>Not assigned.</p>
-                        )}
-                        <div className="mt-1.5 space-y-1.5">
-                            {currentUser && dialogTempAssignedUserId !== currentUser.id && (
-                                <Button onClick={handleDialogAssignToMe} className={cn("w-full text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}>
-                                    <UserCircleIcon className="mr-2 h-3.5 w-3.5" /> Assign to Me
-                                </Button>
-                            )}
-                            {dialogTempAssignedUserId && (
-                                <Button variant="outline" onClick={handleDialogUnassign} className={cn("w-full text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-transparent border-white/40 hover:bg-white/10 text-white")}>
-                                    Unassign
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Right Column - Comments */}
@@ -681,4 +682,3 @@ export function TaskCard({
     </Card>
   );
 }
-
