@@ -251,15 +251,17 @@ export function TaskCard({
 
   const handleToggleLabelColorInDialog = (colorClass: string) => {
     setDialogTempLabel(prev => {
-        const newLabels = prev.includes(colorClass)
-            ? prev.filter(c => c !== colorClass)
-            : [...prev, colorClass];
-        
-        if (newLabels.length > MAX_LABELS) {
-            toast({title: "Label Limit Reached", description: `You can select up to ${MAX_LABELS} labels.`, variant: "default"});
-            return prev;
+        const isSelected = prev.includes(colorClass);
+        if (isSelected) {
+            return prev.filter(c => c !== colorClass);
+        } else {
+            if (prev.length < MAX_LABELS) {
+                return [...prev, colorClass];
+            } else {
+                toast({title: "Label Limit Reached", description: `You can select up to ${MAX_LABELS} labels.`, variant: "default"});
+                return prev;
+            }
         }
-        return newLabels;
     });
   };
   const handleClearAllLabelsInDialog = () => {
@@ -347,9 +349,9 @@ export function TaskCard({
                 )}
               >
                 {item.label && item.label.length > 0 && (
-                    <div className="flex h-1.5 w-24">
+                    <div className={cn("flex h-1.5 rounded-sm overflow-hidden", "w-36")}>
                         {item.label.map((colorClass, index) => (
-                            <div key={index} className={cn("h-full w-4", colorClass)} />
+                            <div key={index} className={cn("h-full", "w-6", colorClass)} />
                         ))}
                     </div>
                 )}
@@ -525,7 +527,7 @@ export function TaskCard({
             onClick={(e) => e.stopPropagation()}
           >
              <DialogHeader className="pb-2">
-                  <DialogTitle className="sr-only">
+                   <DialogTitle className="sr-only">
                     {`Edit item: ${dialogTempTitle || editingItemAllDetails.title || "Untitled Item"}`}
                   </DialogTitle>
                  <div className="flex items-center space-x-2">
@@ -561,9 +563,9 @@ export function TaskCard({
             <div className="flex flex-wrap items-center gap-2 mb-3">
                 <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className={cn("justify-start text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                        <Button variant="outline" size="sm" className={cn("justify-start text-xs h-auto py-1.5 px-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
                             <UserCircleIcon className="mr-1.5 h-3.5 w-3.5" />
-                            {dialogTempAssignedUserName || "Assign"}
+                            {dialogTempAssignedUserName ? dialogTempAssignedUserName.split(' ')[0] : "Assign"}
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
@@ -575,7 +577,7 @@ export function TaskCard({
 
                 <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className={cn("justify-start text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                        <Button variant="outline" size="sm" className={cn("justify-start text-xs h-auto py-1.5 px-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
                             <CalendarDaysIcon className="mr-1.5 h-3.5 w-3.5" />
                             {dialogTempDueDate ? format(dialogTempDueDate, "MMM d") : "Due Date"}
                             {dialogTempCompleted && dialogTempDueDate && (
@@ -600,14 +602,14 @@ export function TaskCard({
                     variant="outline"
                     size="sm"
                     onClick={handleOpenAttachmentDialog}
-                    className={cn("justify-start text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
+                    className={cn("justify-start text-xs h-auto py-1.5 px-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
                 >
                     <PaperclipIcon className="mr-1.5 h-3.5 w-3.5" /> Image
                 </Button>
 
                 <Popover open={isLabelPopoverOpen} onOpenChange={setIsLabelPopoverOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className={cn("justify-start text-xs items-center h-auto py-1.5", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                        <Button variant="outline" size="sm" className={cn("justify-start text-xs items-center h-auto py-1.5 px-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
                             <TagIcon className="mr-1.5 h-3.5 w-3.5" />
                             Label
                             {dialogTempLabel.length > 0 && (
@@ -761,4 +763,5 @@ export function TaskCard({
     </Card>
   );
 }
+
 
