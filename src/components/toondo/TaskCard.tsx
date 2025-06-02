@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Edit3Icon, CalendarDaysIcon, PartyPopperIcon, UsersIcon, PlusCircleIcon, Trash2Icon, UserPlusIcon, MoreHorizontalIcon, UserCircleIcon, ImagePlusIcon } from "lucide-react";
+import { PrinterIcon, Edit3Icon, CalendarDaysIcon, PartyPopperIcon, PlusCircleIcon, Trash2Icon, UserPlusIcon, MoreHorizontalIcon, UserCircleIcon, ImagePlusIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
@@ -45,8 +45,8 @@ interface TaskCardProps {
   onAssignUserToChecklistItem: (taskId: string, itemId: string, userId: string | null, userName: string | null, userAvatarUrl: string | null) => void;
   onApplyForRole: (taskId: string, roleName: string) => void;
   onUpdateTaskTitle: (taskId: string, newTitle: string) => void;
-  onSetDueDate: (taskId: string, date: Date | null) => void;
-  onSetBackgroundImage: (taskId: string, imageUrl: string | null) => void;
+  onSetDueDate: (taskId: string, date: Date | null) => void; // Remains for potential future use via other UI
+  onSetBackgroundImage: (taskId: string, imageUrl: string | null) => void; // Remains for potential future use
 }
 
 export function TaskCard({
@@ -75,13 +75,6 @@ export function TaskCard({
 
   const [showFireworks, setShowFireworks] = useState(false);
   const prevCompleted = useRef(task.completed);
-
-  const [isMainDatePickerOpen, setIsMainDatePickerOpen] = useState(false);
-  const [selectedMainDate, setSelectedMainDate] = useState<Date | undefined>(
-    task.dueDate ? new Date(task.dueDate) : undefined
-  );
-  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
-  const [newImageUrl, setNewImageUrl] = useState(task.backgroundImageUrl || "");
 
   const [editingChecklistItemId, setEditingChecklistItemId] = useState<string | null>(null);
   const [editingChecklistItemNewTitle, setEditingChecklistItemNewTitle] = useState("");
@@ -156,17 +149,6 @@ export function TaskCard({
     }
   };
 
-  const handleSetMainTaskDueDate = (date: Date | undefined) => {
-    setSelectedMainDate(date);
-    onSetDueDate(task.id, date || null);
-    setIsMainDatePickerOpen(false);
-  };
-
-  const handleSetTaskBackgroundImage = () => {
-    onSetBackgroundImage(task.id, newImageUrl.trim() || null);
-    setIsImageDialogOpen(false);
-  };
-
   const handleStartEditChecklistItem = (item: ChecklistItem) => {
     setEditingChecklistItemId(item.id);
     setEditingChecklistItemNewTitle(item.title);
@@ -219,8 +201,8 @@ export function TaskCard({
     cardStyle.backgroundImage = `url(${task.backgroundImageUrl})`;
     cardStyle.backgroundSize = 'cover';
     cardStyle.backgroundPosition = 'center';
-    contentOverlayStyle.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-    contentOverlayStyle.color = 'white';
+    contentOverlayStyle.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Dark overlay for text contrast
+    contentOverlayStyle.color = 'white'; // Ensure text on overlay is white
   }
 
 
@@ -229,7 +211,7 @@ export function TaskCard({
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative border-border",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        !task.backgroundImageUrl && "bg-card text-card-foreground"
+        !task.backgroundImageUrl && "bg-card text-card-foreground" // Apply only if no background image
       )}
       style={cardStyle}
     >
@@ -241,13 +223,13 @@ export function TaskCard({
         <div className="fireworks-container">
           {Array.from({ length: 20 }).map((_, i) => {
             const angle = Math.random() * 360;
-            const radius = 30 + Math.random() * 70;
+            const radius = 30 + Math.random() * 70; // Increased radius for wider spread
             const txVal = Math.cos(angle * Math.PI / 180) * radius;
             const tyVal = Math.sin(angle * Math.PI / 180) * radius;
 
             const tx = txVal + 'px';
             const ty = tyVal + 'px';
-            const delay = Math.random() * 0.4;
+            const delay = Math.random() * 0.4; // Shorten delay slightly for quicker burst
             const particleColors = ['#FFD700', '#FF6347', '#ADFF2F', '#87CEEB', '#DA70D6', '#FFFFFF'];
             const color = particleColors[Math.floor(Math.random() * particleColors.length)];
             return (
@@ -255,9 +237,9 @@ export function TaskCard({
                 key={i}
                 className="firework-particle"
                 style={{
-                  top: '50%',
+                  top: '50%', // Explode from center
                   left: '50%',
-                  transform: 'translate(-50%, -50%)',
+                  transform: 'translate(-50%, -50%)', // Adjust origin for transform
                   backgroundColor: color,
                   animationDelay: `${delay}s`,
                   // @ts-ignore
@@ -565,86 +547,22 @@ export function TaskCard({
         </TooltipProvider>
 
         {isOwner && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn("h-7 w-7 hover:bg-black/10 dark:hover:bg-white/10", task.backgroundImageUrl ? "text-gray-300 hover:text-white" : "text-muted-foreground hover:text-foreground")}
-                aria-label="Task options"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontalIcon className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-                side="bottom"
-                align="end"
-                onClick={(e) => e.stopPropagation()}
-                className="bg-popover text-popover-foreground"
-            >
-              <DropdownMenuItem onClick={() => { setIsEditingTitle(true); setEditableTitle(task.title); }}>
-                <Edit3Icon className="mr-2 h-4 w-4" />
-                Edit Title
-              </DropdownMenuItem>
-
-              <Popover open={isMainDatePickerOpen} onOpenChange={setIsMainDatePickerOpen}>
-                <PopoverTrigger asChild>
-                    <Button variant="ghost" className="w-full justify-start px-2 py-1.5 text-sm font-normal h-auto">
-                        <CalendarDaysIcon className="mr-2 h-4 w-4" /> Set Card Due Date
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start" side="right" sideOffset={5}>
-                    <Calendar
-                        mode="single"
-                        selected={selectedMainDate}
-                        onSelect={handleSetMainTaskDueDate}
-                        initialFocus
-                    />
-                </PopoverContent>
-              </Popover>
-
-              <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button variant="ghost" className="w-full justify-start px-2 py-1.5 text-sm font-normal h-auto">
-                        <ImagePlusIcon className="mr-2 h-4 w-4" /> Set Background Image
-                    </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px] bg-card text-card-foreground" onClick={(e) => e.stopPropagation()}>
-                  <DialogHeader>
-                    <DialogTitle>Set Card Background Image</DialogTitle>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="imageUrl" className="text-right">Image URL</Label>
-                      <Input
-                        id="imageUrl"
-                        value={newImageUrl}
-                        onChange={(e) => setNewImageUrl(e.target.value)}
-                        className="col-span-3 bg-input text-foreground"
-                        placeholder="https://placehold.co/600x400.png"
-                      />
-                    </div>
-                     <p className="text-xs text-muted-foreground text-center col-span-4">Leave empty to remove background image.</p>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleSetTaskBackgroundImage}>Save Background</Button>
-                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <DropdownMenuItem disabled>
-                 <UserPlusIcon className="mr-2 h-4 w-4 text-muted-foreground/70" />
-                 <span className="text-muted-foreground/70">Change Owner (soon)</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDelete(task)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                <Trash2Icon className="mr-2 h-4 w-4" />
-                Delete Card
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); onDelete(task); }}
+                        className={cn("h-7 w-7 text-destructive hover:bg-destructive/10", task.backgroundImageUrl ? "hover:text-red-400" : "hover:text-destructive")}
+                        aria-label="Delete task"
+                        >
+                        <Trash2Icon className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="bg-destructive text-destructive-foreground"><p>Delete Card</p></TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         )}
       </CardFooter>
       </div>
