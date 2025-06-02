@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon, PlusCircleIcon, XIcon, ListChecksIcon } from "lucide-react";
 import { format } from "date-fns";
-import { cn, getContrastingTextColor, generateId } from "@/lib/utils";
+import { cn, generateId } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-// AddSubTaskForm import removed
 
 interface TaskCardProps {
   task: Task;
@@ -46,18 +45,8 @@ export function TaskCard({
   onApplyForRole,
   hasIncompleteChecklistItems
 }: TaskCardProps) {
-  const textColor = getContrastingTextColor(task.color);
   const isOwner = currentUser && currentUser.id === task.userId;
   const [newChecklistItemTitle, setNewChecklistItemTitle] = useState("");
-
-  const cardStyle: React.CSSProperties = {
-    backgroundColor: task.color,
-    color: textColor,
-    borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
-  };
-
-  const textStyle = { color: textColor };
-  const mutedTextStyle = { color: textColor, opacity: 0.8 };
 
   let mainCheckboxDisabled = false;
   let mainCheckboxTooltipContent: React.ReactNode = null;
@@ -106,10 +95,9 @@ export function TaskCard({
   return (
     <Card
       className={cn(
-        "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
+        "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative bg-card text-card-foreground border-border",
         task.completed && "opacity-60 ring-2 ring-green-500"
       )}
-      style={cardStyle}
     >
       {showFireworks && (
         <div className="fireworks-container">
@@ -148,7 +136,7 @@ export function TaskCard({
       <CardHeader className="p-4 pb-2">
         <div className="flex items-start justify-between">
           <div className="flex-grow">
-            <CardTitle className="text-xl font-bold break-words" style={textStyle}>
+            <CardTitle className="text-xl font-bold break-words">
               {task.title}
             </CardTitle>
           </div>
@@ -157,9 +145,9 @@ export function TaskCard({
              <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Avatar className="h-7 w-7 border" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)'}}>
+                  <Avatar className="h-7 w-7 border border-border">
                       <AvatarImage src={task.userAvatarUrl} alt={task.userDisplayName} data-ai-hint="user portrait"/>
-                      <AvatarFallback style={{backgroundColor: task.color, color: textColor, borderStyle: 'solid', borderWidth: '1px', borderColor: textColor, fontSize: '0.7rem'}}>
+                      <AvatarFallback className="bg-muted text-muted-foreground text-xs">
                           {task.userDisplayName?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                   </Avatar>
@@ -170,26 +158,26 @@ export function TaskCard({
               </Tooltip>
               </TooltipProvider>
             )}
-            {task.completed && <PartyPopperIcon className="ml-1 shrink-0 h-5 w-5" style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
+            {task.completed && <PartyPopperIcon className="ml-1 shrink-0 h-5 w-5 text-yellow-400" />}
           </div>
         </div>
         {task.description && (
-            <CardDescription className="mt-1 break-words text-sm" style={{color: textColor, opacity: 0.85}}>
+            <CardDescription className="mt-1 break-words text-sm text-muted-foreground">
                 {task.description}
             </CardDescription>
         )}
       </CardHeader>
       <CardContent className="flex-grow space-y-2 p-4 pt-1 min-h-7">
         {task.dueDate && (
-          <div className="text-sm flex items-center" style={{color: textColor, opacity: 0.9}}>
-            <CalendarDaysIcon className="mr-1 h-3.5 w-3.5" style={textStyle} />
+          <div className="text-sm flex items-center text-muted-foreground">
+            <CalendarDaysIcon className="mr-1 h-3.5 w-3.5" />
             Due: {format(new Date(task.dueDate), "PP")}
           </div>
         )}
 
         {task.assignedRoles && task.assignedRoles.length > 0 && (
-          <div className="mt-1.5 pt-1.5 border-t border-dashed" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}}>
-            <h4 className="text-xs font-semibold uppercase flex items-center mb-0.5" style={mutedTextStyle}>
+          <div className="mt-1.5 pt-1.5 border-t border-dashed border-border/50">
+            <h4 className="text-xs font-semibold uppercase flex items-center mb-0.5 text-muted-foreground">
               <UsersIcon className="mr-1 h-3 w-3" />
               Needed Roles:
             </h4>
@@ -200,7 +188,7 @@ export function TaskCard({
                 const totalPendingForRole = task.applicants?.filter(app => app.role === role && app.status === 'pending').length || 0;
 
                 return (
-                  <div key={index} className="flex items-center justify-between" style={textStyle}>
+                  <div key={index} className="flex items-center justify-between text-card-foreground">
                     <span className="mr-1">- {role}:</span>
                     {acceptedApplicant ? (
                       <Badge variant="default" className="py-0 px-1 text-[10px] bg-green-500/80 hover:bg-green-500 text-white flex items-center gap-0.5">
@@ -245,13 +233,7 @@ export function TaskCard({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-5 px-1 py-0 text-[10px]"
-                                style={{
-                                  backgroundColor: 'rgba(255,255,255,0.15)',
-                                  borderColor: textColor,
-                                  color: textColor,
-                                  lineHeight: 'normal'
-                                }}
+                                className="h-5 px-1 py-0 text-[10px] text-card-foreground border-card-foreground/50 hover:bg-accent hover:text-accent-foreground"
                                 onClick={(e) => { e.stopPropagation(); onApplyForRole(task.id, role); }}
                               >
                                 <ApplyIcon className="h-2.5 w-2.5 mr-0.5"/> Apply
@@ -262,13 +244,13 @@ export function TaskCard({
                           </TooltipProvider>
                         )}
                          {!currentUser && totalPendingForRole === 0 && (
-                            <Badge variant="outline" className="py-0 px-1 text-[10px]" style={{borderColor: textColor, color: textColor}}>Open</Badge>
+                            <Badge variant="outline" className="py-0 px-1 text-[10px]">Open</Badge>
                         )}
                          {isOwner && totalPendingForRole === 0 && (
-                             <Badge variant="outline" className="py-0 px-1 text-[10px]" style={{borderColor: textColor, color: textColor}}>Open</Badge>
+                             <Badge variant="outline" className="py-0 px-1 text-[10px]">Open</Badge>
                         )}
                          {currentUser && !isOwner && totalPendingForRole > 0 && !currentUserApplication && (
-                            <Badge variant="outline" className="py-0 px-1 text-[10px]" style={{borderColor: textColor, color: textColor}}>Open</Badge>
+                            <Badge variant="outline" className="py-0 px-1 text-[10px]">Open</Badge>
                         )}
                       </div>
                     )}
@@ -279,16 +261,15 @@ export function TaskCard({
           </div>
         )}
 
-        {/* Checklist Items Section */}
         {(task.checklistItems && task.checklistItems.length > 0) && (
-          <div className="mt-2 pt-2 border-t border-dashed" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}}>
-            <h4 className="text-xs font-semibold uppercase flex items-center mb-1" style={mutedTextStyle}>
+          <div className="mt-2 pt-2 border-t border-dashed border-border/50">
+            <h4 className="text-xs font-semibold uppercase flex items-center mb-1 text-muted-foreground">
               <ListChecksIcon className="mr-1 h-3 w-3" />
               Checklist
             </h4>
             <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
               {task.checklistItems.map(item => (
-                <div key={item.id} className="flex items-center justify-between group text-sm" style={textStyle}>
+                <div key={item.id} className="flex items-center justify-between group text-sm text-card-foreground">
                   <div className="flex items-center flex-grow">
                     <Checkbox
                       id={`checklist-${task.id}-${item.id}`}
@@ -296,11 +277,9 @@ export function TaskCard({
                       onCheckedChange={() => onToggleChecklistItem(task.id, item.id)}
                       disabled={!isOwner}
                       className={cn(
-                        "h-3.5 w-3.5 mr-2 border-2 data-[state=checked]:bg-green-400 data-[state=checked]:text-white",
-                         textColor === '#FFFFFF' ? "border-white/70" : "border-black/50",
+                        "h-3.5 w-3.5 mr-2 border-2 data-[state=checked]:bg-green-400 data-[state=checked]:text-primary-foreground border-muted-foreground",
                          !isOwner && "cursor-not-allowed opacity-70"
                       )}
-                       style={{ borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }}
                     />
                     <label
                       htmlFor={`checklist-${task.id}-${item.id}`}
@@ -313,8 +292,7 @@ export function TaskCard({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 p-0 opacity-50 group-hover:opacity-100 hover:bg-white/20 dark:hover:bg-black/20"
-                      style={{color: textColor}}
+                      className="h-5 w-5 p-0 opacity-50 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
                       onClick={() => onDeleteChecklistItem(task.id, item.id)}
                       aria-label="Delete checklist item"
                     >
@@ -328,7 +306,7 @@ export function TaskCard({
         )}
 
         {isOwner && (
-          <div className="mt-2 pt-2 border-t border-dashed" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}}>
+          <div className="mt-2 pt-2 border-t border-dashed border-border/50">
             <div className="flex items-center gap-2">
               <Input
                 type="text"
@@ -336,12 +314,7 @@ export function TaskCard({
                 value={newChecklistItemTitle}
                 onChange={(e) => setNewChecklistItemTitle(e.target.value)}
                 onKeyPress={(e) => { if (e.key === 'Enter') handleAddChecklistItemSubmit(); }}
-                className="h-8 text-sm flex-grow"
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  color: textColor,
-                  borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
-                }}
+                className="h-8 text-sm flex-grow bg-background/50 border-input"
                 disabled={!isOwner}
               />
               <Button
@@ -349,11 +322,6 @@ export function TaskCard({
                 variant="outline"
                 onClick={handleAddChecklistItemSubmit}
                 className="h-8 px-2 py-1 text-xs"
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.15)',
-                  borderColor: textColor,
-                  color: textColor,
-                }}
                 disabled={!isOwner || !newChecklistItemTitle.trim()}
               >
                 <PlusCircleIcon className="h-3 w-3 mr-1"/> Add
@@ -378,11 +346,9 @@ export function TaskCard({
                     onClick={(e) => e.stopPropagation()}
                     disabled={mainCheckboxDisabled}
                     className={cn(
-                      "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-white h-4 w-4",
-                       textColor === '#FFFFFF' ? "border-white/70" : "border-black/50",
+                      "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-primary-foreground h-4 w-4 border-muted-foreground",
                        mainCheckboxDisabled && "cursor-not-allowed opacity-70"
                     )}
-                    style={{ borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)' }}
                     aria-labelledby={`label-complete-${task.id}`}
                 />
             </TooltipTrigger>
@@ -397,11 +363,10 @@ export function TaskCard({
             htmlFor={`complete-${task.id}`}
             id={`label-complete-${task.id}`}
             className={cn(
-              "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-sm",
+              "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-sm text-card-foreground",
               task.completed && "line-through",
               mainCheckboxDisabled && "cursor-not-allowed opacity-70"
             )}
-            style={textStyle}
             onClick={(e) => e.stopPropagation()}
           >
             {task.completed ? "Mark Incomplete" : "Mark Complete"}
@@ -409,13 +374,11 @@ export function TaskCard({
         </div>
       </CardContent>
       <CardFooter className="flex justify-end space-x-0.5 p-3 pt-1">
-        {/* Add Sub-task Popover removed */}
         <Button
           variant="ghost"
           size="icon"
           onClick={(e) => { e.stopPropagation(); onPrint(task);}}
-          className="h-7 w-7 hover:bg-white/20 dark:hover:bg-black/20"
-          style={{color: textColor}}
+          className="h-7 w-7 hover:bg-black/10 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
           aria-label="Print task"
         >
           <PrinterIcon className="h-4 w-4" />
@@ -425,8 +388,7 @@ export function TaskCard({
             variant="ghost"
             size="icon"
             onClick={(e) => { e.stopPropagation(); onDelete(task);}}
-            className="h-7 w-7 hover:bg-white/20 dark:hover:bg-black/20"
-            style={{color: textColor}}
+            className="h-7 w-7 hover:bg-black/10 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
             aria-label="Delete task"
             >
             <Trash2Icon className="h-4 w-4" />

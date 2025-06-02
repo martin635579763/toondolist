@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Task, ChecklistItem } from '@/types/task'; // Added ChecklistItem
+import type { Task, ChecklistItem } from '@/types/task';
 import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, UserCircleIcon, PlusSquareIcon } from 'lucide-react';
@@ -20,10 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { getRandomColor } from '@/lib/colors';
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
-
-// Removed TaskGroup interface
 
 function HomePageContent() {
   const { currentUser, logout, isLoading: authIsLoading } = useAuth();
@@ -57,8 +54,8 @@ function HomePageContent() {
       ...task,
       applicants: task.applicants || [],
       assignedRoles: task.assignedRoles || [],
-      checklistItems: task.checklistItems || [], // Ensure checklistItems has a default
-      order: task.order ?? index, // All tasks are main tasks now
+      checklistItems: task.checklistItems || [],
+      order: task.order ?? index,
       userId: task.userId || 'unknown_user',
       userDisplayName: task.userDisplayName || 'Unknown User',
       userAvatarUrl: task.userAvatarUrl || '',
@@ -75,7 +72,7 @@ function HomePageContent() {
   }, [tasks, isLoadingTasks]);
 
 
-  const handleAddTask = (newTask: Task) => {
+  const handleAddTask = (newTask: Omit<Task, 'id' | 'createdAt' | 'order' | 'userId' | 'userDisplayName' | 'userAvatarUrl' | 'applicants' | 'checklistItems'>) => {
     if (!currentUser) {
       toast({ title: "Not Logged In", description: "You must be logged in to add tasks.", variant: "destructive" });
       return;
@@ -84,16 +81,14 @@ function HomePageContent() {
     const tasksForCurrentUser = tasks.filter(t => t.userId === currentUser.id);
     const taskWithUserAndDefaults: Task = {
       ...newTask,
-      id: newTask.id || generateId(),
-      createdAt: newTask.createdAt || Date.now(),
-      applicants: newTask.applicants || [],
-      assignedRoles: newTask.assignedRoles || [],
-      checklistItems: newTask.checklistItems || [], // Ensure checklistItems
-      order: tasksForCurrentUser.length, // Simplified order for new tasks
+      id: generateId(),
+      createdAt: Date.now(),
+      applicants: [],
+      checklistItems: [],
+      order: tasksForCurrentUser.length,
       userId: currentUser.id,
       userDisplayName: currentUser.displayName,
       userAvatarUrl: currentUser.avatarUrl,
-      color: newTask.color || getRandomColor(),
     };
 
     setTasks(prevTasks => [...prevTasks, taskWithUserAndDefaults]);
@@ -250,7 +245,7 @@ function HomePageContent() {
         return prevTasks;
       }
 
-      const newApplicant = { // Applicant type is defined in task.ts
+      const newApplicant = {
         id: generateId(),
         role: roleName,
         name: currentUser.displayName,
@@ -311,7 +306,7 @@ function HomePageContent() {
     };
   }, []);
 
-  const handleDragStart = (taskId: string) => { // Renamed mainTaskId to taskId
+  const handleDragStart = (taskId: string) => {
     if (!currentUser) return;
     const taskToDrag = tasks.find(t => t.id === taskId);
     if (taskToDrag && taskToDrag.userId === currentUser.id) {
@@ -321,7 +316,7 @@ function HomePageContent() {
     }
   };
 
-  const handleDragEnter = (taskId: string) => { // Renamed mainTaskId to taskId
+  const handleDragEnter = (taskId: string) => {
     if (!currentUser) return;
     const taskToDragOver = tasks.find(t => t.id === taskId);
     if (taskToDragOver && taskToDragOver.userId === currentUser.id && taskId !== draggedItemId) {
@@ -337,7 +332,7 @@ function HomePageContent() {
     event.preventDefault();
   };
 
-  const handleDrop = (droppedOnTaskId: string) => { // Renamed droppedOnMainTaskId to droppedOnTaskId
+  const handleDrop = (droppedOnTaskId: string) => {
     if (!draggedItemId || draggedItemId === droppedOnTaskId || !droppedOnTaskId || !currentUser) {
       setDraggedItemId(null);
       setDragOverItemId(null);
@@ -356,7 +351,7 @@ function HomePageContent() {
 
     setTasks(prevTasks => {
       const allTasksForCurrentUser = prevTasks
-        .filter(task => task.userId === currentUser.id) // Simplified filter
+        .filter(task => task.userId === currentUser.id)
         .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
 
       const taskIds = allTasksForCurrentUser.map(t => t.id);
@@ -372,7 +367,7 @@ function HomePageContent() {
       taskIds.splice(targetIdx, 0, itemToMove);
 
       const newTasks = prevTasks.map(task => {
-        if (task.userId === currentUser.id) { // Simplified condition
+        if (task.userId === currentUser.id) {
           const newOrder = taskIds.indexOf(task.id);
           if (newOrder !== -1) {
             return { ...task, order: newOrder };
@@ -386,7 +381,6 @@ function HomePageContent() {
             if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
             if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
         }
-        // All tasks are main tasks now
         return (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (b.createdAt ?? 0));
       });
     });
@@ -523,7 +517,7 @@ function HomePageContent() {
                     <div
                       key={task.id}
                       className={cn(
-                        "flex-shrink-0 w-80 space-y-4 rounded-lg", // Each task card is a column now
+                        "flex-shrink-0 w-80 space-y-4 rounded-lg",
                         currentUser && task.userId === currentUser.id && "cursor-grab",
                         draggedItemId === task.id && "opacity-50 ring-2 ring-primary ring-offset-2",
                         dragOverItemId === task.id && draggedItemId !== task.id && "ring-2 ring-accent ring-offset-1 scale-102 shadow-xl z-10"
@@ -548,7 +542,6 @@ function HomePageContent() {
                         onApplyForRole={handleApplyForRole}
                         hasIncompleteChecklistItems={taskHasIncompleteChecklistItems(task.id)}
                       />
-                      {/* Sub-tasks are no longer rendered separately here */}
                     </div>
                   ))}
                 </div>

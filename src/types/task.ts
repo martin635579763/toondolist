@@ -25,9 +25,7 @@ export interface Task {
   description: string;
   completed: boolean;
   dueDate: string | null; // ISO date string or null
-  color: string;
   createdAt: number; // Timestamp (number) for sorting for localStorage
-  // parentId?: string; // Removed: Sub-task functionality is being removed
   assignedRoles?: string[];
   applicants?: Applicant[];
   checklistItems?: ChecklistItem[]; // Added: For internal to-do items within a card

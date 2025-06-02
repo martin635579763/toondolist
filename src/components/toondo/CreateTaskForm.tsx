@@ -15,8 +15,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, UsersIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn, generateId } from "@/lib/utils";
-import { getRandomColor } from "@/lib/colors";
-import type { Task } from "@/types/task"; // TaskBreakdownStep removed as it's no longer used here
+import type { Task } from "@/types/task";
 import { suggestDueDate } from "@/ai/flows/suggest-due-date";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -128,7 +127,6 @@ export function CreateTaskForm({ onAddTask, onTaskCreated }: CreateTaskFormProps
       description: data.description || "",
       completed: false,
       dueDate: data.dueDate ? data.dueDate.toISOString() : null,
-      color: getRandomColor(),
       createdAt: currentTime,
       assignedRoles: rolesArray.length > 0 ? rolesArray : undefined,
       applicants: [],
@@ -257,8 +255,6 @@ export function CreateTaskForm({ onAddTask, onTaskCreated }: CreateTaskFormProps
           {errors.assignedRoles && <p className="text-sm text-destructive">{errors.assignedRoles.message}</p>}
         </div>
       </div>
-
-      {/* Removed Task Breakdown Section */}
 
       <Button type="submit" className="w-full text-lg py-3 h-auto">
         Add ToonDo Task!
