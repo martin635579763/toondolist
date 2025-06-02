@@ -526,7 +526,7 @@ export function TaskCard({
           >
              <DialogHeader className="pb-2">
                   <DialogTitle className="sr-only">
-                    {`Edit item: ${dialogTempTitle || "Untitled Item"}`}
+                    {`Edit item: ${dialogTempTitle || editingItemAllDetails.title || "Untitled Item"}`}
                   </DialogTitle>
                  <div className="flex items-center space-x-2">
                      <Checkbox
@@ -558,10 +558,10 @@ export function TaskCard({
                   </div>
             </DialogHeader>
             
-            <div className="flex flex-wrap items-center gap-2 mb-3 py-1">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
                 <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className={cn("justify-start text-xs", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                        <Button variant="outline" size="sm" className={cn("justify-start text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
                             <UserCircleIcon className="mr-1.5 h-3.5 w-3.5" />
                             {dialogTempAssignedUserName || "Assign"}
                         </Button>
@@ -575,7 +575,7 @@ export function TaskCard({
 
                 <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className={cn("justify-start text-xs", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                        <Button variant="outline" size="sm" className={cn("justify-start text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
                             <CalendarDaysIcon className="mr-1.5 h-3.5 w-3.5" />
                             {dialogTempDueDate ? format(dialogTempDueDate, "MMM d") : "Due Date"}
                             {dialogTempCompleted && dialogTempDueDate && (
@@ -600,19 +600,19 @@ export function TaskCard({
                     variant="outline"
                     size="sm"
                     onClick={handleOpenAttachmentDialog}
-                    className={cn("justify-start text-xs", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
+                    className={cn("justify-start text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
                 >
                     <PaperclipIcon className="mr-1.5 h-3.5 w-3.5" /> Image
                 </Button>
 
                 <Popover open={isLabelPopoverOpen} onOpenChange={setIsLabelPopoverOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className={cn("justify-start text-xs items-center", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                        <Button variant="outline" size="sm" className={cn("justify-start text-xs items-center h-auto py-1.5", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
                             <TagIcon className="mr-1.5 h-3.5 w-3.5" />
                             Label
                             {dialogTempLabel.length > 0 && (
                                 <div className="flex items-center gap-0.5 ml-1.5">
-                                    {dialogTempLabel.slice(0, MAX_LABELS).map(color => ( // Ensure only up to MAX_LABELS are shown
+                                    {dialogTempLabel.slice(0, MAX_LABELS).map(color => ( 
                                         <span key={color} className={cn("w-2.5 h-2.5 rounded-sm", color)} />
                                     ))}
                                 </div>
