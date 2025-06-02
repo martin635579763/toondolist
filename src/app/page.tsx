@@ -50,19 +50,45 @@ function HomePageContent() {
       }
     }
 
-    const tasksWithDefaults = parsedTasks.map((task, index) => ({
+    let tasksToProcess = [...parsedTasks];
+
+    if (currentUser && !authIsLoading) {
+      const currentUserTasks = tasksToProcess.filter(task => task.userId === currentUser.id);
+      if (currentUserTasks.length === 0) {
+        const defaultTitles = ["Today", "This Week", "Later"];
+        const defaultTasksForUser: Task[] = defaultTitles.map((title, index) => ({
+          id: generateId(),
+          title: title,
+          description: `Tasks to do ${title.toLowerCase()}.`,
+          completed: false,
+          dueDate: null,
+          createdAt: Date.now() + index, // Stagger createdAt slightly for stable sort fallback
+          applicants: [],
+          checklistItems: [],
+          assignedRoles: [],
+          order: index,
+          userId: currentUser.id,
+          userDisplayName: currentUser.displayName,
+          userAvatarUrl: currentUser.avatarUrl,
+        }));
+        tasksToProcess = [...tasksToProcess, ...defaultTasksForUser];
+      }
+    }
+
+    const tasksWithDefaults = tasksToProcess.map((task, index) => ({
       ...task,
       applicants: task.applicants || [],
       assignedRoles: task.assignedRoles || [],
       checklistItems: task.checklistItems || [],
-      order: task.order ?? index,
+      order: task.order ?? index, // Ensure order is present
       userId: task.userId || 'unknown_user',
       userDisplayName: task.userDisplayName || 'Unknown User',
       userAvatarUrl: task.userAvatarUrl || '',
     }));
+
     setTasks(tasksWithDefaults);
     setIsLoadingTasks(false);
-  }, []);
+  }, [currentUser, authIsLoading]);
 
 
   useEffect(() => {
@@ -72,7 +98,7 @@ function HomePageContent() {
   }, [tasks, isLoadingTasks]);
 
 
-  const handleAddTask = (newTask: Omit<Task, 'id' | 'createdAt' | 'order' | 'userId' | 'userDisplayName' | 'userAvatarUrl' | 'applicants' | 'checklistItems'>) => {
+  const handleAddTask = (newTaskData: Omit<Task, 'id' | 'createdAt' | 'order' | 'userId' | 'userDisplayName' | 'userAvatarUrl' | 'applicants' | 'checklistItems'>) => {
     if (!currentUser) {
       toast({ title: "Not Logged In", description: "You must be logged in to add tasks.", variant: "destructive" });
       return;
@@ -80,12 +106,12 @@ function HomePageContent() {
 
     const tasksForCurrentUser = tasks.filter(t => t.userId === currentUser.id);
     const taskWithUserAndDefaults: Task = {
-      ...newTask,
+      ...newTaskData,
       id: generateId(),
       createdAt: Date.now(),
       applicants: [],
       checklistItems: [],
-      order: tasksForCurrentUser.length,
+      order: tasksForCurrentUser.length, // New tasks go to the end of the user's list
       userId: currentUser.id,
       userDisplayName: currentUser.displayName,
       userAvatarUrl: currentUser.avatarUrl,
@@ -95,7 +121,7 @@ function HomePageContent() {
 
     toast({
       title: "ToonDo Added!",
-      description: `"${newTask.title}" is ready to be tackled!`,
+      description: `"${newTaskData.title}" is ready to be tackled!`,
     });
   };
 
@@ -393,7 +419,10 @@ function HomePageContent() {
             if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
             if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
         }
-        return (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (b.createdAt ?? 0));
+        // Fallback sort for tasks not belonging to current user, or if no user
+        const orderA = typeof a.order === 'number' ? a.order : (typeof a.createdAt === 'number' ? a.createdAt : Infinity);
+        const orderB = typeof b.order === 'number' ? b.order : (typeof b.createdAt === 'number' ? b.createdAt : Infinity);
+        return orderA - orderB;
       });
     });
 
@@ -413,10 +442,15 @@ function HomePageContent() {
         if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
         if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
         if (a.userId === currentUser.id && b.userId === currentUser.id) {
-            return ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number);
+             const orderA = typeof a.order === 'number' ? a.order : (typeof a.createdAt === 'number' ? a.createdAt : Infinity);
+             const orderB = typeof b.order === 'number' ? b.order : (typeof b.createdAt === 'number' ? b.createdAt : Infinity);
+             return orderA - orderB;
         }
       }
-      return ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number);
+      // Fallback sort for tasks not belonging to current user, or if no user
+      const orderA = typeof a.order === 'number' ? a.order : (typeof a.createdAt === 'number' ? a.createdAt : Infinity);
+      const orderB = typeof b.order === 'number' ? b.order : (typeof b.createdAt === 'number' ? b.createdAt : Infinity);
+      return orderA - orderB;
   });
 
 
@@ -585,3 +619,5 @@ export default function HomePage() {
 }
 
     
+
+      
