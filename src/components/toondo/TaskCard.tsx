@@ -7,9 +7,9 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon, PlusCircleIcon, XIcon, ListChecksIcon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon, PlusCircleIcon, XIcon, ListChecksIcon, Edit3Icon } from "lucide-react";
 import { format } from "date-fns";
-import { cn, generateId } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -17,7 +17,7 @@ import {
   TooltipTrigger,
   TooltipProvider
 } from "@/components/ui/tooltip";
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface TaskCardProps {
@@ -31,6 +31,7 @@ interface TaskCardProps {
   onDeleteChecklistItem: (taskId: string, itemId: string) => void;
   onApplyForRole: (taskId: string, roleName: string) => void;
   hasIncompleteChecklistItems: boolean;
+  onUpdateTaskTitle: (taskId: string, newTitle: string) => void; // New prop
 }
 
 export function TaskCard({
@@ -43,10 +44,15 @@ export function TaskCard({
   onToggleChecklistItem,
   onDeleteChecklistItem,
   onApplyForRole,
-  hasIncompleteChecklistItems
+  hasIncompleteChecklistItems,
+  onUpdateTaskTitle,
 }: TaskCardProps) {
   const isOwner = currentUser && currentUser.id === task.userId;
   const [newChecklistItemTitle, setNewChecklistItemTitle] = useState("");
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editableTitle, setEditableTitle] = useState(task.title);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   let mainCheckboxDisabled = false;
   let mainCheckboxTooltipContent: React.ReactNode = null;
@@ -70,6 +76,46 @@ export function TaskCard({
     }
     prevCompleted.current = task.completed;
   }, [task.completed]);
+
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isEditingTitle]);
+
+  // Update editableTitle if task.title changes from props (e.g., after successful save)
+  useEffect(() => {
+    if (!isEditingTitle) {
+      setEditableTitle(task.title);
+    }
+  }, [task.title, isEditingTitle]);
+
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditableTitle(e.target.value);
+  };
+
+  const saveTitle = () => {
+    if (isOwner && editableTitle.trim() && editableTitle.trim() !== task.title) {
+      onUpdateTaskTitle(task.id, editableTitle.trim());
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      saveTitle();
+    } else if (e.key === 'Escape') {
+      setEditableTitle(task.title); // Revert to original
+      setIsEditingTitle(false);
+    }
+  };
+
+  const handleTitleBlur = () => {
+    saveTitle();
+  };
+
 
   const handleAddChecklistItemSubmit = () => {
     if (newChecklistItemTitle.trim()) {
@@ -135,10 +181,36 @@ export function TaskCard({
 
       <CardHeader className="p-4 pb-2">
         <div className="flex items-start justify-between">
-          <div className="flex-grow">
-            <CardTitle className="text-xl font-bold break-words">
-              {task.title}
-            </CardTitle>
+          <div className="flex-grow mr-2">
+            {isEditingTitle && isOwner ? (
+              <Input
+                ref={titleInputRef}
+                type="text"
+                value={editableTitle}
+                onChange={handleTitleChange}
+                onKeyDown={handleTitleKeyDown}
+                onBlur={handleTitleBlur}
+                className="text-xl font-bold h-auto p-0 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none bg-transparent"
+                aria-label="Edit task title"
+              />
+            ) : (
+              <CardTitle
+                className={cn(
+                  "text-xl font-bold break-words",
+                  isOwner && "cursor-pointer hover:text-primary transition-colors"
+                )}
+                onClick={() => {
+                  if (isOwner) {
+                    setEditableTitle(task.title); // Ensure editableTitle is current
+                    setIsEditingTitle(true);
+                  }
+                }}
+                title={isOwner ? "Click to edit title" : undefined}
+              >
+                {task.title}
+                 {isOwner && !isEditingTitle && <Edit3Icon className="inline-block ml-2 h-3 w-3 text-muted-foreground opacity-0 group-hover/card:opacity-50 transition-opacity" />}
+              </CardTitle>
+            )}
           </div>
           <div className="flex items-center space-x-1 shrink-0">
             {(task.userAvatarUrl || task.userDisplayName) && (
@@ -398,3 +470,5 @@ export function TaskCard({
     </Card>
   );
 }
+
+    

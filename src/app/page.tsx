@@ -265,6 +265,18 @@ function HomePageContent() {
     });
   };
 
+  const handleUpdateTaskTitle = (taskId: string, newTitle: string) => {
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
+        task.id === taskId ? { ...task, title: newTitle } : task
+      )
+    );
+    toast({
+      title: "Title Updated!",
+      description: "The task title has been changed.",
+    });
+  };
+
   const actualPrint = useCallback(() => {
     if (printableAreaRef.current) {
       printableAreaRef.current.classList.remove('hidden');
@@ -517,7 +529,7 @@ function HomePageContent() {
                     <div
                       key={task.id}
                       className={cn(
-                        "flex-shrink-0 w-80 space-y-4 rounded-lg",
+                        "flex-shrink-0 w-80 space-y-4 rounded-lg group/card", // Added group/card for hover effects
                         currentUser && task.userId === currentUser.id && "cursor-grab",
                         draggedItemId === task.id && "opacity-50 ring-2 ring-primary ring-offset-2",
                         dragOverItemId === task.id && draggedItemId !== task.id && "ring-2 ring-accent ring-offset-1 scale-102 shadow-xl z-10"
@@ -541,6 +553,7 @@ function HomePageContent() {
                         onDeleteChecklistItem={handleDeleteChecklistItem}
                         onApplyForRole={handleApplyForRole}
                         hasIncompleteChecklistItems={taskHasIncompleteChecklistItems(task.id)}
+                        onUpdateTaskTitle={handleUpdateTaskTitle}
                       />
                     </div>
                   ))}
@@ -570,3 +583,5 @@ export default function HomePage() {
       <HomePageContent />
   );
 }
+
+    
