@@ -87,7 +87,7 @@ function HomePageContent() {
         ...item,
         id: item.id || generateId(),
         title: item.title || "Untitled Item",
-        description: item.description || "", // Initialize new field
+        description: item.description || "",
         completed: item.completed || false,
         dueDate: item.dueDate || null,
         assignedUserId: item.assignedUserId || null,
@@ -95,7 +95,8 @@ function HomePageContent() {
         assignedUserAvatarUrl: item.assignedUserAvatarUrl || null,
         imageUrl: item.imageUrl || null,
         imageAiHint: item.imageAiHint || null,
-        comments: item.comments || [], // Initialize new field
+        comments: item.comments || [],
+        label: item.label || null, // Initialize new label field
       })),
       order: task.order ?? index,
       userId: task.userId || 'unknown_user',
@@ -182,7 +183,7 @@ function HomePageContent() {
           const newItem: ChecklistItem = {
             id: generateId(),
             title: itemTitle.trim(),
-            description: "", // Initialize new field
+            description: "", 
             completed: false,
             dueDate: null,
             assignedUserId: null,
@@ -190,7 +191,8 @@ function HomePageContent() {
             assignedUserAvatarUrl: null,
             imageUrl: null,
             imageAiHint: null,
-            comments: [], // Initialize new field
+            comments: [], 
+            label: null,
           };
           const updatedChecklistItems = [...(task.checklistItems || []), newItem];
           return {
@@ -358,6 +360,22 @@ function HomePageContent() {
         return task;
       })
     );
+  };
+
+  const handleSetChecklistItemLabel = (taskId: string, itemId: string, newLabel: string | null) => {
+    if (!currentUser) return;
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        if (task.id === taskId && task.userId === currentUser.id) {
+          const updatedChecklistItems = (task.checklistItems || []).map(item =>
+            item.id === itemId ? { ...item, label: newLabel } : item
+          );
+          return { ...task, checklistItems: updatedChecklistItems };
+        }
+        return task;
+      })
+    );
+    toast({ title: "Item Label Updated!", description: newLabel ? `Label set to "${newLabel}".` : "Label removed." });
   };
 
 
@@ -711,6 +729,7 @@ function HomePageContent() {
                         onSetChecklistItemDueDate={handleSetChecklistItemDueDate}
                         onAssignUserToChecklistItem={handleAssignUserToChecklistItem}
                         onSetChecklistItemImage={handleSetChecklistItemImage}
+                        onSetChecklistItemLabel={handleSetChecklistItemLabel} // Pass new handler
                         onApplyForRole={handleApplyForRole}
                         onUpdateTaskTitle={handleUpdateTaskTitle}
                         onSetDueDate={handleSetTaskDueDate}

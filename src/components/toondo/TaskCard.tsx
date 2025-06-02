@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon, CheckCircle2, PaperclipIcon } from "lucide-react";
+import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, ImageIcon, TrashIcon, MessageSquareIcon, CheckCircle2, PaperclipIcon, TagIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -42,6 +42,7 @@ interface TaskCardProps {
   onSetChecklistItemDueDate: (taskId: string, itemId: string, date: Date | null) => void;
   onAssignUserToChecklistItem: (taskId: string, itemId: string, userId: string | null, userName: string | null, userAvatarUrl: string | null) => void;
   onSetChecklistItemImage: (taskId: string, itemId: string, imageUrl: string | null, imageAiHint: string | null) => void;
+  onSetChecklistItemLabel: (taskId: string, itemId: string, newLabel: string | null) => void; // New prop
   onApplyForRole: (taskId: string, roleName: string) => void;
   onUpdateTaskTitle: (taskId: string, newTitle: string) => void;
   onSetDueDate: (taskId: string, date: Date | null) => void;
@@ -61,29 +62,29 @@ export function TaskCard({
   onSetChecklistItemDueDate,
   onAssignUserToChecklistItem,
   onSetChecklistItemImage,
-  // onApplyForRole, // This prop seems unused currently
+  onSetChecklistItemLabel,
   onUpdateTaskTitle,
-  // onSetDueDate, // This prop seems unused for the main card footer options
-  // onSetBackgroundImage, // This prop seems unused for the main card footer options
 }: TaskCardProps) {
   const isOwner = currentUser && currentUser.id === task.userId;
   const { toast } = useToast();
   const [newChecklistItemTitle, setNewChecklistItemTitle] = useState("");
 
   const [editingItemAllDetails, setEditingItemAllDetails] = useState<ChecklistItem | null>(null);
-  // State for the dialog's temporary values
+  // State for the main edit dialog's temporary values
   const [dialogTempTitle, setDialogTempTitle] = useState("");
   const [dialogTempDescription, setDialogTempDescription] = useState("");
-  const [dialogTempDueDate, setDialogTempDueDate] = useState<Date | undefined>(undefined);
-  const [dialogTempIsDatePickerOpen, setDialogTempIsDatePickerOpen] = useState(false);
-  const [dialogTempAssignedUserId, setDialogTempAssignedUserId] = useState<string | null | undefined>(null);
-  const [dialogTempAssignedUserName, setDialogTempAssignedUserName] = useState<string | null | undefined>(null);
-  const [dialogTempAssignedUserAvatarUrl, setDialogTempAssignedUserAvatarUrl] = useState<string | null | undefined>(null);
-  const [dialogTempImageUrl, setDialogTempImageUrl] = useState("");
-  const [dialogTempComments, setDialogTempComments] = useState<string[]>([]); // For future use
   const [dialogTempCompleted, setDialogTempCompleted] = useState(false);
-  const dialogFileInpuRef = useRef<HTMLInputElement>(null);
+  
+  // State for attachment dialog
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
+  const [attachmentDialogCurrentItemId, setAttachmentDialogCurrentItemId] = useState<string | null>(null);
+  const [attachmentDialogTempImageUrl, setAttachmentDialogTempImageUrl] = useState("");
+  const attachmentDialogFileInpuRef = useRef<HTMLInputElement>(null);
+
+  // State for popovers
+  const [activePopover, setActivePopover] = useState<{ itemId: string, type: 'user' | 'dueDate' | 'label' } | null>(null);
+  const [popoverTempDueDate, setPopoverTempDueDate] = useState<Date | undefined>(undefined);
+  const [popoverTempLabel, setPopoverTempLabel] = useState<string>("");
 
 
   const handleAddChecklistItemSubmit = () => {
@@ -98,38 +99,17 @@ export function TaskCard({
     setEditingItemAllDetails(item);
     setDialogTempTitle(item.title);
     setDialogTempDescription(item.description || "");
-    setDialogTempDueDate(item.dueDate ? new Date(item.dueDate) : undefined);
-    setDialogTempAssignedUserId(item.assignedUserId);
-    setDialogTempAssignedUserName(item.assignedUserName);
-    setDialogTempAssignedUserAvatarUrl(item.assignedUserAvatarUrl);
-    setDialogTempImageUrl(item.imageUrl || "");
-    setDialogTempComments(item.comments || []);
     setDialogTempCompleted(item.completed);
-    if (dialogFileInpuRef.current) {
-        dialogFileInpuRef.current.value = "";
-    }
   };
 
   const handleCloseItemEditDialog = () => {
     setEditingItemAllDetails(null);
-    // Reset temp states
     setDialogTempTitle("");
     setDialogTempDescription("");
-    setDialogTempDueDate(undefined);
-    setDialogTempIsDatePickerOpen(false);
-    setDialogTempAssignedUserId(null);
-    setDialogTempAssignedUserName(null);
-    setDialogTempAssignedUserAvatarUrl(null);
-    setDialogTempImageUrl("");
-    setDialogTempComments([]);
     setDialogTempCompleted(false);
-    if (dialogFileInpuRef.current) {
-        dialogFileInpuRef.current.value = "";
-    }
-    setIsAttachmentDialogOpen(false); 
   };
 
-  const handleSaveItemEdits = () => {
+  const handleSaveItemEditsFromMainDialog = () => {
     if (!editingItemAllDetails) return;
 
     if (dialogTempCompleted !== editingItemAllDetails.completed) {
@@ -146,36 +126,10 @@ export function TaskCard({
       onUpdateChecklistItemTitle(task.id, editingItemAllDetails.id, trimmedTitle);
     }
 
-
     if (dialogTempDescription.trim() !== (editingItemAllDetails.description || "").trim()) {
       onUpdateChecklistItemDescription(task.id, editingItemAllDetails.id, dialogTempDescription.trim());
     }
     
-    const currentDueDate = editingItemAllDetails.dueDate ? new Date(editingItemAllDetails.dueDate).toISOString() : null;
-    const newDueDate = dialogTempDueDate ? dialogTempDueDate.toISOString() : null;
-    if (newDueDate !== currentDueDate) {
-        onSetChecklistItemDueDate(task.id, editingItemAllDetails.id, dialogTempDueDate || null);
-    }
-
-    if (dialogTempAssignedUserId !== editingItemAllDetails.assignedUserId) {
-        onAssignUserToChecklistItem(task.id, editingItemAllDetails.id, dialogTempAssignedUserId || null, dialogTempAssignedUserName || null, dialogTempAssignedUserAvatarUrl || null);
-    }
-
-    const finalImageUrl = dialogTempImageUrl.trim() || null;
-    let finalImageAiHint: string | null = null;
-
-    if (finalImageUrl && trimmedTitle) {
-      finalImageAiHint = trimmedTitle.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
-    }
-
-
-    if (finalImageUrl !== editingItemAllDetails.imageUrl || (finalImageUrl && finalImageAiHint !== editingItemAllDetails.imageAiHint)) {
-        onSetChecklistItemImage(task.id, editingItemAllDetails.id, finalImageUrl, finalImageAiHint);
-    } else if (!finalImageUrl && editingItemAllDetails.imageUrl) {
-        onSetChecklistItemImage(task.id, editingItemAllDetails.id, null, null);
-    }
-
-
     handleCloseItemEditDialog();
     toast({ title: "Item Updated", description: "Checklist item details saved." });
   };
@@ -188,47 +142,89 @@ export function TaskCard({
     }
   };
 
-  const handleToggleDialogAssignCurrentUser = () => {
-      if (currentUser && isOwner) {
-          if (dialogTempAssignedUserId === currentUser.id) {
-              // Unassign current user
-              setDialogTempAssignedUserId(null);
-              setDialogTempAssignedUserName(null);
-              setDialogTempAssignedUserAvatarUrl(null);
-          } else {
-              // Assign current user
-              setDialogTempAssignedUserId(currentUser.id);
-              setDialogTempAssignedUserName(currentUser.displayName);
-              setDialogTempAssignedUserAvatarUrl(currentUser.avatarUrl);
-          }
-      }
+  const handleOpenAttachmentDialog = (item: ChecklistItem) => {
+    if (!isOwner) return;
+    setAttachmentDialogCurrentItemId(item.id);
+    setAttachmentDialogTempImageUrl(item.imageUrl || "");
+    if (attachmentDialogFileInpuRef.current) {
+      attachmentDialogFileInpuRef.current.value = "";
+    }
+    setIsAttachmentDialogOpen(true);
   };
 
+  const handleSaveAttachment = () => {
+    if (!attachmentDialogCurrentItemId) return;
+    const itemToUpdate = task.checklistItems?.find(i => i.id === attachmentDialogCurrentItemId);
+    if (!itemToUpdate) return;
 
-  const handleDialogImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const finalImageUrl = attachmentDialogTempImageUrl.trim() || null;
+    let finalImageAiHint: string | null = null;
+    if (finalImageUrl && itemToUpdate.title) {
+      finalImageAiHint = itemToUpdate.title.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
+    }
+    
+    onSetChecklistItemImage(task.id, attachmentDialogCurrentItemId, finalImageUrl, finalImageAiHint);
+    toast({ title: "Attachment Updated" });
+    setIsAttachmentDialogOpen(false);
+    setAttachmentDialogCurrentItemId(null);
+    setAttachmentDialogTempImageUrl("");
+  };
+  
+  const handleAttachmentFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) { // 2MB limit
-        toast({
-          title: "File Too Large",
-          description: "Please select an image smaller than 2MB.",
-          variant: "destructive",
-        });
-        if (dialogFileInpuRef.current) dialogFileInpuRef.current.value = "";
+        toast({ title: "File Too Large", description: "Please select an image smaller than 2MB.", variant: "destructive" });
+        if (attachmentDialogFileInpuRef.current) attachmentDialogFileInpuRef.current.value = "";
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setDialogTempImageUrl(reader.result as string);
-      };
+      reader.onloadend = () => setAttachmentDialogTempImageUrl(reader.result as string);
       reader.onerror = () => toast({ title: "Error Reading File", variant: "destructive" });
       reader.readAsDataURL(file);
     }
   };
 
-  const handleDialogRemoveImage = () => {
-    setDialogTempImageUrl("");
-    if (dialogFileInpuRef.current) dialogFileInpuRef.current.value = "";
+  const handleRemoveAttachment = () => {
+    setAttachmentDialogTempImageUrl("");
+    if (attachmentDialogFileInpuRef.current) attachmentDialogFileInpuRef.current.value = "";
+  };
+
+  const handleTogglePopover = (itemId: string, type: 'user' | 'dueDate' | 'label') => {
+    if (activePopover?.itemId === itemId && activePopover.type === type) {
+      setActivePopover(null);
+    } else {
+      const item = task.checklistItems?.find(i => i.id === itemId);
+      if (!item) return;
+      
+      if (type === 'dueDate') {
+        setPopoverTempDueDate(item.dueDate ? new Date(item.dueDate) : undefined);
+      } else if (type === 'label') {
+        setPopoverTempLabel(item.label || "");
+      }
+      setActivePopover({ itemId, type });
+    }
+  };
+
+  const handleSaveDueDateFromPopover = (itemId: string) => {
+    onSetChecklistItemDueDate(task.id, itemId, popoverTempDueDate || null);
+    setActivePopover(null);
+  };
+
+  const handleToggleUserFromPopover = (itemId: string) => {
+    const item = task.checklistItems?.find(i => i.id === itemId);
+    if (!item || !currentUser) return;
+    if (item.assignedUserId === currentUser.id) {
+      onAssignUserToChecklistItem(task.id, itemId, null, null, null);
+    } else {
+      onAssignUserToChecklistItem(task.id, itemId, currentUser.id, currentUser.displayName, currentUser.avatarUrl);
+    }
+    // No need to close popover here, it can stay open or be closed by clicking outside
+  };
+
+  const handleSaveLabelFromPopover = (itemId: string) => {
+    onSetChecklistItemLabel(task.id, itemId, popoverTempLabel.trim() || null);
+    setActivePopover(null);
   };
 
 
@@ -281,7 +277,7 @@ export function TaskCard({
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("text-yellow-300", task.backgroundImageUrl ? "text-yellow-300" : "text-yellow-400")}><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                            <CheckCircle2 className={cn("h-5 w-5", task.backgroundImageUrl ? "text-yellow-300" : "text-yellow-400")} />
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className={cn(task.backgroundImageUrl && "bg-black/70 text-white border-white/20" )}>
                             <p>Completed!</p>
@@ -308,92 +304,151 @@ export function TaskCard({
                 className={cn(
                   "flex flex-col group/checklist text-sm rounded-md p-1.5 border",
                   task.backgroundImageUrl ? "border-white/30 bg-white/10 text-gray-100" : "border-border/60 bg-card text-card-foreground",
-                   isOwner && "cursor-pointer hover:bg-opacity-20",
-                   !isOwner && "cursor-default"
                 )}
-                onClick={(e) => {
-                    e.stopPropagation();
+              >
+                {/* Item Title and Checkbox */}
+                <div 
+                  className={cn("flex items-center justify-between", isOwner && "cursor-pointer hover:bg-opacity-20")}
+                  onClick={(e) => {
+                    if (!isOwner) return;
                     const target = e.target as HTMLElement;
-                    if (target.closest('button[role="checkbox"]') || target.closest('[data-no-dialog-trigger="true"]')) {
+                    // Prevent dialog open if clicking checkbox or action buttons area
+                    if (target.closest('button[role="checkbox"]') || target.closest('[data-role="action-buttons-container"]')) {
                         return;
                     }
-                    if (isOwner) handleOpenItemEditDialog(item);
-                }}
-              >
-                <div className="flex items-center justify-between">
+                    handleOpenItemEditDialog(item);
+                  }}
+                >
                   <div className="flex items-center flex-grow min-w-0 relative">
                     <Checkbox
                       id={`checklist-${task.id}-${item.id}`}
                       checked={item.completed}
-                      onCheckedChange={(checked) => {
-                        onToggleChecklistItem(task.id, item.id)}
-                      }
+                      onCheckedChange={(checked) => onToggleChecklistItem(task.id, item.id)}
                       disabled={!isOwner}
                       className={cn(
-                        "h-3.5 w-3.5 border-2 rounded-full data-[state=checked]:bg-green-400 shrink-0",
-                        "transition-opacity duration-200 ease-in-out",
-                        "absolute left-0 top-1/2 -translate-y-1/2 z-10",
+                        "h-3.5 w-3.5 border-2 rounded-sm data-[state=checked]:bg-green-400 shrink-0",
                         task.backgroundImageUrl ? "border-gray-300 data-[state=checked]:text-gray-800" : "border-muted-foreground data-[state=checked]:text-primary-foreground",
-                        isOwner
-                          ? "opacity-100" 
-                          : "opacity-50 cursor-not-allowed"
+                        !isOwner && "opacity-50 cursor-not-allowed"
                       )}
                       onClick={(e) => e.stopPropagation()} 
                       aria-label={`Toggle completion for ${item.title}`}
                     />
-                      <label
-                        htmlFor={`checklist-${task.id}-${item.id}`} 
-                        className={cn(
-                          "flex-grow break-all truncate",
-                          "transition-all duration-200 ease-in-out",
-                          "pl-[calc(0.875rem+0.5rem)]", 
-                          item.completed && "line-through opacity-70",
-                           task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
-                           "pointer-events-none" 
-                        )}
-                      >
-                        {item.title}
-                      </label>
+                    <label
+                      htmlFor={`checklist-${task.id}-${item.id}`} 
+                      className={cn(
+                        "flex-grow break-all truncate ml-2",
+                        item.completed && "line-through opacity-70",
+                        task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
+                        !isOwner && "pointer-events-none"
+                      )}
+                    >
+                      {item.title}
+                    </label>
                   </div>
                 </div>
-                {(item.description || item.dueDate || item.assignedUserId || item.imageUrl) && (
-                  <div className={cn("mt-1 pt-1 border-t text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "border-white/20 text-gray-200" : "border-border/30 text-muted-foreground", "pointer-events-none")}>
-                    {item.imageUrl && (
-                      <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
-                         <Image 
-                            src={item.imageUrl} 
-                            alt={item.title || "Checklist item image"}
-                            fill 
-                            style={{objectFit: "cover"}} 
-                            className="rounded"
-                            data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
-                          />
-                      </div>
-                    )}
-                     {item.description && (
-                        <p className="italic truncate w-full text-ellipsis text-gray-400/90 dark:text-gray-500/90">
-                          {item.description.length > 50 ? `${item.description.substring(0, 47)}...` : item.description}
-                        </p>
-                      )}
-                    <div className="flex items-center gap-x-3 w-full">
-                      {item.dueDate && (
-                        <div className="flex items-center">
-                          <CalendarDaysIcon className="mr-1 h-3 w-3" />
-                          {format(new Date(item.dueDate), "MMM d")}
-                        </div>
-                      )}
-                      {item.assignedUserId && item.assignedUserName && (
-                        <div className="flex items-center">
-                          <Avatar className="h-4 w-4 mr-1">
-                             <AvatarImage src={item.assignedUserAvatarUrl || undefined} alt={item.assignedUserName} data-ai-hint="user"/>
-                             <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary" )}>{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          {item.assignedUserName}
-                        </div>
-                      )}
+
+                {/* Displayed Content Area */}
+                <div className={cn("mt-1 pt-1 text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "border-t border-white/20 text-gray-200" : "border-t border-border/30 text-muted-foreground")}>
+                  {item.imageUrl && (
+                    <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
+                       <Image 
+                          src={item.imageUrl} 
+                          alt={item.title || "Checklist item image"}
+                          fill 
+                          style={{objectFit: "cover"}} 
+                          className="rounded"
+                          data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
+                        />
                     </div>
+                  )}
+                  {item.description && (
+                    <p className="italic truncate w-full text-ellipsis text-gray-400/90 dark:text-gray-500/90">
+                      {item.description.length > 50 ? `${item.description.substring(0, 47)}...` : item.description}
+                    </p>
+                  )}
+                  {item.dueDate && (
+                    <div className="flex items-center">
+                      <CalendarDaysIcon className="mr-1 h-3 w-3" />
+                      {format(new Date(item.dueDate), "MMM d")}
+                    </div>
+                  )}
+                  {item.assignedUserId && item.assignedUserName && (
+                    <div className="flex items-center">
+                      <Avatar className="h-4 w-4 mr-1">
+                         <AvatarImage src={item.assignedUserAvatarUrl || undefined} alt={item.assignedUserName} data-ai-hint="user"/>
+                         <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      {item.assignedUserName}
+                    </div>
+                  )}
+                  {item.label && (
+                    <Badge variant={task.backgroundImageUrl ? "secondary" : "outline"} className={cn("px-1.5 py-0.5 text-xs", task.backgroundImageUrl && "bg-white/20 text-white border-white/30")}>{item.label}</Badge>
+                  )}
+                </div>
+
+                {/* Action Buttons Area */}
+                {isOwner && (
+                  <div data-role="action-buttons-container" className={cn("mt-1.5 pt-1.5 border-t flex items-center justify-start space-x-1", task.backgroundImageUrl ? "border-white/20" : "border-border/30")}>
+                    {/* User Popover */}
+                    <Popover open={activePopover?.itemId === item.id && activePopover.type === 'user'} onOpenChange={(isOpen) => !isOpen && setActivePopover(null)}>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className={cn("h-6 w-6", task.backgroundImageUrl && "text-gray-300 hover:text-white hover:bg-white/10")} onClick={(e) => {e.stopPropagation(); handleTogglePopover(item.id, 'user');}}>
+                          <UserCircleIcon className="h-3.5 w-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleToggleUserFromPopover(item.id)}>
+                          {item.assignedUserId === currentUser?.id ? "Unassign Myself" : "Assign to Me"}
+                        </Button>
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* Due Date Popover */}
+                    <Popover open={activePopover?.itemId === item.id && activePopover.type === 'dueDate'} onOpenChange={(isOpen) => !isOpen && setActivePopover(null)}>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className={cn("h-6 w-6", task.backgroundImageUrl && "text-gray-300 hover:text-white hover:bg-white/10")} onClick={(e) => {e.stopPropagation(); handleTogglePopover(item.id, 'dueDate');}}>
+                          <CalendarDaysIcon className="h-3.5 w-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
+                        <Calendar
+                          mode="single"
+                          selected={popoverTempDueDate}
+                          onSelect={(date) => { setPopoverTempDueDate(date || undefined); if(date) handleSaveDueDateFromPopover(item.id); else onSetChecklistItemDueDate(task.id, item.id, null); }}
+                          initialFocus
+                        />
+                         {popoverTempDueDate && <Button size="sm" variant="link" className="w-full text-xs text-destructive" onClick={() => {setPopoverTempDueDate(undefined); onSetChecklistItemDueDate(task.id, item.id, null); setActivePopover(null);}}>Clear Date</Button>}
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* Attachment Dialog Trigger */}
+                    <Button variant="ghost" size="icon" className={cn("h-6 w-6", task.backgroundImageUrl && "text-gray-300 hover:text-white hover:bg-white/10")} onClick={(e) => {e.stopPropagation(); handleOpenAttachmentDialog(item);}}>
+                      <PaperclipIcon className="h-3.5 w-3.5" />
+                    </Button>
+
+                    {/* Label Popover */}
+                    <Popover open={activePopover?.itemId === item.id && activePopover.type === 'label'} onOpenChange={(isOpen) => !isOpen && setActivePopover(null)}>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className={cn("h-6 w-6", task.backgroundImageUrl && "text-gray-300 hover:text-white hover:bg-white/10")} onClick={(e) => {e.stopPropagation(); setPopoverTempLabel(item.label || ""); handleTogglePopover(item.id, 'label');}}>
+                          <TagIcon className="h-3.5 w-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48 p-2 space-y-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
+                        <Input 
+                          placeholder="Enter label..." 
+                          value={popoverTempLabel} 
+                          onChange={(e) => setPopoverTempLabel(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                        <div className="flex gap-1">
+                          <Button size="sm" className="flex-grow text-xs h-7" onClick={() => handleSaveLabelFromPopover(item.id)}>Save</Button>
+                          {item.label && <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => {setPopoverTempLabel(""); onSetChecklistItemLabel(task.id, item.id, null); setActivePopover(null);}}>Clear</Button>}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 )}
+
               </div>
             ))}
           </div>
@@ -470,184 +525,61 @@ export function TaskCard({
       </CardFooter>
       </div>
 
+      {/* Main Item Edit Dialog (Title, Description, Completion, Delete) */}
       {editingItemAllDetails && isOwner && (
         <Dialog open={!!editingItemAllDetails} onOpenChange={(isOpen) => { if (!isOpen) handleCloseItemEditDialog(); }}>
           <DialogContent
-            className={cn("sm:max-w-3xl bg-card text-card-foreground max-h-[90vh] flex flex-col", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
+            className={cn("sm:max-w-lg bg-card text-card-foreground max-h-[90vh] flex flex-col", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
             onClick={(e) => e.stopPropagation()}
           >
             <DialogHeader className="pb-2 border-b border-border">
               <DialogTitle className={cn("text-xl", task.backgroundImageUrl && "text-white")}>
-                Edit Item
+                Edit Item Details
               </DialogTitle>
             </DialogHeader>
             
-            <div className="py-3 flex-grow overflow-y-auto grid grid-cols-1 gap-x-6 gap-y-4 items-start">
-              {/* Top Image Display (conditionally rendered based on attachment dialog being closed) */}
-              {!isAttachmentDialogOpen && dialogTempImageUrl && (
-                  <div className="col-span-1 mb-1">
-                    <div className="w-full h-48 relative overflow-hidden rounded-md border border-border">
-                      <Image 
-                        src={dialogTempImageUrl} 
-                        alt={dialogTempTitle || "Checklist item image"}
-                        fill
-                        style={{objectFit: "cover"}}
-                        className="rounded-md"
-                        data-ai-hint={dialogTempTitle.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
-                      />
-                    </div>
-                  </div>
-              )}
-               {!isAttachmentDialogOpen && !dialogTempImageUrl && (
-                  <div className="col-span-1 mb-1">
-                    <div className="w-full h-24 flex items-center justify-center bg-muted rounded-md border border-dashed border-border">
-                        <ImageIcon className={cn("h-10 w-10", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")} />
-                    </div>
-                  </div>
-               )}
-
-
-              {/* Main Content Area (Two Columns) */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 items-start">
-                {/* Left Column */}
-                <div className="md:col-span-2 space-y-3 pr-1">
-                  <div className="flex items-center space-x-2">
-                     <Checkbox
-                        id={`dialog-item-completed-${editingItemAllDetails.id}`}
-                        checked={dialogTempCompleted}
-                        onCheckedChange={(checked) => setDialogTempCompleted(Boolean(checked))}
-                        className={cn("h-5 w-5 rounded-full", task.backgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
-                      />
-                     <EditableTitle
-                        initialValue={dialogTempTitle}
-                        onSave={(newTitle) => setDialogTempTitle(newTitle)}
-                        isEditable={true} 
-                        textElement='div'
-                        textClassName={cn(
-                          "text-lg font-medium py-1",
-                          task.backgroundImageUrl && "text-gray-100",
-                          dialogTempCompleted && "line-through text-muted-foreground"
-                        )} 
-                        inputClassName={cn(
-                          "text-lg font-medium h-auto p-0", 
-                          task.backgroundImageUrl && "bg-transparent text-white placeholder-gray-300",
-                          dialogTempCompleted && "line-through text-muted-foreground"
-                        )}
-                        placeholder="Item title..."
-                        ariaLabel="Item title"
-                        showEditIcon={true} 
-                        containerClassName="flex-grow" 
-                     />
-                  </div>
-                  
-                  {/* Assigned User Section */}
-                   <div className="pt-2 border-t border-border/50">
-                    <div>
-                        <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Assigned User</Label>
-                        {dialogTempAssignedUserId && dialogTempAssignedUserName ? (
-                        <div className="flex items-center space-x-2 text-sm p-2 rounded-md border bg-muted/50 border-muted">
-                            <Avatar className="h-6 w-6">
-                                <AvatarImage src={dialogTempAssignedUserAvatarUrl || undefined} alt={dialogTempAssignedUserName} data-ai-hint="user portrait"/>
-                                <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{dialogTempAssignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                            <span>{dialogTempAssignedUserName}</span>
-                        </div>
-                        ) : (
-                        <p className={cn("text-sm p-2 rounded-md border bg-muted/50 border-muted", task.backgroundImageUrl ? "text-gray-300 bg-white/5 border-white/20" : "text-muted-foreground")}>Not assigned.</p>
-                        )}
-                        {currentUser && (
-                            <Button 
-                                onClick={handleToggleDialogAssignCurrentUser} 
-                                className={cn("w-full text-xs h-auto py-1.5 mt-1.5", task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}
-                                variant={dialogTempAssignedUserId === currentUser.id ? "outline" : "default"}
-                            >
-                                <UserCircleIcon className="mr-2 h-3.5 w-3.5" /> 
-                                {dialogTempAssignedUserId === currentUser.id ? "Unassign Myself" : "Assign to Me"}
-                            </Button>
-                        )}
-                    </div>
-                  </div>
-                  
-                  {/* Due Date Section */}
-                  <div className="pt-2 border-t border-border/50">
-                     <div> 
-                        <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Due Date</Label>
-                        <div className="flex items-center">
-                          <Popover open={dialogTempIsDatePickerOpen} onOpenChange={setDialogTempIsDatePickerOpen}>
-                              <PopoverTrigger asChild>
-                                  <Button
-                                  variant={"outline"}
-                                  className={cn(
-                                      "w-full justify-start text-left font-normal h-auto py-2",
-                                      !dialogTempDueDate && "text-muted-foreground",
-                                      task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
-                                  )}
-                                  >
-                                  <CalendarDaysIcon className="mr-2 h-4 w-4" />
-                                  {dialogTempDueDate ? format(dialogTempDueDate, "PPP") : <span>Pick a date</span>}
-                                  </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start" side="right">
-                                  <Calendar
-                                  mode="single"
-                                  selected={dialogTempDueDate}
-                                  onSelect={(date) => { setDialogTempDueDate(date || undefined); setDialogTempIsDatePickerOpen(false); }}
-                                  initialFocus
-                                  className={cn(task.backgroundImageUrl && "bg-card text-card-foreground border-white/30")}
-                                  />
-                              </PopoverContent>
-                          </Popover>
-                          {dialogTempCompleted && (
-                            <Badge variant="outline" className="ml-2 border-green-600 bg-green-100 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400 text-xs px-1.5 py-0.5 h-auto flex items-center whitespace-nowrap">
-                              <CheckCircle2 className="mr-1 h-3 w-3 flex-shrink-0" /> Done
-                            </Badge>
-                          )}
-                        </div>
-                    </div>
-                  </div>
-
-                  {/* Description Section */}
-                  <div className="pt-2 border-t border-border/50">
-                    <Label htmlFor="dialogItemDescription" className={cn(task.backgroundImageUrl && "text-gray-200")}>Description</Label>
-                    <Textarea
-                      id="dialogItemDescription"
-                      value={dialogTempDescription}
-                      onChange={(e) => setDialogTempDescription(e.target.value)}
-                      placeholder="Add more details about this item..."
-                      className={cn("min-h-[60px]",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                      rows={3}
-                    />
-                  </div>
-                  
-                  {/* Attachment Button Section */}
-                  <div className="space-y-2 pt-2 border-t border-border/50">
-                    <Label className={cn("block", task.backgroundImageUrl && "text-gray-200")}>Attachment</Label>
-                    <Button 
-                        variant="outline" 
-                        onClick={() => setIsAttachmentDialogOpen(true)} 
-                        className={cn("w-full text-sm h-auto py-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
-                    >
-                        <PaperclipIcon className="mr-2 h-4 w-4" /> Manage Attachment
-                    </Button>
-                  </div>
-
-                </div>
-
-                {/* Right Column - Comments */}
-                <div className="md:col-span-1 space-y-3 border-t md:border-t-0 md:border-l border-border/50 pt-3 md:pt-0 md:pl-4">
-                  <h4 className={cn("text-sm font-medium flex items-center", task.backgroundImageUrl && "text-gray-200")}>
-                    <MessageSquareIcon className="mr-2 h-4 w-4" /> Comments
-                  </h4>
-                  <div className={cn("h-40 p-2 border border-dashed rounded-md flex items-center justify-center", task.backgroundImageUrl ? "border-white/30 bg-white/5" : "border-border bg-muted/30")}>
-                    <p className={cn("text-xs", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>
-                      Comments functionality coming soon.
-                      {dialogTempComments && dialogTempComments.length > 0 && (
-                        <span className="block mt-2">Current comments: {dialogTempComments.join(', ')}</span>
-                      )}
-                    </p>
-                  </div>
-                   {/* Placeholder for future comment input and display list */}
-                </div>
+            <div className="py-3 flex-grow overflow-y-auto space-y-4">
+              {/* Completion Status and Title */}
+              <div className="flex items-center space-x-2">
+                 <Checkbox
+                    id={`dialog-item-completed-${editingItemAllDetails.id}`}
+                    checked={dialogTempCompleted}
+                    onCheckedChange={(checked) => setDialogTempCompleted(Boolean(checked))}
+                    className={cn("h-5 w-5 rounded-full", task.backgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
+                  />
+                 <EditableTitle
+                    initialValue={dialogTempTitle}
+                    onSave={(newTitle) => setDialogTempTitle(newTitle)}
+                    isEditable={true} 
+                    textElement='div'
+                    textClassName={cn(
+                      "text-lg font-medium py-1",
+                      task.backgroundImageUrl && "text-gray-100",
+                      dialogTempCompleted && "line-through text-muted-foreground"
+                    )} 
+                    inputClassName={cn(
+                      "text-lg font-medium h-auto p-0", 
+                      task.backgroundImageUrl && "bg-transparent text-white placeholder-gray-300",
+                      dialogTempCompleted && "line-through text-muted-foreground"
+                    )}
+                    placeholder="Item title..."
+                    ariaLabel="Item title"
+                    showEditIcon={true} 
+                    containerClassName="flex-grow" 
+                 />
+              </div>
+            
+              {/* Description Section */}
+              <div>
+                <Label htmlFor="dialogItemDescription" className={cn(task.backgroundImageUrl && "text-gray-200")}>Description</Label>
+                <Textarea
+                  id="dialogItemDescription"
+                  value={dialogTempDescription}
+                  onChange={(e) => setDialogTempDescription(e.target.value)}
+                  placeholder="Add more details about this item..."
+                  className={cn("min-h-[80px]",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                  rows={4}
+                />
               </div>
             </div>
 
@@ -659,14 +591,14 @@ export function TaskCard({
               <DialogClose asChild>
                 <Button variant="ghost" onClick={handleCloseItemEditDialog} className={cn(task.backgroundImageUrl && "text-gray-300 hover:bg-white/10")}>Cancel</Button>
               </DialogClose>
-              <Button onClick={handleSaveItemEdits} className={cn(task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}>Save Changes</Button>
+              <Button onClick={handleSaveItemEditsFromMainDialog} className={cn(task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}>Save Changes</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
 
       {/* Attachment Management Dialog */}
-      {editingItemAllDetails && isOwner && (
+      {isOwner && (
         <Dialog open={isAttachmentDialogOpen} onOpenChange={setIsAttachmentDialogOpen}>
             <DialogContent 
                 className={cn("sm:max-w-md bg-card text-card-foreground", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
@@ -676,12 +608,11 @@ export function TaskCard({
                     <DialogTitle className={cn(task.backgroundImageUrl && "text-white")}>Manage Item Image</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
-                    {/* Image Preview */}
-                    {dialogTempImageUrl ? (
+                    {attachmentDialogTempImageUrl ? (
                         <div className="w-full h-40 relative overflow-hidden rounded-md border border-border">
                             <Image 
-                                src={dialogTempImageUrl} 
-                                alt={dialogTempTitle || "Attachment preview"}
+                                src={attachmentDialogTempImageUrl} 
+                                alt={"Attachment preview"}
                                 fill
                                 style={{objectFit: "cover"}}
                                 className="rounded-md"
@@ -692,38 +623,32 @@ export function TaskCard({
                             <ImageIcon className={cn("h-10 w-10", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")} />
                         </div>
                     )}
-
-                    {/* Image URL Input */}
                     <div>
                         <Label htmlFor="dialogAttachmentImageUrl" className={cn("text-xs", task.backgroundImageUrl && "text-gray-200")}>Image URL</Label>
                         <Input 
                             id="dialogAttachmentImageUrl" 
-                            value={dialogTempImageUrl} 
-                            onChange={(e) => setDialogTempImageUrl(e.target.value)} 
+                            value={attachmentDialogTempImageUrl} 
+                            onChange={(e) => setAttachmentDialogTempImageUrl(e.target.value)} 
                             placeholder="https://example.com/image.png" 
                             className={cn("text-sm h-9", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
                         />
                     </div>
-
-                    {/* File Upload Input */}
                     <div>
                         <Label htmlFor="dialogAttachmentImageFile" className={cn("text-xs", task.backgroundImageUrl && "text-gray-200")}>Or Upload Image (Max 2MB)</Label>
                         <Input 
                             id="dialogAttachmentImageFile" 
                             type="file"
                             accept="image/*"
-                            ref={dialogFileInpuRef}
-                            onChange={handleDialogImageFileChange}
+                            ref={attachmentDialogFileInpuRef}
+                            onChange={handleAttachmentFileChange}
                             className={cn("text-xs p-1 h-auto file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-input file:bg-transparent file:text-xs file:font-medium file:text-foreground", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 file:text-gray-200 file:border-white/30 hover:file:bg-white/5")}
                         />
                     </div>
-                    
-                    {/* Remove Image Button */}
-                    {(dialogTempImageUrl) && 
+                    {(attachmentDialogTempImageUrl) && 
                         <Button 
                             size="sm" 
                             variant="outline" 
-                            onClick={handleDialogRemoveImage} 
+                            onClick={handleRemoveAttachment} 
                             className={cn("w-full mt-2 text-xs h-auto py-1.5", task.backgroundImageUrl ? "bg-red-500/20 border-red-500/50 hover:bg-red-500/30 text-red-300" : "border-destructive text-destructive hover:bg-destructive/5")}
                         >
                             <TrashIcon className="mr-2 h-3.5 w-3.5"/>Remove Current Image
@@ -731,11 +656,14 @@ export function TaskCard({
                     }
                 </div>
                 <DialogFooter className="pt-3">
+                    <DialogClose asChild>
+                         <Button variant="ghost" onClick={() => { setIsAttachmentDialogOpen(false); setAttachmentDialogCurrentItemId(null); setAttachmentDialogTempImageUrl("");}} className={cn(task.backgroundImageUrl && "text-gray-300 hover:bg-white/10")}>Cancel</Button>
+                    </DialogClose>
                     <Button 
-                        onClick={() => setIsAttachmentDialogOpen(false)}
+                        onClick={handleSaveAttachment}
                         className={cn(task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}
                     >
-                        Done
+                        Save Attachment
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -745,4 +673,3 @@ export function TaskCard({
     </Card>
   );
 }
-
