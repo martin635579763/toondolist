@@ -186,8 +186,6 @@ export function TaskCard({
   // Attachment Dialog specific logic
   const handleOpenAttachmentDialog = () => {
     if (!isOwner) return;
-    // Ensure tempImageUrl is set from the main dialog's temp state
-    // setDialogTempImageUrl(editingItemAllDetails?.imageUrl || ""); // This should already be the case
     if (attachmentDialogFileInpuRef.current) {
       attachmentDialogFileInpuRef.current.value = "";
     }
@@ -195,9 +193,6 @@ export function TaskCard({
   };
 
   const handleSaveAttachmentFromSubDialog = () => {
-    // The actual saving of the image URL to the task item happens when the main dialog is saved.
-    // This function just closes the attachment sub-dialog.
-    // dialogTempImageUrl is already updated.
     setIsAttachmentDialogOpen(false);
   };
   
@@ -244,8 +239,7 @@ export function TaskCard({
 
   // Label Popover specific logic (within main dialog)
   const handleSaveLabelFromPopover = () => {
-    // dialogTempLabel is already updated by its input's onChange
-    setIsLabelPopoverOpen(false); // Close popover after "saving" (value is already in temp state)
+    setIsLabelPopoverOpen(false); 
   };
 
 
@@ -498,6 +492,9 @@ export function TaskCard({
             onClick={(e) => e.stopPropagation()}
           >
             <DialogHeader className="pb-2 border-b border-border">
+                 <DialogTitle className="sr-only">
+                    {dialogTempTitle ? `Edit item: ${dialogTempTitle}` : "Edit Item"}
+                 </DialogTitle>
                  <div className="flex items-center space-x-2">
                      <Checkbox
                         id={`dialog-item-completed-${editingItemAllDetails.id}`}
@@ -542,7 +539,6 @@ export function TaskCard({
                       rows={4}
                     />
                   </div>
-                   {/* Action Buttons Section */}
                   <div className="space-y-2 pt-2">
                      <Label className={cn(task.backgroundImageUrl && "text-gray-200")}>Details</Label>
                      <div className="grid grid-cols-2 gap-2">
@@ -567,6 +563,11 @@ export function TaskCard({
                                 <Button variant="outline" className={cn("w-full justify-start text-sm", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
                                     <CalendarDaysIcon className="mr-2 h-4 w-4" />
                                     {dialogTempDueDate ? format(dialogTempDueDate, "MMM d, yyyy") : "Set Due Date"}
+                                    {dialogTempCompleted && dialogTempDueDate && (
+                                        <Badge variant="secondary" className={cn("ml-auto text-xs px-1.5 py-0.5", task.backgroundImageUrl ? "bg-green-300/30 text-green-100 border-green-300/50" : "bg-green-100 text-green-700")}>
+                                           <CheckCircle2 className="mr-1 h-3 w-3"/> Done
+                                        </Badge>
+                                    )}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
@@ -656,6 +657,7 @@ export function TaskCard({
                                 fill
                                 style={{objectFit: "cover"}}
                                 className="rounded-md"
+                                data-ai-hint="image content"
                             />
                         </div>
                     ) : (
@@ -700,7 +702,7 @@ export function TaskCard({
                          <Button variant="ghost" onClick={() => { setIsAttachmentDialogOpen(false); }} className={cn(task.backgroundImageUrl && "text-gray-300 hover:bg-white/10")}>Cancel</Button>
                     </DialogClose>
                     <Button 
-                        onClick={handleSaveAttachmentFromSubDialog} // This just closes the dialog; main save handles data
+                        onClick={handleSaveAttachmentFromSubDialog} 
                         className={cn(task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}
                     >
                         Done
@@ -713,4 +715,3 @@ export function TaskCard({
     </Card>
   );
 }
-
