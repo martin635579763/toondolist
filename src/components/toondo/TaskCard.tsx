@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, ImageIcon, TrashIcon, MessageSquareIcon, CheckCircle2, PaperclipIcon, TagIcon } from "lucide-react";
+import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, ImageIcon, TrashIcon, MessageSquareIcon, CheckCircle2, PaperclipIcon, TagIcon, Edit3Icon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -42,7 +42,7 @@ interface TaskCardProps {
   onSetChecklistItemDueDate: (taskId: string, itemId: string, date: Date | null) => void;
   onAssignUserToChecklistItem: (taskId: string, itemId: string, userId: string | null, userName: string | null, userAvatarUrl: string | null) => void;
   onSetChecklistItemImage: (taskId: string, itemId: string, imageUrl: string | null, imageAiHint: string | null) => void;
-  onSetChecklistItemLabel: (taskId: string, itemId: string, newLabel: string | null) => void; // New prop
+  onSetChecklistItemLabel: (taskId: string, itemId: string, newLabel: string | null) => void;
   onApplyForRole: (taskId: string, roleName: string) => void;
   onUpdateTaskTitle: (taskId: string, newTitle: string) => void;
   onSetDueDate: (taskId: string, date: Date | null) => void;
@@ -74,17 +74,19 @@ export function TaskCard({
   const [dialogTempTitle, setDialogTempTitle] = useState("");
   const [dialogTempDescription, setDialogTempDescription] = useState("");
   const [dialogTempCompleted, setDialogTempCompleted] = useState(false);
+  const [dialogTempDueDate, setDialogTempDueDate] = useState<Date | undefined>(undefined);
+  const [dialogTempAssignedUserId, setDialogTempAssignedUserId] = useState<string | null>(null);
+  const [dialogTempAssignedUserName, setDialogTempAssignedUserName] = useState<string | null>(null);
+  const [dialogTempAssignedUserAvatarUrl, setDialogTempAssignedUserAvatarUrl] = useState<string | null>(null);
+  const [dialogTempImageUrl, setDialogTempImageUrl] = useState<string>("");
+  const [dialogTempLabel, setDialogTempLabel] = useState<string>("");
   
-  // State for attachment dialog
+  // State for sub-dialogs/popovers within the main edit dialog
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
-  const [attachmentDialogCurrentItemId, setAttachmentDialogCurrentItemId] = useState<string | null>(null);
-  const [attachmentDialogTempImageUrl, setAttachmentDialogTempImageUrl] = useState("");
   const attachmentDialogFileInpuRef = useRef<HTMLInputElement>(null);
-
-  // State for popovers
-  const [activePopover, setActivePopover] = useState<{ itemId: string, type: 'user' | 'dueDate' | 'label' } | null>(null);
-  const [popoverTempDueDate, setPopoverTempDueDate] = useState<Date | undefined>(undefined);
-  const [popoverTempLabel, setPopoverTempLabel] = useState<string>("");
+  const [isUserPopoverOpen, setIsUserPopoverOpen] = useState(false);
+  const [isDueDatePopoverOpen, setIsDueDatePopoverOpen] = useState(false);
+  const [isLabelPopoverOpen, setIsLabelPopoverOpen] = useState(false);
 
 
   const handleAddChecklistItemSubmit = () => {
@@ -100,13 +102,31 @@ export function TaskCard({
     setDialogTempTitle(item.title);
     setDialogTempDescription(item.description || "");
     setDialogTempCompleted(item.completed);
+    setDialogTempDueDate(item.dueDate ? new Date(item.dueDate) : undefined);
+    setDialogTempAssignedUserId(item.assignedUserId || null);
+    setDialogTempAssignedUserName(item.assignedUserName || null);
+    setDialogTempAssignedUserAvatarUrl(item.assignedUserAvatarUrl || null);
+    setDialogTempImageUrl(item.imageUrl || "");
+    setDialogTempLabel(item.label || "");
   };
 
   const handleCloseItemEditDialog = () => {
     setEditingItemAllDetails(null);
+    // Reset all temp states
     setDialogTempTitle("");
     setDialogTempDescription("");
     setDialogTempCompleted(false);
+    setDialogTempDueDate(undefined);
+    setDialogTempAssignedUserId(null);
+    setDialogTempAssignedUserName(null);
+    setDialogTempAssignedUserAvatarUrl(null);
+    setDialogTempImageUrl("");
+    setDialogTempLabel("");
+    // Close any open popovers
+    setIsUserPopoverOpen(false);
+    setIsDueDatePopoverOpen(false);
+    setIsLabelPopoverOpen(false);
+    setIsAttachmentDialogOpen(false);
   };
 
   const handleSaveItemEditsFromMainDialog = () => {
@@ -129,6 +149,27 @@ export function TaskCard({
     if (dialogTempDescription.trim() !== (editingItemAllDetails.description || "").trim()) {
       onUpdateChecklistItemDescription(task.id, editingItemAllDetails.id, dialogTempDescription.trim());
     }
+
+    if ((dialogTempDueDate ? dialogTempDueDate.toISOString().split('T')[0] : null) !== (editingItemAllDetails.dueDate ? new Date(editingItemAllDetails.dueDate).toISOString().split('T')[0] : null)) {
+      onSetChecklistItemDueDate(task.id, editingItemAllDetails.id, dialogTempDueDate || null);
+    }
+    
+    if (dialogTempAssignedUserId !== editingItemAllDetails.assignedUserId) {
+      onAssignUserToChecklistItem(task.id, editingItemAllDetails.id, dialogTempAssignedUserId, dialogTempAssignedUserName, dialogTempAssignedUserAvatarUrl);
+    }
+
+    const finalImageUrl = dialogTempImageUrl.trim() || null;
+    let finalImageAiHint: string | null = null;
+    if (finalImageUrl && trimmedTitle) {
+        finalImageAiHint = trimmedTitle.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
+    }
+    if (finalImageUrl !== editingItemAllDetails.imageUrl) {
+        onSetChecklistItemImage(task.id, editingItemAllDetails.id, finalImageUrl, finalImageAiHint);
+    }
+    
+    if (dialogTempLabel.trim() !== (editingItemAllDetails.label || "").trim()){
+        onSetChecklistItemLabel(task.id, editingItemAllDetails.id, dialogTempLabel.trim() || null);
+    }
     
     handleCloseItemEditDialog();
     toast({ title: "Item Updated", description: "Checklist item details saved." });
@@ -142,32 +183,22 @@ export function TaskCard({
     }
   };
 
-  const handleOpenAttachmentDialog = (item: ChecklistItem) => {
+  // Attachment Dialog specific logic
+  const handleOpenAttachmentDialog = () => {
     if (!isOwner) return;
-    setAttachmentDialogCurrentItemId(item.id);
-    setAttachmentDialogTempImageUrl(item.imageUrl || "");
+    // Ensure tempImageUrl is set from the main dialog's temp state
+    // setDialogTempImageUrl(editingItemAllDetails?.imageUrl || ""); // This should already be the case
     if (attachmentDialogFileInpuRef.current) {
       attachmentDialogFileInpuRef.current.value = "";
     }
     setIsAttachmentDialogOpen(true);
   };
 
-  const handleSaveAttachment = () => {
-    if (!attachmentDialogCurrentItemId) return;
-    const itemToUpdate = task.checklistItems?.find(i => i.id === attachmentDialogCurrentItemId);
-    if (!itemToUpdate) return;
-
-    const finalImageUrl = attachmentDialogTempImageUrl.trim() || null;
-    let finalImageAiHint: string | null = null;
-    if (finalImageUrl && itemToUpdate.title) {
-      finalImageAiHint = itemToUpdate.title.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
-    }
-    
-    onSetChecklistItemImage(task.id, attachmentDialogCurrentItemId, finalImageUrl, finalImageAiHint);
-    toast({ title: "Attachment Updated" });
+  const handleSaveAttachmentFromSubDialog = () => {
+    // The actual saving of the image URL to the task item happens when the main dialog is saved.
+    // This function just closes the attachment sub-dialog.
+    // dialogTempImageUrl is already updated.
     setIsAttachmentDialogOpen(false);
-    setAttachmentDialogCurrentItemId(null);
-    setAttachmentDialogTempImageUrl("");
   };
   
   const handleAttachmentFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -179,52 +210,42 @@ export function TaskCard({
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => setAttachmentDialogTempImageUrl(reader.result as string);
+      reader.onloadend = () => setDialogTempImageUrl(reader.result as string);
       reader.onerror = () => toast({ title: "Error Reading File", variant: "destructive" });
       reader.readAsDataURL(file);
     }
   };
 
-  const handleRemoveAttachment = () => {
-    setAttachmentDialogTempImageUrl("");
+  const handleRemoveAttachmentInSubDialog = () => {
+    setDialogTempImageUrl("");
     if (attachmentDialogFileInpuRef.current) attachmentDialogFileInpuRef.current.value = "";
   };
 
-  const handleTogglePopover = (itemId: string, type: 'user' | 'dueDate' | 'label') => {
-    if (activePopover?.itemId === itemId && activePopover.type === type) {
-      setActivePopover(null);
+  // User Assignment Popover specific logic (within main dialog)
+  const handleToggleDialogAssignCurrentUser = () => {
+    if (!currentUser) return;
+    if (dialogTempAssignedUserId === currentUser.id) {
+      setDialogTempAssignedUserId(null);
+      setDialogTempAssignedUserName(null);
+      setDialogTempAssignedUserAvatarUrl(null);
     } else {
-      const item = task.checklistItems?.find(i => i.id === itemId);
-      if (!item) return;
-      
-      if (type === 'dueDate') {
-        setPopoverTempDueDate(item.dueDate ? new Date(item.dueDate) : undefined);
-      } else if (type === 'label') {
-        setPopoverTempLabel(item.label || "");
-      }
-      setActivePopover({ itemId, type });
+      setDialogTempAssignedUserId(currentUser.id);
+      setDialogTempAssignedUserName(currentUser.displayName);
+      setDialogTempAssignedUserAvatarUrl(currentUser.avatarUrl || null);
     }
+    setIsUserPopoverOpen(false); // Close popover after action
   };
 
-  const handleSaveDueDateFromPopover = (itemId: string) => {
-    onSetChecklistItemDueDate(task.id, itemId, popoverTempDueDate || null);
-    setActivePopover(null);
+  // Due Date Popover specific logic (within main dialog)
+  const handleSaveDueDateFromPopover = (date: Date | undefined) => {
+    setDialogTempDueDate(date);
+    setIsDueDatePopoverOpen(false); // Close popover after selection
   };
 
-  const handleToggleUserFromPopover = (itemId: string) => {
-    const item = task.checklistItems?.find(i => i.id === itemId);
-    if (!item || !currentUser) return;
-    if (item.assignedUserId === currentUser.id) {
-      onAssignUserToChecklistItem(task.id, itemId, null, null, null);
-    } else {
-      onAssignUserToChecklistItem(task.id, itemId, currentUser.id, currentUser.displayName, currentUser.avatarUrl);
-    }
-    // No need to close popover here, it can stay open or be closed by clicking outside
-  };
-
-  const handleSaveLabelFromPopover = (itemId: string) => {
-    onSetChecklistItemLabel(task.id, itemId, popoverTempLabel.trim() || null);
-    setActivePopover(null);
+  // Label Popover specific logic (within main dialog)
+  const handleSaveLabelFromPopover = () => {
+    // dialogTempLabel is already updated by its input's onChange
+    setIsLabelPopoverOpen(false); // Close popover after "saving" (value is already in temp state)
   };
 
 
@@ -306,13 +327,11 @@ export function TaskCard({
                   task.backgroundImageUrl ? "border-white/30 bg-white/10 text-gray-100" : "border-border/60 bg-card text-card-foreground",
                 )}
               >
-                {/* Item Title and Checkbox */}
                 <div 
                   className={cn("flex items-center justify-between", isOwner && "cursor-pointer hover:bg-opacity-20")}
                   onClick={(e) => {
                     if (!isOwner) return;
                     const target = e.target as HTMLElement;
-                    // Prevent dialog open if clicking checkbox or action buttons area
                     if (target.closest('button[role="checkbox"]') || target.closest('[data-role="action-buttons-container"]')) {
                         return;
                     }
@@ -345,110 +364,56 @@ export function TaskCard({
                       {item.title}
                     </label>
                   </div>
+                   {isOwner && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleOpenItemEditDialog(item); }}
+                        className={cn("ml-2 p-0.5 rounded opacity-50 group-hover/checklist:opacity-100 focus:opacity-100 transition-opacity", task.backgroundImageUrl ? "text-gray-300 hover:text-white" : "text-muted-foreground hover:text-foreground")}
+                        aria-label="Edit item details"
+                    >
+                        <Edit3Icon className="h-3.5 w-3.5" />
+                    </button>
+                   )}
                 </div>
 
-                {/* Displayed Content Area */}
-                <div className={cn("mt-1 pt-1 text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "border-t border-white/20 text-gray-200" : "border-t border-border/30 text-muted-foreground")}>
-                  {item.imageUrl && (
-                    <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
-                       <Image 
-                          src={item.imageUrl} 
-                          alt={item.title || "Checklist item image"}
-                          fill 
-                          style={{objectFit: "cover"}} 
-                          className="rounded"
-                          data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
-                        />
-                    </div>
-                  )}
-                  {item.description && (
-                    <p className="italic truncate w-full text-ellipsis text-gray-400/90 dark:text-gray-500/90">
-                      {item.description.length > 50 ? `${item.description.substring(0, 47)}...` : item.description}
-                    </p>
-                  )}
-                  {item.dueDate && (
-                    <div className="flex items-center">
-                      <CalendarDaysIcon className="mr-1 h-3 w-3" />
-                      {format(new Date(item.dueDate), "MMM d")}
-                    </div>
-                  )}
-                  {item.assignedUserId && item.assignedUserName && (
-                    <div className="flex items-center">
-                      <Avatar className="h-4 w-4 mr-1">
-                         <AvatarImage src={item.assignedUserAvatarUrl || undefined} alt={item.assignedUserName} data-ai-hint="user"/>
-                         <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      {item.assignedUserName}
-                    </div>
-                  )}
-                  {item.label && (
-                    <Badge variant={task.backgroundImageUrl ? "secondary" : "outline"} className={cn("px-1.5 py-0.5 text-xs", task.backgroundImageUrl && "bg-white/20 text-white border-white/30")}>{item.label}</Badge>
-                  )}
-                </div>
-
-                {/* Action Buttons Area */}
-                {isOwner && (
-                  <div data-role="action-buttons-container" className={cn("mt-1.5 pt-1.5 border-t flex items-center justify-start space-x-1", task.backgroundImageUrl ? "border-white/20" : "border-border/30")}>
-                    {/* User Popover */}
-                    <Popover open={activePopover?.itemId === item.id && activePopover.type === 'user'} onOpenChange={(isOpen) => !isOpen && setActivePopover(null)}>
-                      <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className={cn("h-6 w-6", task.backgroundImageUrl && "text-gray-300 hover:text-white hover:bg-white/10")} onClick={(e) => {e.stopPropagation(); handleTogglePopover(item.id, 'user');}}>
-                          <UserCircleIcon className="h-3.5 w-3.5" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleToggleUserFromPopover(item.id)}>
-                          {item.assignedUserId === currentUser?.id ? "Unassign Myself" : "Assign to Me"}
-                        </Button>
-                      </PopoverContent>
-                    </Popover>
-
-                    {/* Due Date Popover */}
-                    <Popover open={activePopover?.itemId === item.id && activePopover.type === 'dueDate'} onOpenChange={(isOpen) => !isOpen && setActivePopover(null)}>
-                      <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className={cn("h-6 w-6", task.backgroundImageUrl && "text-gray-300 hover:text-white hover:bg-white/10")} onClick={(e) => {e.stopPropagation(); handleTogglePopover(item.id, 'dueDate');}}>
-                          <CalendarDaysIcon className="h-3.5 w-3.5" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
-                        <Calendar
-                          mode="single"
-                          selected={popoverTempDueDate}
-                          onSelect={(date) => { setPopoverTempDueDate(date || undefined); if(date) handleSaveDueDateFromPopover(item.id); else onSetChecklistItemDueDate(task.id, item.id, null); }}
-                          initialFocus
-                        />
-                         {popoverTempDueDate && <Button size="sm" variant="link" className="w-full text-xs text-destructive" onClick={() => {setPopoverTempDueDate(undefined); onSetChecklistItemDueDate(task.id, item.id, null); setActivePopover(null);}}>Clear Date</Button>}
-                      </PopoverContent>
-                    </Popover>
-
-                    {/* Attachment Dialog Trigger */}
-                    <Button variant="ghost" size="icon" className={cn("h-6 w-6", task.backgroundImageUrl && "text-gray-300 hover:text-white hover:bg-white/10")} onClick={(e) => {e.stopPropagation(); handleOpenAttachmentDialog(item);}}>
-                      <PaperclipIcon className="h-3.5 w-3.5" />
-                    </Button>
-
-                    {/* Label Popover */}
-                    <Popover open={activePopover?.itemId === item.id && activePopover.type === 'label'} onOpenChange={(isOpen) => !isOpen && setActivePopover(null)}>
-                      <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className={cn("h-6 w-6", task.backgroundImageUrl && "text-gray-300 hover:text-white hover:bg-white/10")} onClick={(e) => {e.stopPropagation(); setPopoverTempLabel(item.label || ""); handleTogglePopover(item.id, 'label');}}>
-                          <TagIcon className="h-3.5 w-3.5" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-48 p-2 space-y-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
-                        <Input 
-                          placeholder="Enter label..." 
-                          value={popoverTempLabel} 
-                          onChange={(e) => setPopoverTempLabel(e.target.value)}
-                          className="h-8 text-xs"
-                        />
-                        <div className="flex gap-1">
-                          <Button size="sm" className="flex-grow text-xs h-7" onClick={() => handleSaveLabelFromPopover(item.id)}>Save</Button>
-                          {item.label && <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => {setPopoverTempLabel(""); onSetChecklistItemLabel(task.id, item.id, null); setActivePopover(null);}}>Clear</Button>}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                {(item.imageUrl || item.description || item.dueDate || item.assignedUserId || item.label) && (
+                  <div className={cn("mt-1 pt-1 text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "border-t border-white/20 text-gray-200" : "border-t border-border/30 text-muted-foreground")}>
+                    {item.imageUrl && (
+                      <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
+                         <Image 
+                            src={item.imageUrl} 
+                            alt={item.title || "Checklist item image"}
+                            fill 
+                            style={{objectFit: "cover"}} 
+                            className="rounded"
+                            data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
+                          />
+                      </div>
+                    )}
+                    {item.description && (
+                      <p className="italic truncate w-full text-ellipsis text-gray-400/90 dark:text-gray-500/90">
+                        {item.description.length > 50 ? `${item.description.substring(0, 47)}...` : item.description}
+                      </p>
+                    )}
+                    {item.dueDate && (
+                      <div className="flex items-center">
+                        <CalendarDaysIcon className="mr-1 h-3 w-3" />
+                        {format(new Date(item.dueDate), "MMM d")}
+                      </div>
+                    )}
+                    {item.assignedUserId && item.assignedUserName && (
+                      <div className="flex items-center">
+                        <Avatar className="h-4 w-4 mr-1">
+                           <AvatarImage src={item.assignedUserAvatarUrl || undefined} alt={item.assignedUserName} data-ai-hint="user"/>
+                           <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        {item.assignedUserName}
+                      </div>
+                    )}
+                    {item.label && (
+                      <Badge variant={task.backgroundImageUrl ? "secondary" : "outline"} className={cn("px-1.5 py-0.5 text-xs", task.backgroundImageUrl && "bg-white/20 text-white border-white/30")}>{item.label}</Badge>
+                    )}
                   </div>
                 )}
-
               </div>
             ))}
           </div>
@@ -525,61 +490,136 @@ export function TaskCard({
       </CardFooter>
       </div>
 
-      {/* Main Item Edit Dialog (Title, Description, Completion, Delete) */}
+      {/* Main Item Edit Dialog */}
       {editingItemAllDetails && isOwner && (
         <Dialog open={!!editingItemAllDetails} onOpenChange={(isOpen) => { if (!isOpen) handleCloseItemEditDialog(); }}>
           <DialogContent
-            className={cn("sm:max-w-lg bg-card text-card-foreground max-h-[90vh] flex flex-col", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
+            className={cn("sm:max-w-3xl bg-card text-card-foreground max-h-[90vh] flex flex-col", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
             onClick={(e) => e.stopPropagation()}
           >
             <DialogHeader className="pb-2 border-b border-border">
-              <DialogTitle className={cn("text-xl", task.backgroundImageUrl && "text-white")}>
-                Edit Item Details
-              </DialogTitle>
+                 <div className="flex items-center space-x-2">
+                     <Checkbox
+                        id={`dialog-item-completed-${editingItemAllDetails.id}`}
+                        checked={dialogTempCompleted}
+                        onCheckedChange={(checked) => setDialogTempCompleted(Boolean(checked))}
+                        className={cn("h-5 w-5 rounded-full", task.backgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
+                      />
+                     <EditableTitle
+                        initialValue={dialogTempTitle}
+                        onSave={(newTitle) => setDialogTempTitle(newTitle)}
+                        isEditable={true} 
+                        textElement='div'
+                        textClassName={cn(
+                          "text-xl font-semibold py-1",
+                          task.backgroundImageUrl && "text-gray-100",
+                           dialogTempCompleted && "line-through text-muted-foreground"
+                        )} 
+                        inputClassName={cn(
+                          "text-xl font-semibold h-auto p-0", 
+                          task.backgroundImageUrl && "bg-transparent text-white placeholder-gray-300",
+                           dialogTempCompleted && "line-through text-muted-foreground"
+                        )}
+                        placeholder="Item title..."
+                        ariaLabel="Item title"
+                        showEditIcon={true} 
+                        containerClassName="flex-grow" 
+                     />
+                  </div>
             </DialogHeader>
             
-            <div className="py-3 flex-grow overflow-y-auto space-y-4">
-              {/* Completion Status and Title */}
-              <div className="flex items-center space-x-2">
-                 <Checkbox
-                    id={`dialog-item-completed-${editingItemAllDetails.id}`}
-                    checked={dialogTempCompleted}
-                    onCheckedChange={(checked) => setDialogTempCompleted(Boolean(checked))}
-                    className={cn("h-5 w-5 rounded-full", task.backgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
-                  />
-                 <EditableTitle
-                    initialValue={dialogTempTitle}
-                    onSave={(newTitle) => setDialogTempTitle(newTitle)}
-                    isEditable={true} 
-                    textElement='div'
-                    textClassName={cn(
-                      "text-lg font-medium py-1",
-                      task.backgroundImageUrl && "text-gray-100",
-                      dialogTempCompleted && "line-through text-muted-foreground"
-                    )} 
-                    inputClassName={cn(
-                      "text-lg font-medium h-auto p-0", 
-                      task.backgroundImageUrl && "bg-transparent text-white placeholder-gray-300",
-                      dialogTempCompleted && "line-through text-muted-foreground"
-                    )}
-                    placeholder="Item title..."
-                    ariaLabel="Item title"
-                    showEditIcon={true} 
-                    containerClassName="flex-grow" 
-                 />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 flex-grow overflow-y-auto py-3">
+              {/* Left Column */}
+              <div className="md:col-span-2 space-y-4">
+                  <div>
+                    <Label htmlFor="dialogItemDescription" className={cn(task.backgroundImageUrl && "text-gray-200")}>Description</Label>
+                    <Textarea
+                      id="dialogItemDescription"
+                      value={dialogTempDescription}
+                      onChange={(e) => setDialogTempDescription(e.target.value)}
+                      placeholder="Add more details about this item..."
+                      className={cn("min-h-[100px]",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                      rows={4}
+                    />
+                  </div>
+                   {/* Action Buttons Section */}
+                  <div className="space-y-2 pt-2">
+                     <Label className={cn(task.backgroundImageUrl && "text-gray-200")}>Details</Label>
+                     <div className="grid grid-cols-2 gap-2">
+                        {/* Assign User Button & Popover */}
+                        <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className={cn("w-full justify-start text-sm", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                                    <UserCircleIcon className="mr-2 h-4 w-4" />
+                                    {dialogTempAssignedUserName || "Assign User"}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
+                                <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleToggleDialogAssignCurrentUser}>
+                                {dialogTempAssignedUserId === currentUser?.id ? "Unassign Myself" : "Assign to Me"}
+                                </Button>
+                            </PopoverContent>
+                        </Popover>
+
+                        {/* Due Date Button & Popover */}
+                        <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className={cn("w-full justify-start text-sm", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                                    <CalendarDaysIcon className="mr-2 h-4 w-4" />
+                                    {dialogTempDueDate ? format(dialogTempDueDate, "MMM d, yyyy") : "Set Due Date"}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
+                                <Calendar
+                                mode="single"
+                                selected={dialogTempDueDate}
+                                onSelect={handleSaveDueDateFromPopover}
+                                initialFocus
+                                />
+                                {dialogTempDueDate && <Button size="sm" variant="link" className="w-full text-xs text-destructive" onClick={() => {handleSaveDueDateFromPopover(undefined);}}>Clear Date</Button>}
+                            </PopoverContent>
+                        </Popover>
+
+                        {/* Manage Attachment Button */}
+                        <Button 
+                            variant="outline" 
+                            onClick={handleOpenAttachmentDialog} 
+                            className={cn("w-full justify-start text-sm", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
+                        >
+                            <PaperclipIcon className="mr-2 h-4 w-4" /> Manage Attachment
+                        </Button>
+
+                        {/* Label Button & Popover */}
+                        <Popover open={isLabelPopoverOpen} onOpenChange={setIsLabelPopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className={cn("w-full justify-start text-sm", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                                    <TagIcon className="mr-2 h-4 w-4" />
+                                    {dialogTempLabel || "Set Label"}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-2 space-y-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
+                                <Input 
+                                placeholder="Enter label..." 
+                                value={dialogTempLabel} 
+                                onChange={(e) => setDialogTempLabel(e.target.value)}
+                                className={cn("h-8 text-xs", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400")}
+                                />
+                                <div className="flex gap-1">
+                                    <Button size="sm" className="flex-grow text-xs h-7" onClick={handleSaveLabelFromPopover}>Set</Button>
+                                    {dialogTempLabel && <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => {setDialogTempLabel(""); handleSaveLabelFromPopover();}}>Clear</Button>}
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                     </div>
+                  </div>
               </div>
-            
-              {/* Description Section */}
-              <div>
-                <Label htmlFor="dialogItemDescription" className={cn(task.backgroundImageUrl && "text-gray-200")}>Description</Label>
-                <Textarea
-                  id="dialogItemDescription"
-                  value={dialogTempDescription}
-                  onChange={(e) => setDialogTempDescription(e.target.value)}
-                  placeholder="Add more details about this item..."
-                  className={cn("min-h-[80px]",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                  rows={4}
-                />
+
+              {/* Right Column (Comments Placeholder) */}
+              <div className="md:col-span-1 space-y-3 border-l border-border md:pl-6 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0">
+                <h4 className={cn("font-medium", task.backgroundImageUrl && "text-gray-200")}>Comments</h4>
+                <div className={cn("p-3 rounded-md text-sm min-h-[150px] flex items-center justify-center", task.backgroundImageUrl ? "bg-white/5 text-gray-400 border border-white/20" : "bg-muted text-muted-foreground border border-dashed")}>
+                   <MessageSquareIcon className="h-6 w-6 mr-2 opacity-50" /> Comments are coming soon!
+                </div>
               </div>
             </div>
 
@@ -597,9 +637,9 @@ export function TaskCard({
         </Dialog>
       )}
 
-      {/* Attachment Management Dialog */}
-      {isOwner && (
-        <Dialog open={isAttachmentDialogOpen} onOpenChange={setIsAttachmentDialogOpen}>
+      {/* Attachment Management Sub-Dialog */}
+      {isOwner && editingItemAllDetails && (
+        <Dialog open={isAttachmentDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setIsAttachmentDialogOpen(false); }}>
             <DialogContent 
                 className={cn("sm:max-w-md bg-card text-card-foreground", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
                 onClick={(e) => e.stopPropagation()}
@@ -608,10 +648,10 @@ export function TaskCard({
                     <DialogTitle className={cn(task.backgroundImageUrl && "text-white")}>Manage Item Image</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
-                    {attachmentDialogTempImageUrl ? (
+                    {dialogTempImageUrl ? (
                         <div className="w-full h-40 relative overflow-hidden rounded-md border border-border">
                             <Image 
-                                src={attachmentDialogTempImageUrl} 
+                                src={dialogTempImageUrl} 
                                 alt={"Attachment preview"}
                                 fill
                                 style={{objectFit: "cover"}}
@@ -627,8 +667,8 @@ export function TaskCard({
                         <Label htmlFor="dialogAttachmentImageUrl" className={cn("text-xs", task.backgroundImageUrl && "text-gray-200")}>Image URL</Label>
                         <Input 
                             id="dialogAttachmentImageUrl" 
-                            value={attachmentDialogTempImageUrl} 
-                            onChange={(e) => setAttachmentDialogTempImageUrl(e.target.value)} 
+                            value={dialogTempImageUrl} 
+                            onChange={(e) => setDialogTempImageUrl(e.target.value)} 
                             placeholder="https://example.com/image.png" 
                             className={cn("text-sm h-9", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
                         />
@@ -644,11 +684,11 @@ export function TaskCard({
                             className={cn("text-xs p-1 h-auto file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-input file:bg-transparent file:text-xs file:font-medium file:text-foreground", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 file:text-gray-200 file:border-white/30 hover:file:bg-white/5")}
                         />
                     </div>
-                    {(attachmentDialogTempImageUrl) && 
+                    {(dialogTempImageUrl) && 
                         <Button 
                             size="sm" 
                             variant="outline" 
-                            onClick={handleRemoveAttachment} 
+                            onClick={handleRemoveAttachmentInSubDialog} 
                             className={cn("w-full mt-2 text-xs h-auto py-1.5", task.backgroundImageUrl ? "bg-red-500/20 border-red-500/50 hover:bg-red-500/30 text-red-300" : "border-destructive text-destructive hover:bg-destructive/5")}
                         >
                             <TrashIcon className="mr-2 h-3.5 w-3.5"/>Remove Current Image
@@ -657,13 +697,13 @@ export function TaskCard({
                 </div>
                 <DialogFooter className="pt-3">
                     <DialogClose asChild>
-                         <Button variant="ghost" onClick={() => { setIsAttachmentDialogOpen(false); setAttachmentDialogCurrentItemId(null); setAttachmentDialogTempImageUrl("");}} className={cn(task.backgroundImageUrl && "text-gray-300 hover:bg-white/10")}>Cancel</Button>
+                         <Button variant="ghost" onClick={() => { setIsAttachmentDialogOpen(false); }} className={cn(task.backgroundImageUrl && "text-gray-300 hover:bg-white/10")}>Cancel</Button>
                     </DialogClose>
                     <Button 
-                        onClick={handleSaveAttachment}
+                        onClick={handleSaveAttachmentFromSubDialog} // This just closes the dialog; main save handles data
                         className={cn(task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}
                     >
-                        Save Attachment
+                        Done
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -673,3 +713,4 @@ export function TaskCard({
     </Card>
   );
 }
+
