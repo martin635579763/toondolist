@@ -257,7 +257,7 @@ export function TaskCard({
         
         if (newLabels.length > MAX_LABELS) {
             toast({title: "Label Limit Reached", description: `You can select up to ${MAX_LABELS} labels.`, variant: "default"});
-            return prev; // Return original array if limit exceeded
+            return prev;
         }
         return newLabels;
     });
@@ -349,7 +349,7 @@ export function TaskCard({
                 {item.label && item.label.length > 0 && (
                     <div className="flex h-1.5 w-24">
                         {item.label.map((colorClass, index) => (
-                            <div key={index} className={cn("flex-1", colorClass)} />
+                            <div key={index} className={cn("h-full w-4", colorClass)} />
                         ))}
                     </div>
                 )}
@@ -526,7 +526,7 @@ export function TaskCard({
           >
              <DialogHeader className="pb-2">
                   <DialogTitle className="sr-only">
-                    {dialogTempTitle ? `Edit item: ${dialogTempTitle}` : "Edit Item"}
+                    {`Edit item: ${dialogTempTitle || "Untitled Item"}`}
                   </DialogTitle>
                  <div className="flex items-center space-x-2">
                      <Checkbox
@@ -558,15 +558,7 @@ export function TaskCard({
                   </div>
             </DialogHeader>
             
-            {dialogTempLabel && dialogTempLabel.length > 0 && (
-                <div className="flex h-1.5 w-full my-2">
-                    {dialogTempLabel.map((color, index) => (
-                        <div key={index} className={cn("flex-1", color)} />
-                    ))}
-                </div>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2 mb-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 mb-3 py-1">
                 <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                     <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className={cn("justify-start text-xs", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
@@ -620,7 +612,7 @@ export function TaskCard({
                             Label
                             {dialogTempLabel.length > 0 && (
                                 <div className="flex items-center gap-0.5 ml-1.5">
-                                    {dialogTempLabel.map(color => (
+                                    {dialogTempLabel.slice(0, MAX_LABELS).map(color => ( // Ensure only up to MAX_LABELS are shown
                                         <span key={color} className={cn("w-2.5 h-2.5 rounded-sm", color)} />
                                     ))}
                                 </div>
@@ -769,3 +761,4 @@ export function TaskCard({
     </Card>
   );
 }
+
