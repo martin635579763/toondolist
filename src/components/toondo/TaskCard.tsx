@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon, CheckCircle2 } from "lucide-react";
+import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon, CheckCircle2, PaperclipIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -83,6 +83,7 @@ export function TaskCard({
   const [dialogTempComments, setDialogTempComments] = useState<string[]>([]); // For future use
   const [dialogTempCompleted, setDialogTempCompleted] = useState(false);
   const dialogFileInpuRef = useRef<HTMLInputElement>(null);
+  const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
 
 
   const handleAddChecklistItemSubmit = () => {
@@ -125,6 +126,7 @@ export function TaskCard({
     if (dialogFileInpuRef.current) {
         dialogFileInpuRef.current.value = "";
     }
+    setIsAttachmentDialogOpen(false); 
   };
 
   const handleSaveItemEdits = () => {
@@ -359,8 +361,8 @@ export function TaskCard({
                          <Image 
                             src={item.imageUrl} 
                             alt={item.title || "Checklist item image"}
-                            fill // Changed from layout="fill"
-                            style={{objectFit: "cover"}} // Changed from objectFit="cover"
+                            fill 
+                            style={{objectFit: "cover"}} 
                             className="rounded"
                             data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
                           />
@@ -479,25 +481,29 @@ export function TaskCard({
             </DialogHeader>
             
             <div className="py-3 flex-grow overflow-y-auto grid grid-cols-1 gap-x-6 gap-y-4 items-start">
-              {/* Top Image */}
-              <div className="col-span-1 mb-1">
-                {dialogTempImageUrl ? (
-                  <div className="w-full h-48 relative overflow-hidden rounded-md border border-border">
-                    <Image 
-                      src={dialogTempImageUrl} 
-                      alt={dialogTempTitle || "Checklist item image"}
-                      fill
-                      style={{objectFit: "cover"}}
-                      className="rounded-md"
-                      data-ai-hint={dialogTempTitle.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
-                    />
+              {/* Top Image Display (conditionally rendered based on attachment dialog being closed) */}
+              {!isAttachmentDialogOpen && dialogTempImageUrl && (
+                  <div className="col-span-1 mb-1">
+                    <div className="w-full h-48 relative overflow-hidden rounded-md border border-border">
+                      <Image 
+                        src={dialogTempImageUrl} 
+                        alt={dialogTempTitle || "Checklist item image"}
+                        fill
+                        style={{objectFit: "cover"}}
+                        className="rounded-md"
+                        data-ai-hint={dialogTempTitle.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
+                      />
+                    </div>
                   </div>
-                ) : (
-                  <div className="w-full h-24 flex items-center justify-center bg-muted rounded-md border border-dashed border-border">
-                    <ImageIcon className={cn("h-10 w-10", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")} />
+              )}
+               {!isAttachmentDialogOpen && !dialogTempImageUrl && (
+                  <div className="col-span-1 mb-1">
+                    <div className="w-full h-24 flex items-center justify-center bg-muted rounded-md border border-dashed border-border">
+                        <ImageIcon className={cn("h-10 w-10", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")} />
+                    </div>
                   </div>
-                )}
-              </div>
+               )}
+
 
               {/* Main Content Area (Two Columns) */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 items-start">
@@ -531,7 +537,7 @@ export function TaskCard({
                         containerClassName="flex-grow" 
                      />
                   </div>
-
+                  
                   {/* Assigned User Section */}
                   <div className="pt-2 border-t border-border/50">
                     <div>
@@ -560,39 +566,6 @@ export function TaskCard({
                             )}
                         </div>
                     </div>
-                  </div>
-
-                  {/* Attachment Section */}
-                  <div className="space-y-2 pt-2 border-t border-border/50">
-                    <h4 className={cn("text-sm font-medium mb-1", task.backgroundImageUrl && "text-gray-200")}>Attachment</h4>
-                    <div>
-                      <Label htmlFor="dialogItemImageUrl" className={cn("text-xs",task.backgroundImageUrl && "text-gray-200")}>Image URL</Label>
-                      <Input 
-                        id="dialogItemImageUrl" 
-                        value={dialogTempImageUrl} 
-                        onChange={(e) => setDialogTempImageUrl(e.target.value)} 
-                        placeholder="https://..." 
-                        className={cn("text-sm h-9",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                      />
-                    </div>
-                    <div className="mt-1.5">
-                      <Label htmlFor="dialogItemImageFile" className={cn("text-xs", task.backgroundImageUrl && "text-gray-200")}>Or Upload Image</Label>
-                      <Input 
-                          id="dialogItemImageFile" 
-                          type="file"
-                          accept="image/*"
-                          ref={dialogFileInpuRef}
-                          onChange={handleDialogImageFileChange}
-                          className={cn("text-xs p-1 h-auto file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-input file:bg-transparent file:text-xs file:font-medium file:text-foreground", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 file:text-gray-200 file:border-white/30 hover:file:bg-white/5")}
-                        />
-                        <p className={cn("text-xs mt-0.5", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>Max 2MB. Upload generates a Data URI.</p>
-                    </div>
-                    
-                    { (dialogTempImageUrl || (editingItemAllDetails && editingItemAllDetails.imageUrl)) && 
-                        <Button size="sm" variant="outline" onClick={handleDialogRemoveImage} className={cn("w-full mt-2 text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-red-500/20 border-red-500/50 hover:bg-red-500/30 text-red-300")}>
-                            <TrashIcon className="mr-2 h-3.5 w-3.5"/>Remove Current Image
-                        </Button>
-                    }
                   </div>
                   
                   {/* Due Date Section */}
@@ -645,6 +618,18 @@ export function TaskCard({
                       rows={3}
                     />
                   </div>
+                  
+                  {/* Attachment Button Section */}
+                  <div className="space-y-2 pt-2 border-t border-border/50">
+                    <Label className={cn("block", task.backgroundImageUrl && "text-gray-200")}>Attachment</Label>
+                    <Button 
+                        variant="outline" 
+                        onClick={() => setIsAttachmentDialogOpen(true)} 
+                        className={cn("w-full text-sm h-auto py-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
+                    >
+                        <PaperclipIcon className="mr-2 h-4 w-4" /> Manage Attachment
+                    </Button>
+                  </div>
 
                 </div>
 
@@ -679,6 +664,85 @@ export function TaskCard({
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Attachment Management Dialog */}
+      {editingItemAllDetails && isOwner && (
+        <Dialog open={isAttachmentDialogOpen} onOpenChange={setIsAttachmentDialogOpen}>
+            <DialogContent 
+                className={cn("sm:max-w-md bg-card text-card-foreground", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <DialogHeader>
+                    <DialogTitle className={cn(task.backgroundImageUrl && "text-white")}>Manage Item Image</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                    {/* Image Preview */}
+                    {dialogTempImageUrl ? (
+                        <div className="w-full h-40 relative overflow-hidden rounded-md border border-border">
+                            <Image 
+                                src={dialogTempImageUrl} 
+                                alt={dialogTempTitle || "Attachment preview"}
+                                fill
+                                style={{objectFit: "cover"}}
+                                className="rounded-md"
+                            />
+                        </div>
+                    ) : (
+                        <div className="w-full h-24 flex items-center justify-center bg-muted rounded-md border border-dashed border-border">
+                            <ImageIcon className={cn("h-10 w-10", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")} />
+                        </div>
+                    )}
+
+                    {/* Image URL Input */}
+                    <div>
+                        <Label htmlFor="dialogAttachmentImageUrl" className={cn("text-xs", task.backgroundImageUrl && "text-gray-200")}>Image URL</Label>
+                        <Input 
+                            id="dialogAttachmentImageUrl" 
+                            value={dialogTempImageUrl} 
+                            onChange={(e) => setDialogTempImageUrl(e.target.value)} 
+                            placeholder="https://example.com/image.png" 
+                            className={cn("text-sm h-9", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                        />
+                    </div>
+
+                    {/* File Upload Input */}
+                    <div>
+                        <Label htmlFor="dialogAttachmentImageFile" className={cn("text-xs", task.backgroundImageUrl && "text-gray-200")}>Or Upload Image (Max 2MB)</Label>
+                        <Input 
+                            id="dialogAttachmentImageFile" 
+                            type="file"
+                            accept="image/*"
+                            ref={dialogFileInpuRef}
+                            onChange={handleDialogImageFileChange}
+                            className={cn("text-xs p-1 h-auto file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-input file:bg-transparent file:text-xs file:font-medium file:text-foreground", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 file:text-gray-200 file:border-white/30 hover:file:bg-white/5")}
+                        />
+                    </div>
+                    
+                    {/* Remove Image Button */}
+                    {(dialogTempImageUrl) && 
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={handleDialogRemoveImage} 
+                            className={cn("w-full mt-2 text-xs h-auto py-1.5", task.backgroundImageUrl ? "bg-red-500/20 border-red-500/50 hover:bg-red-500/30 text-red-300" : "border-destructive text-destructive hover:bg-destructive/5")}
+                        >
+                            <TrashIcon className="mr-2 h-3.5 w-3.5"/>Remove Current Image
+                        </Button>
+                    }
+                </div>
+                <DialogFooter className="pt-3">
+                    <Button 
+                        onClick={() => setIsAttachmentDialogOpen(false)}
+                        className={cn(task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}
+                    >
+                        Done
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
+
     </Card>
   );
 }
+
