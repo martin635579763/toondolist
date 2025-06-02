@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon, Circle, CheckCircle2, Edit3Icon as MoreOptionsIcon } from "lucide-react";
+import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon, Circle, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -27,7 +27,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { EditableTitle } from "./EditableTitle";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 
 interface TaskCardProps {
@@ -82,6 +81,7 @@ export function TaskCard({
   const [dialogTempAssignedUserAvatarUrl, setDialogTempAssignedUserAvatarUrl] = useState<string | null | undefined>(null);
   const [dialogTempImageUrl, setDialogTempImageUrl] = useState("");
   const [dialogTempComments, setDialogTempComments] = useState<string[]>([]); // For future use
+  const [dialogTempCompleted, setDialogTempCompleted] = useState(false);
   const dialogFileInpuRef = useRef<HTMLInputElement>(null);
 
 
@@ -103,6 +103,7 @@ export function TaskCard({
     setDialogTempAssignedUserAvatarUrl(item.assignedUserAvatarUrl);
     setDialogTempImageUrl(item.imageUrl || "");
     setDialogTempComments(item.comments || []);
+    setDialogTempCompleted(item.completed);
     if (dialogFileInpuRef.current) {
         dialogFileInpuRef.current.value = "";
     }
@@ -110,7 +111,7 @@ export function TaskCard({
 
   const handleCloseItemEditDialog = () => {
     setEditingItemAllDetails(null);
-    // Reset temp states, maybe not all if some persistence is desired on cancel
+    // Reset temp states
     setDialogTempTitle("");
     setDialogTempDescription("");
     setDialogTempDueDate(undefined);
@@ -120,6 +121,7 @@ export function TaskCard({
     setDialogTempAssignedUserAvatarUrl(null);
     setDialogTempImageUrl("");
     setDialogTempComments([]);
+    setDialogTempCompleted(false);
     if (dialogFileInpuRef.current) {
         dialogFileInpuRef.current.value = "";
     }
@@ -128,10 +130,14 @@ export function TaskCard({
   const handleSaveItemEdits = () => {
     if (!editingItemAllDetails) return;
 
+    if (dialogTempCompleted !== editingItemAllDetails.completed) {
+      onToggleChecklistItem(task.id, editingItemAllDetails.id);
+    }
+
     const trimmedTitle = dialogTempTitle.trim();
     if (!trimmedTitle) {
         toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
-        setDialogTempTitle(editingItemAllDetails.title); // Revert to original if user tried to blank it
+        setDialogTempTitle(editingItemAllDetails.title); 
         return; 
     }
     if (trimmedTitle !== editingItemAllDetails.title) {
@@ -157,7 +163,6 @@ export function TaskCard({
     let finalImageAiHint: string | null = null;
 
     if (finalImageUrl) {
-      // Automatically derive AI hint from the first one or two words of the title
       finalImageAiHint = trimmedTitle.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
     }
 
@@ -351,8 +356,8 @@ export function TaskCard({
                          <Image 
                             src={item.imageUrl} 
                             alt={item.title || "Checklist item image"}
-                            layout="fill"
-                            objectFit="cover"
+                            fill // Changed from layout="fill"
+                            style={{objectFit: "cover"}} // Changed from objectFit="cover"
                             className="rounded"
                             data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
                           />
@@ -466,7 +471,7 @@ export function TaskCard({
           >
             <DialogHeader className="pb-2 border-b border-border">
               <DialogTitle className={cn("text-xl", task.backgroundImageUrl && "text-white")}>
-                Edit Item: {editingItemAllDetails.title}
+                Edit Item
               </DialogTitle>
             </DialogHeader>
             
@@ -478,8 +483,8 @@ export function TaskCard({
                     <Image 
                       src={dialogTempImageUrl} 
                       alt={dialogTempTitle || "Checklist item image"}
-                      layout="fill" 
-                      objectFit="cover" 
+                      fill
+                      style={{objectFit: "cover"}}
                       className="rounded-md"
                       data-ai-hint={dialogTempTitle.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
                     />
@@ -496,14 +501,28 @@ export function TaskCard({
                 {/* Left Column */}
                 <div className="md:col-span-2 space-y-3 pr-1">
                   <div className="flex items-center space-x-2">
-                     <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                     <Checkbox
+                        id={`dialog-item-completed-${editingItemAllDetails.id}`}
+                        checked={dialogTempCompleted}
+                        onCheckedChange={(checked) => setDialogTempCompleted(Boolean(checked))}
+                        className={cn("h-5 w-5 rounded-sm", task.backgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
+                      />
+                     <Circle className={cn("h-4 w-4 flex-shrink-0", task.backgroundImageUrl ? "text-gray-300" : "text-muted-foreground")} />
                      <EditableTitle
                         initialValue={dialogTempTitle}
                         onSave={(newTitle) => setDialogTempTitle(newTitle)}
                         isEditable={true} 
                         textElement='div'
-                        textClassName={cn("text-lg font-medium py-1",task.backgroundImageUrl && "text-gray-100")} 
-                        inputClassName={cn("text-lg font-medium h-auto p-0", task.backgroundImageUrl && "bg-transparent text-white placeholder-gray-300")}
+                        textClassName={cn(
+                          "text-lg font-medium py-1",
+                          task.backgroundImageUrl && "text-gray-100",
+                          dialogTempCompleted && "line-through text-muted-foreground"
+                        )} 
+                        inputClassName={cn(
+                          "text-lg font-medium h-auto p-0", 
+                          task.backgroundImageUrl && "bg-transparent text-white placeholder-gray-300",
+                          dialogTempCompleted && "line-through text-muted-foreground"
+                        )}
                         placeholder="Item title..."
                         ariaLabel="Item title"
                         showEditIcon={true} 
@@ -543,7 +562,7 @@ export function TaskCard({
                         </Button>
                     }
                   </div>
-
+                  
                   {/* Due Date Section */}
                   <div className="pt-2 border-t border-border/50">
                      <div> 
@@ -573,7 +592,7 @@ export function TaskCard({
                                   />
                               </PopoverContent>
                           </Popover>
-                          {editingItemAllDetails?.completed && (
+                          {dialogTempCompleted && (
                             <Badge variant="outline" className="ml-2 border-green-600 bg-green-100 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400 text-xs px-1.5 py-0.5 h-auto flex items-center whitespace-nowrap">
                               <CheckCircle2 className="mr-1 h-3 w-3 flex-shrink-0" /> Done
                             </Badge>
@@ -581,7 +600,7 @@ export function TaskCard({
                         </div>
                     </div>
                   </div>
-                  
+
                   {/* Description Section */}
                   <div className="pt-2 border-t border-border/50">
                     <Label htmlFor="dialogItemDescription" className={cn(task.backgroundImageUrl && "text-gray-200")}>Description</Label>
@@ -660,3 +679,4 @@ export function TaskCard({
     </Card>
   );
 }
+
