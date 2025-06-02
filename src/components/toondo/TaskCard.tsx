@@ -167,9 +167,12 @@ export function TaskCard({
     }
 
 
-    if (finalImageUrl !== editingItemAllDetails.imageUrl || finalImageAiHint !== editingItemAllDetails.imageAiHint) {
+    if (finalImageUrl !== editingItemAllDetails.imageUrl || (finalImageUrl && finalImageAiHint !== editingItemAllDetails.imageAiHint)) {
         onSetChecklistItemImage(task.id, editingItemAllDetails.id, finalImageUrl, finalImageAiHint);
+    } else if (!finalImageUrl && editingItemAllDetails.imageUrl) {
+        onSetChecklistItemImage(task.id, editingItemAllDetails.id, null, null);
     }
+
 
     handleCloseItemEditDialog();
     toast({ title: "Item Updated", description: "Checklist item details saved." });
@@ -505,7 +508,7 @@ export function TaskCard({
                         id={`dialog-item-completed-${editingItemAllDetails.id}`}
                         checked={dialogTempCompleted}
                         onCheckedChange={(checked) => setDialogTempCompleted(Boolean(checked))}
-                        className={cn("h-5 w-5 rounded-sm", task.backgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
+                        className={cn("h-5 w-5 rounded-full", task.backgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
                       />
                      <EditableTitle
                         initialValue={dialogTempTitle}
@@ -678,3 +681,4 @@ export function TaskCard({
     </Card>
   );
 }
+
