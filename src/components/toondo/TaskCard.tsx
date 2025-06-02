@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, ImageIcon, TrashIcon, MessageSquareIcon, CheckCircle2, PaperclipIcon, TagIcon, Edit3Icon } from "lucide-react";
+import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, ImageIcon, TrashIcon, MessageSquareIcon, CheckCircle2, PaperclipIcon, TagIcon, Edit3Icon, AlignLeftIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { EditableTitle } from "./EditableTitle";
 import { Badge } from "@/components/ui/badge";
+import { marked } from 'marked';
 
 const LABEL_COLORS = [
   "bg-red-500",
@@ -250,13 +251,15 @@ export function TaskCard({
 
   const handleToggleLabelColorInDialog = (colorClass: string) => {
     setDialogTempLabel(prev => {
-        if (prev.includes(colorClass)) {
-            return prev.filter(c => c !== colorClass);
-        } else if (prev.length < MAX_LABELS) {
-            return [...prev, colorClass];
+        const newLabels = prev.includes(colorClass)
+            ? prev.filter(c => c !== colorClass)
+            : [...prev, colorClass];
+        
+        if (newLabels.length > MAX_LABELS) {
+            toast({title: "Label Limit Reached", description: `You can select up to ${MAX_LABELS} labels.`, variant: "default"});
+            return prev; // Return original array if limit exceeded
         }
-        toast({title: "Label Limit Reached", description: `You can select up to ${MAX_LABELS} labels.`, variant: "default"});
-        return prev;
+        return newLabels;
     });
   };
   const handleClearAllLabelsInDialog = () => {
@@ -344,7 +347,7 @@ export function TaskCard({
                 )}
               >
                 {item.label && item.label.length > 0 && (
-                    <div className="flex h-1.5 w-24"> {/* Fixed width w-24 */}
+                    <div className="flex h-1.5 w-24">
                         {item.label.map((colorClass, index) => (
                             <div key={index} className={cn("flex-1", colorClass)} />
                         ))}
@@ -414,9 +417,12 @@ export function TaskCard({
                         </div>
                         )}
                         {item.description && (
-                        <p className="italic truncate w-full text-ellipsis text-gray-400/90 dark:text-gray-500/90">
-                            {item.description.length > 50 ? `${item.description.substring(0, 47)}...` : item.description}
-                        </p>
+                            <p
+                                className="italic truncate w-full text-ellipsis text-gray-400/90 dark:text-gray-500/90"
+                                dangerouslySetInnerHTML={{
+                                __html: marked.parseInline(item.description.length > 50 ? `${item.description.substring(0, 47)}...` : item.description)
+                                }}
+                            />
                         )}
                         {item.dueDate && (
                         <div className="flex items-center">
@@ -519,9 +525,9 @@ export function TaskCard({
             onClick={(e) => e.stopPropagation()}
           >
              <DialogHeader className="pb-2">
-                 <DialogTitle className="sr-only">
-                    {editingItemAllDetails && dialogTempTitle ? `Edit item: ${dialogTempTitle}` : "Edit Item"}
-                 </DialogTitle>
+                  <DialogTitle className="sr-only">
+                    {dialogTempTitle ? `Edit item: ${dialogTempTitle}` : "Edit Item"}
+                  </DialogTitle>
                  <div className="flex items-center space-x-2">
                      <Checkbox
                         id={`dialog-item-completed-${editingItemAllDetails.id}`}
@@ -551,6 +557,14 @@ export function TaskCard({
                      />
                   </div>
             </DialogHeader>
+            
+            {dialogTempLabel && dialogTempLabel.length > 0 && (
+                <div className="flex h-1.5 w-full my-2">
+                    {dialogTempLabel.map((color, index) => (
+                        <div key={index} className={cn("flex-1", color)} />
+                    ))}
+                </div>
+            )}
 
             <div className="flex flex-wrap items-center gap-2 mb-3 py-2">
                 <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
@@ -642,12 +656,15 @@ export function TaskCard({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 flex-grow overflow-y-auto pb-3">
               <div className="md:col-span-2 space-y-3">
                   <div>
-                    <Label htmlFor="dialogItemDescription" className={cn("text-sm", task.backgroundImageUrl && "text-gray-200")}>Description</Label>
+                    <div className="flex items-center space-x-2 mb-1">
+                        <AlignLeftIcon className={cn("h-4 w-4", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")} />
+                        <Label htmlFor="dialogItemDescription" className={cn("text-sm", task.backgroundImageUrl && "text-gray-200")}>Description</Label>
+                    </div>
                     <Textarea
                       id="dialogItemDescription"
                       value={dialogTempDescription}
                       onChange={(e) => setDialogTempDescription(e.target.value)}
-                      placeholder="Add more details about this item..."
+                      placeholder="Add more details about this item... Markdown is supported for formatting (e.g. **bold**, *italic*, - lists)."
                       className={cn("min-h-[100px]",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
                       rows={3}
                     />
@@ -752,4 +769,3 @@ export function TaskCard({
     </Card>
   );
 }
-
