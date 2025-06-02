@@ -35,6 +35,7 @@ const LABEL_COLORS = [
   "bg-blue-500",
   "bg-purple-500",
   "bg-pink-500",
+  "bg-orange-500", // Added orange
 ];
 
 interface TaskCardProps {
@@ -543,9 +544,9 @@ export function TaskCard({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 flex-grow overflow-y-auto py-3">
               {/* Left Column */}
               <div className="md:col-span-2 space-y-3">
-                {dialogTempLabel && (
-                  <div className={cn("h-1.5 w-full rounded-sm mb-2", dialogTempLabel)} />
-                )}
+                  {dialogTempLabel && (
+                     <div className={cn("h-1.5 w-full rounded-sm mb-2", dialogTempLabel)} />
+                  )}
                   {/* Action Buttons Row */}
                   <div className="flex flex-wrap items-center gap-2">
                         <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
@@ -596,7 +597,7 @@ export function TaskCard({
 
                         <Popover open={isLabelPopoverOpen} onOpenChange={setIsLabelPopoverOpen}>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                                <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0 items-center", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
                                     {dialogTempLabel ? (
                                         <span className={cn("w-3 h-3 rounded-sm mr-1.5", dialogTempLabel)}></span>
                                     ) : (
