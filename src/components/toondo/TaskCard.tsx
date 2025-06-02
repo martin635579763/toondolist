@@ -491,7 +491,7 @@ export function TaskCard({
                         side="left" 
                         align="start"   
                         onClick={(e) => e.stopPropagation()}
-                        className={cn("bg-popover text-popover-foreground", task.backgroundImageUrl && "bg-background/80 backdrop-blur-sm border-white/30 text-white")}
+                        className={cn("bg-popover text-popover-foreground w-44", task.backgroundImageUrl && "bg-background/80 backdrop-blur-sm border-white/30 text-white")}
                       >
                         <DropdownMenuItem onClick={() => handleStartEditChecklistItem(item)} className={cn(task.backgroundImageUrl && "focus:bg-white/20")}>
                           <Edit3Icon className="mr-2 h-3.5 w-3.5" />
@@ -790,4 +790,3 @@ export function TaskCard({
     </Card>
   );
 }
-
