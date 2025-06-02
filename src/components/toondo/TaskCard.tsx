@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon, Circle, CheckCircle2 } from "lucide-react";
+import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon, Circle, CheckCircle2, Edit3Icon as MoreOptionsIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { EditableTitle } from "./EditableTitle";
 import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 
 interface TaskCardProps {
@@ -299,11 +300,9 @@ export function TaskCard({
                    !isOwner && "cursor-default"
                 )}
                 onClick={(e) => {
-                    
                     e.stopPropagation();
-                    
                     const target = e.target as HTMLElement;
-                    if (target.closest('button[role="checkbox"]')) {
+                    if (target.closest('button[role="checkbox"]') || target.closest('[data-no-dialog-trigger="true"]')) {
                         return;
                     }
                     if (isOwner) handleOpenItemEditDialog(item);
@@ -545,22 +544,9 @@ export function TaskCard({
                     }
                   </div>
 
-                  {/* Description Section */}
+                  {/* Due Date Section */}
                   <div className="pt-2 border-t border-border/50">
-                    <Label htmlFor="dialogItemDescription" className={cn(task.backgroundImageUrl && "text-gray-200")}>Description</Label>
-                    <Textarea
-                      id="dialogItemDescription"
-                      value={dialogTempDescription}
-                      onChange={(e) => setDialogTempDescription(e.target.value)}
-                      placeholder="Add more details about this item..."
-                      className={cn("min-h-[60px]",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                      rows={3}
-                    />
-                  </div>
-
-                  {/* Details Section (Due Date & Assign User) */}
-                  <div className="space-y-3 pt-2 border-t border-border/50">
-                     <div>
+                     <div> 
                         <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Due Date</Label>
                         <div className="flex items-center">
                           <Popover open={dialogTempIsDatePickerOpen} onOpenChange={setDialogTempIsDatePickerOpen}>
@@ -594,6 +580,23 @@ export function TaskCard({
                           )}
                         </div>
                     </div>
+                  </div>
+                  
+                  {/* Description Section */}
+                  <div className="pt-2 border-t border-border/50">
+                    <Label htmlFor="dialogItemDescription" className={cn(task.backgroundImageUrl && "text-gray-200")}>Description</Label>
+                    <Textarea
+                      id="dialogItemDescription"
+                      value={dialogTempDescription}
+                      onChange={(e) => setDialogTempDescription(e.target.value)}
+                      placeholder="Add more details about this item..."
+                      className={cn("min-h-[60px]",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Assigned User Section */}
+                  <div className="pt-2 border-t border-border/50">
                     <div>
                         <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Assigned User</Label>
                         {dialogTempAssignedUserId && dialogTempAssignedUserName ? (
@@ -657,4 +660,3 @@ export function TaskCard({
     </Card>
   );
 }
-
