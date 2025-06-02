@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Task } from '@/types/task';
 import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
 import { TaskCard } from '@/components/toondo/TaskCard';
-import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, CaseSensitiveIcon, UserCircleIcon, PlusSquareIcon } from 'lucide-react';
+import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, UserCircleIcon, PlusSquareIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { cn, generateId } from '@/lib/utils';
 import {
@@ -19,10 +19,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { parseMarkdownToTasks, type ParseMarkdownInput, type ParseMarkdownOutput } from '@/ai/flows/parse-markdown-tasks-flow';
 import { getRandomColor } from '@/lib/colors';
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
 
@@ -45,8 +42,6 @@ function HomePageContent() {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
 
-  const [markdownInput, setMarkdownInput] = useState<string>('');
-  const [isParsingMarkdown, setIsParsingMarkdown] = useState<boolean>(false);
   const [isCreateTaskPopoverOpen, setIsCreateTaskPopoverOpen] = useState(false);
 
 
@@ -123,75 +118,6 @@ function HomePageContent() {
 
   const handleTaskCreatedInPopover = () => {
     setIsCreateTaskPopoverOpen(false);
-  };
-
-  const handleParseAndAddTasks = async () => {
-    if (!markdownInput.trim()) {
-      toast({ title: "Empty Input", description: "Please enter some markdown to parse.", variant: "default" });
-      return;
-    }
-    if (!currentUser) {
-      toast({ title: "Not Logged In", description: "You must be logged in to create tasks from markdown.", variant: "destructive" });
-      return;
-    }
-
-    setIsParsingMarkdown(true);
-    try {
-      const result: ParseMarkdownOutput = await parseMarkdownToTasks({ markdownContent: markdownInput });
-      if (result.parsedTasks && result.parsedTasks.length > 0) {
-        let tasksAddedCount = 0;
-        result.parsedTasks.forEach(parsedMainTask => {
-          const mainTaskId = generateId();
-          const mainTaskToAdd: Task = {
-            id: mainTaskId,
-            title: parsedMainTask.title,
-            description: parsedMainTask.description || "",
-            completed: false,
-            dueDate: null, 
-            color: getRandomColor(),
-            createdAt: Date.now() + tasksAddedCount, 
-            assignedRoles: parsedMainTask.assignedRolesString ? parsedMainTask.assignedRolesString.split(',').map(r => r.trim()).filter(r => r) : [],
-            applicants: [],
-            userId: currentUser.id,
-            userDisplayName: currentUser.displayName,
-            userAvatarUrl: currentUser.avatarUrl,
-          };
-          handleAddTask(mainTaskToAdd);
-          tasksAddedCount++;
-
-          if (parsedMainTask.subTasks && parsedMainTask.subTasks.length > 0) {
-            parsedMainTask.subTasks.forEach(parsedSubTask => {
-              const subTaskToAdd: Task = {
-                id: generateId(),
-                title: parsedSubTask.title,
-                description: parsedSubTask.description || "",
-                completed: false,
-                dueDate: null,
-                color: getRandomColor(),
-                createdAt: Date.now() + tasksAddedCount,
-                parentId: mainTaskId,
-                applicants: [],
-                userId: currentUser.id,
-                userDisplayName: currentUser.displayName,
-                userAvatarUrl: currentUser.avatarUrl,
-              };
-              handleAddTask(subTaskToAdd);
-              tasksAddedCount++;
-            });
-          }
-        });
-        toast({ title: "Tasks Created!", description: `${tasksAddedCount} task(s) were created from your markdown.` });
-        setMarkdownInput(''); 
-      } else {
-        toast({ title: "No Tasks Found", description: "The parser couldn't find any tasks in your markdown, or there was an issue.", variant: "default" });
-      }
-    } catch (error) {
-      console.error("Error parsing markdown to tasks:", error);
-      let description = "Could not parse markdown. Please try again.";
-      toast({ title: "Parsing Error", description, variant: "destructive" });
-    } finally {
-      setIsParsingMarkdown(false);
-    }
   };
 
  const handleToggleComplete = (id: string) => {
@@ -572,7 +498,7 @@ function HomePageContent() {
             </div>
           ) : (
             <>
-              <div className="mb-8 flex space-x-4">
+              <div className="mb-8">
                 <Popover open={isCreateTaskPopoverOpen} onOpenChange={setIsCreateTaskPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="default" size="lg" className="shadow-lg hover:shadow-xl transition-shadow">
@@ -586,44 +512,9 @@ function HomePageContent() {
                     />
                   </PopoverContent>
                 </Popover>
-
-                <Card className="flex-grow p-0 bg-card shadow-xl rounded-xl border border-border">
-                  <CardHeader className="p-3 pb-2">
-                    <CardTitle className="text-lg flex items-center">
-                      <CaseSensitiveIcon className="mr-2 h-5 w-5 text-primary" />
-                      Bulk Create from Markdown
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      Paste markdown. Ex: "# Task\n- Subtask"
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-3 pt-0 space-y-2">
-                    <Textarea
-                      placeholder="Paste your markdown here..."
-                      value={markdownInput}
-                      onChange={(e) => setMarkdownInput(e.target.value)}
-                      rows={3}
-                      className="text-sm"
-                      disabled={isParsingMarkdown}
-                    />
-                    <Button
-                      onClick={handleParseAndAddTasks}
-                      disabled={isParsingMarkdown || !markdownInput.trim()}
-                      className="w-full h-9 text-sm"
-                      size="sm"
-                    >
-                      {isParsingMarkdown ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <CaseSensitiveIcon className="mr-2 h-4 w-4" />
-                      )}
-                      Create from Markdown
-                    </Button>
-                  </CardContent>
-                </Card>
               </div>
               
-              {taskGroups.length === 0 && !isLoadingTasks && !markdownInput ? (
+              {taskGroups.length === 0 && !isLoadingTasks ? (
                  <div className="text-center py-16">
                   <FileTextIcon className="mx-auto h-24 w-24 text-muted-foreground opacity-50 mb-4" />
                   <h2 className="text-3xl font-semibold mb-2">No ToonDos Yet, {currentUser.displayName}!</h2>
