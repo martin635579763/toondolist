@@ -5,7 +5,6 @@ import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Task, Applicant } from '@/types/task';
 import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
-import { EditTaskDialog } from '@/components/toondo/EditTaskDialog';
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, CaseSensitiveIcon, UserCircleIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -44,9 +43,6 @@ function HomePageContent() {
 
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
-
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const [markdownInput, setMarkdownInput] = useState<string>('');
   const [isParsingMarkdown, setIsParsingMarkdown] = useState<boolean>(false);
@@ -190,93 +186,6 @@ function HomePageContent() {
     } finally {
       setIsParsingMarkdown(false);
     }
-  };
-
-
-  const handleOpenEditDialog = (task: Task) => {
-    if (!currentUser) {
-      toast({ title: "Login Required", description: "You must be logged in to edit tasks.", variant: "destructive" });
-      return;
-    }
-     if (currentUser.id !== task.userId) {
-      toast({ title: "Permission Denied", description: "You can only edit your own tasks.", variant: "destructive" });
-      return;
-    }
-    setEditingTask(task);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleCloseEditDialog = () => {
-    setIsEditDialogOpen(false);
-    setEditingTask(null);
-  };
-
-  const handleUpdateTask = (updatedTaskData: Task, newSubTasksToCreate?: Task[]) => {
-    if (!currentUser || !editingTask) {
-      toast({ title: "Error", description: "User not logged in or no task selected for editing.", variant: "destructive" });
-      return;
-    }
-    if (currentUser.id !== editingTask.userId) {
-      toast({ title: "Permission Denied", description: "You can only update your own tasks.", variant: "destructive" });
-      handleCloseEditDialog();
-      return;
-    }
-
-    let toastDescription = `"${updatedTaskData.title}" has been updated.`;
-    let shouldMarkParentIncomplete = false;
-
-    setTasks(prevTasks => {
-        let newTasksList = prevTasks.map(task =>
-          task.id === editingTask.id ? { 
-            ...task, 
-            ...updatedTaskData, 
-            userId: task.userId, 
-            userDisplayName: task.userDisplayName,
-            userAvatarUrl: task.userAvatarUrl,
-          } : task
-        );
-
-        if (newSubTasksToCreate && newSubTasksToCreate.length > 0) {
-           const mainTaskInListForSubs = newTasksList.find(t => t.id === editingTask.id);
-           if (!mainTaskInListForSubs) {
-             console.error("Parent task for new sub-tasks not found in list during update.");
-             return newTasksList; 
-           }
-
-          const subTasksWithParentAndUser = newSubTasksToCreate.map((subTask, index) => ({
-            ...subTask,
-            id: subTask.id || generateId(),
-            parentId: editingTask.id,
-            createdAt: Date.now() + index + 1, 
-            applicants: [],
-            assignedRoles: [],
-            color: subTask.color || getRandomColor(),
-            order: undefined, 
-            userId: mainTaskInListForSubs.userId, 
-            userDisplayName: mainTaskInListForSubs.userDisplayName,
-            userAvatarUrl: mainTaskInListForSubs.userAvatarUrl,
-            completed: subTask.completed || false,
-          }));
-          newTasksList = [...newTasksList, ...subTasksWithParentAndUser];
-          toastDescription += ` ${newSubTasksToCreate.length} new sub-task${newSubTasksToCreate.length > 1 ? 's were' : ' was'} added.`;
-          
-          if (mainTaskInListForSubs && mainTaskInListForSubs.completed && subTasksWithParentAndUser.some(st => !st.completed)) {
-            shouldMarkParentIncomplete = true;
-            newTasksList = newTasksList.map(t =>
-              t.id === editingTask.id ? { ...t, completed: false } : t
-            );
-          }
-        }
-        return newTasksList;
-    });
-    
-    toast({
-      title: "ToonDo Updated!",
-      description: toastDescription,
-    });
-    if (shouldMarkParentIncomplete) {
-    }
-    handleCloseEditDialog();
   };
 
  const handleToggleComplete = (id: string) => {
@@ -703,14 +612,14 @@ function HomePageContent() {
               ) : (
                 <div
                   className={cn(
-                    'flex overflow-x-auto space-x-6 py-4 items-start' // Trello-like horizontal scroll
+                    'flex overflow-x-auto space-x-6 py-4 items-start' 
                   )}
                 >
                   {taskGroups.map(({ mainTask, subTasks, mainTaskHasIncompleteSubtasks: groupHasIncompleteSubtasks }) => (
                     <div
                       key={mainTask.id}
                       className={cn(
-                        "flex-shrink-0 w-80 space-y-4 rounded-lg", // Column style
+                        "flex-shrink-0 w-80 space-y-4 rounded-lg", 
                         currentUser && mainTask.userId === currentUser.id && "cursor-grab",
                         draggedItemId === mainTask.id && "opacity-50 ring-2 ring-primary ring-offset-2",
                         dragOverItemId === mainTask.id && draggedItemId !== mainTask.id && "ring-2 ring-accent ring-offset-1 scale-102 shadow-xl z-10"
@@ -730,7 +639,6 @@ function HomePageContent() {
                         onToggleComplete={handleToggleComplete}
                         onDelete={handleDeleteTask} 
                         onPrint={handleInitiatePrint}
-                        onEdit={handleOpenEditDialog}
                         onApplyForRole={handleApplyForRole}
                         isMainTaskWithIncompleteSubtasks={groupHasIncompleteSubtasks}
                       />
@@ -743,7 +651,6 @@ function HomePageContent() {
                           onToggleComplete={handleToggleComplete}
                           onDelete={handleDeleteTask} 
                           onPrint={handleInitiatePrint}
-                          onEdit={handleOpenEditDialog}
                           onApplyForRole={handleApplyForRole} 
                           isMainTaskWithIncompleteSubtasks={false} 
                         />
@@ -759,15 +666,6 @@ function HomePageContent() {
         <div id="printable-area" ref={printableAreaRef} className="hidden print:block">
           {taskToPrint && <PrintableTaskCard task={taskToPrint} />}
         </div>
-
-        {editingTask && (
-          <EditTaskDialog
-            isOpen={isEditDialogOpen}
-            onClose={handleCloseEditDialog}
-            taskToEdit={editingTask}
-            onSaveTask={handleUpdateTask}
-          />
-        )}
 
         <footer className="text-center py-8 border-t border-border mt-auto">
           <p className="text-muted-foreground">

@@ -6,7 +6,7 @@ import type { User } from "@/types/user";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, PencilIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getContrastingTextColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +26,6 @@ interface TaskCardProps {
   onToggleComplete: (id: string) => void;
   onDelete: (task: Task) => void;
   onPrint: (task: Task) => void;
-  onEdit: (task: Task) => void;
   onApplyForRole: (taskId: string, roleName: string) => void;
   isMainTaskWithIncompleteSubtasks: boolean;
 }
@@ -38,7 +37,6 @@ export function TaskCard({
   onToggleComplete,
   onDelete,
   onPrint,
-  onEdit,
   onApplyForRole,
   isMainTaskWithIncompleteSubtasks
 }: TaskCardProps) {
@@ -103,8 +101,8 @@ export function TaskCard({
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        isSubTask && "ml-0", // Subtasks are now in the same column flow
-        isMainTask && !isSubTask && " " // Main task cards don't need specific margin in column
+        isSubTask && "ml-0", 
+        isMainTask && !isSubTask && " " 
       )}
       style={cardStyle}
     >
@@ -253,17 +251,7 @@ export function TaskCard({
                              {totalPendingForRole} Pending
                            </Badge>
                         )}
-                        {isOwner && totalPendingForRole > 0 && (
-                             <Button
-                                variant="link"
-                                size="sm"
-                                className="h-auto px-0.5 py-0 text-[10px] underline"
-                                style={{color: textColor}}
-                                onClick={(e) => { e.stopPropagation(); onEdit(task); }}
-                             >
-                                Manage
-                             </Button>
-                        )}
+                        {/* Task owner role management UI was here, removed with Edit Dialog */}
                         {currentUser && !isOwner && !currentUserApplication && ( 
                           <Button 
                             variant="outline" 
@@ -381,18 +369,7 @@ export function TaskCard({
         "flex justify-end space-x-0.5",
         isSubTask ? "p-2 pt-1 pb-1" : "p-3 pt-1" 
       )}>
-        {isOwner && (
-            <Button
-            variant="ghost"
-            size={isSubTask ? "icon" : "icon"} 
-            onClick={(e) => { e.stopPropagation(); onEdit(task);}}
-            className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-5 w-5 p-0.5" : "h-7 w-7")}
-            style={{color: textColor}}
-            aria-label="Edit task"
-            >
-            <PencilIcon className={isSubTask ? "h-3 w-3" : "h-4 w-4"} />
-            </Button>
-        )}
+        {/* Edit button removed as per user request */}
         <Button
           variant="ghost"
           size={isSubTask ? "icon" : "icon"} 
