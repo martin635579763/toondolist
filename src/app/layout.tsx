@@ -1,14 +1,15 @@
 
 import type {Metadata} from 'next';
-import { Nunito } from 'next/font/google'; // Changed font to Nunito
+import { Aldrich } from 'next/font/google'; // Changed font to Aldrich
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import { AuthProvider } from '@/contexts/AuthContext';
 
-const nunito = Nunito({ // Initialize Nunito
+const aldrich = Aldrich({ // Initialize Aldrich
   subsets: ['latin'],
-  variable: '--font-nunito', // Set CSS variable for Nunito
+  weight: ['400'], // Aldrich only supports '400' weight
+  variable: '--font-aldrich', // Set CSS variable for Aldrich
 });
 
 export const metadata: Metadata = {
@@ -23,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn("min-h-screen bg-background font-sans antialiased", nunito.variable)}> {/* Apply Nunito font */}
+      <body className={cn("min-h-screen bg-background font-sans antialiased", aldrich.variable)}> {/* Apply Aldrich font */}
         <AuthProvider>
           <main>{children}</main>
           <Toaster />

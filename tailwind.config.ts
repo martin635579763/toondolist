@@ -10,7 +10,7 @@ export default {
   theme: {
   	extend: {
       fontFamily: {
-        sans: ['var(--font-nunito)', 'sans-serif'], // Changed to Nunito, added sans-serif fallback
+        sans: ['var(--font-aldrich)', 'sans-serif'], // Changed to Aldrich, added sans-serif fallback
       },
   		colors: {
   			background: 'hsl(var(--background))',
