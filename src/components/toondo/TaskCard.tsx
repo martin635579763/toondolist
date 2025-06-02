@@ -188,20 +188,22 @@ export function TaskCard({
     }
   };
 
-  const handleDialogAssignToMe = () => {
+  const handleToggleDialogAssignCurrentUser = () => {
       if (currentUser && isOwner) {
-          setDialogTempAssignedUserId(currentUser.id);
-          setDialogTempAssignedUserName(currentUser.displayName);
-          setDialogTempAssignedUserAvatarUrl(currentUser.avatarUrl);
+          if (dialogTempAssignedUserId === currentUser.id) {
+              // Unassign current user
+              setDialogTempAssignedUserId(null);
+              setDialogTempAssignedUserName(null);
+              setDialogTempAssignedUserAvatarUrl(null);
+          } else {
+              // Assign current user
+              setDialogTempAssignedUserId(currentUser.id);
+              setDialogTempAssignedUserName(currentUser.displayName);
+              setDialogTempAssignedUserAvatarUrl(currentUser.avatarUrl);
+          }
       }
   };
-  const handleDialogUnassign = () => {
-      if (isOwner) {
-          setDialogTempAssignedUserId(null);
-          setDialogTempAssignedUserName(null);
-          setDialogTempAssignedUserAvatarUrl(null);
-      }
-  };
+
 
   const handleDialogImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -539,7 +541,7 @@ export function TaskCard({
                   </div>
                   
                   {/* Assigned User Section */}
-                  <div className="pt-2 border-t border-border/50">
+                   <div className="pt-2 border-t border-border/50">
                     <div>
                         <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Assigned User</Label>
                         {dialogTempAssignedUserId && dialogTempAssignedUserName ? (
@@ -553,18 +555,16 @@ export function TaskCard({
                         ) : (
                         <p className={cn("text-sm p-2 rounded-md border bg-muted/50 border-muted", task.backgroundImageUrl ? "text-gray-300 bg-white/5 border-white/20" : "text-muted-foreground")}>Not assigned.</p>
                         )}
-                        <div className="mt-1.5 space-y-1.5">
-                            {currentUser && dialogTempAssignedUserId !== currentUser.id && (
-                                <Button onClick={handleDialogAssignToMe} className={cn("w-full text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}>
-                                    <UserCircleIcon className="mr-2 h-3.5 w-3.5" /> Assign to Me
-                                </Button>
-                            )}
-                            {dialogTempAssignedUserId && (
-                                <Button variant="outline" onClick={handleDialogUnassign} className={cn("w-full text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-transparent border-white/40 hover:bg-white/10 text-white")}>
-                                    Unassign
-                                </Button>
-                            )}
-                        </div>
+                        {currentUser && (
+                            <Button 
+                                onClick={handleToggleDialogAssignCurrentUser} 
+                                className={cn("w-full text-xs h-auto py-1.5 mt-1.5", task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}
+                                variant={dialogTempAssignedUserId === currentUser.id ? "outline" : "default"}
+                            >
+                                <UserCircleIcon className="mr-2 h-3.5 w-3.5" /> 
+                                {dialogTempAssignedUserId === currentUser.id ? "Unassign Myself" : "Assign to Me"}
+                            </Button>
+                        )}
                     </div>
                   </div>
                   
