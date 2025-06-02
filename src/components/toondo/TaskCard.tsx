@@ -51,6 +51,14 @@ interface TaskCardProps {
   onSetBackgroundImage: (taskId: string, imageUrl: string | null) => void;
 }
 
+const suggestedImages = [
+  { src: 'https://placehold.co/300x200.png?text=Peaceful+Lake', alt: 'Peaceful lake scenery', aiHint: 'lake mountain' },
+  { src: 'https://placehold.co/300x200.png?text=Forest+Trail', alt: 'Sunlit forest trail', aiHint: 'forest trail' },
+  { src: 'https://placehold.co/300x200.png?text=Sandy+Beach', alt: 'Tropical sandy beach', aiHint: 'beach ocean' },
+  { src: 'https://placehold.co/300x200.png?text=Snowy+Peaks', alt: 'Majestic snowy mountains', aiHint: 'mountain snow' },
+];
+
+
 export function TaskCard({
   task,
   currentUser,
@@ -386,9 +394,9 @@ export function TaskCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className={cn("flex-grow space-y-2 pt-1", !task.backgroundImageUrl && "p-4")}>
+      <CardContent className={cn("flex-grow space-y-1 pt-1", !task.backgroundImageUrl && "p-4")}>
         {task.dueDate && (
-          <div className={cn("text-sm flex items-center", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")}>
+          <div className={cn("text-sm flex items-center mb-2", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")}>
             <CalendarDaysIcon className="mr-1 h-3.5 w-3.5" />
             Due: {format(new Date(task.dueDate), "PP")}
           </div>
@@ -557,7 +565,7 @@ export function TaskCard({
                             </Button>
                           </DialogTrigger>
                           {editingImageItemId === item.id && itemForImageDialog && (
-                            <DialogContent className={cn("sm:max-w-[425px] bg-card text-card-foreground", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")} onClick={(e) => e.stopPropagation()}>
+                            <DialogContent className={cn("sm:max-w-md bg-card text-card-foreground", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")} onClick={(e) => e.stopPropagation()}>
                               <DialogHeader>
                                 <DialogTitle className={cn(task.backgroundImageUrl && "text-white")}>Image for: {itemForImageDialog.title}</DialogTitle>
                               </DialogHeader>
@@ -566,7 +574,7 @@ export function TaskCard({
                                   <div className="mb-2 w-full h-32 relative overflow-hidden rounded-md">
                                     <Image 
                                       src={currentImageUrlInput || itemForImageDialog.imageUrl!} 
-                                      alt="Checklist item image" 
+                                      alt={currentImageAiHintInput || itemForImageDialog.imageAiHint || "Checklist item image"}
                                       layout="fill" 
                                       objectFit="cover" 
                                       className="rounded-md"
@@ -616,6 +624,36 @@ export function TaskCard({
                                     If no URL/upload, placeholder used with this hint. If no hint, first 2 words of title used.
                                   </p>
                                 </div>
+
+                                <div className="mt-4 pt-3 border-t border-border/50">
+                                  <Label className={cn("block mb-2 text-sm font-medium", task.backgroundImageUrl ? "text-gray-200" : "text-foreground")}>Or select a suggestion:</Label>
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    {suggestedImages.map((img) => (
+                                      <div
+                                        key={img.src}
+                                        onClick={() => {
+                                          setCurrentImageUrlInput(img.src);
+                                          setCurrentImageAiHintInput(img.aiHint);
+                                        }}
+                                        className="cursor-pointer rounded-md overflow-hidden border-2 border-transparent hover:border-primary transition-all focus:outline-none focus:ring-2 focus:ring-primary"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setCurrentImageUrlInput(img.src); setCurrentImageAiHintInput(img.aiHint);}}}
+                                      >
+                                        <div className="w-full h-[50px] sm:h-[60px] relative">
+                                          <Image
+                                            src={img.src}
+                                            alt={img.alt}
+                                            layout="fill"
+                                            objectFit="cover"
+                                            className="rounded-sm"
+                                            data-ai-hint={img.aiHint}
+                                          />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
                               </div>
                               <DialogFooter className="gap-2 sm:gap-0">
                                 {(itemForImageDialog.imageUrl || currentImageUrlInput) && 
@@ -752,3 +790,4 @@ export function TaskCard({
     </Card>
   );
 }
+
