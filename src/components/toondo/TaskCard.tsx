@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Edit3Icon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon } from "lucide-react";
+import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -25,6 +25,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import { EditableTitle } from "./EditableTitle";
 
 
 interface TaskCardProps {
@@ -68,11 +69,8 @@ export function TaskCard({
   const { toast } = useToast();
   const [newChecklistItemTitle, setNewChecklistItemTitle] = useState("");
 
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editableTitle, setEditableTitle] = useState(task.title);
-  const titleInputRef = useRef<HTMLInputElement>(null);
-
   const [editingItemAllDetails, setEditingItemAllDetails] = useState<ChecklistItem | null>(null);
+  // State for the dialog's temporary values
   const [dialogTempTitle, setDialogTempTitle] = useState("");
   const [dialogTempDescription, setDialogTempDescription] = useState("");
   const [dialogTempDueDate, setDialogTempDueDate] = useState<Date | undefined>(undefined);
@@ -83,45 +81,6 @@ export function TaskCard({
   const [dialogTempImageUrl, setDialogTempImageUrl] = useState("");
   const [dialogTempComments, setDialogTempComments] = useState<string[]>([]); // For future use
   const dialogFileInpuRef = useRef<HTMLInputElement>(null);
-
-
-  useEffect(() => {
-    if (isEditingTitle && titleInputRef.current) {
-      titleInputRef.current.focus();
-      titleInputRef.current.select();
-    }
-  }, [isEditingTitle]);
-
-  useEffect(() => {
-    if (!isEditingTitle) {
-      setEditableTitle(task.title);
-    }
-  }, [task.title, isEditingTitle]);
-
-
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditableTitle(e.target.value);
-  };
-
-  const saveTitle = () => {
-    if (isOwner && editableTitle.trim() && editableTitle.trim() !== task.title) {
-      onUpdateTaskTitle(task.id, editableTitle.trim());
-    }
-    setIsEditingTitle(false);
-  };
-
-  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      saveTitle();
-    } else if (e.key === 'Escape') {
-      setEditableTitle(task.title);
-      setIsEditingTitle(false);
-    }
-  };
-
-  const handleTitleBlur = () => {
-    saveTitle();
-  };
 
 
   const handleAddChecklistItemSubmit = () => {
@@ -149,6 +108,7 @@ export function TaskCard({
 
   const handleCloseItemEditDialog = () => {
     setEditingItemAllDetails(null);
+    // Reset temp states, maybe not all if some persistence is desired on cancel
     setDialogTempTitle("");
     setDialogTempDescription("");
     setDialogTempDueDate(undefined);
@@ -166,9 +126,15 @@ export function TaskCard({
   const handleSaveItemEdits = () => {
     if (!editingItemAllDetails) return;
 
-    if (dialogTempTitle.trim() && dialogTempTitle.trim() !== editingItemAllDetails.title) {
-      onUpdateChecklistItemTitle(task.id, editingItemAllDetails.id, dialogTempTitle.trim());
+    const trimmedTitle = dialogTempTitle.trim();
+    if (trimmedTitle && trimmedTitle !== editingItemAllDetails.title) {
+      onUpdateChecklistItemTitle(task.id, editingItemAllDetails.id, trimmedTitle);
+    } else if (!trimmedTitle && editingItemAllDetails.title) {
+        toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
+        setDialogTempTitle(editingItemAllDetails.title); // Revert to original if user tried to blank it
+        return; // Prevent saving if title is emptied
     }
+
 
     if (dialogTempDescription.trim() !== (editingItemAllDetails.description || "").trim()) {
       onUpdateChecklistItemDescription(task.id, editingItemAllDetails.id, dialogTempDescription.trim());
@@ -188,14 +154,12 @@ export function TaskCard({
     let finalImageAiHint: string | null = null;
 
     if (finalImageUrl) {
-        finalImageAiHint = dialogTempTitle.trim().split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
+        finalImageAiHint = trimmedTitle.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
     }
 
     if (finalImageUrl !== editingItemAllDetails.imageUrl || finalImageAiHint !== editingItemAllDetails.imageAiHint) {
         onSetChecklistItemImage(task.id, editingItemAllDetails.id, finalImageUrl, finalImageAiHint);
     }
-
-    // Comment saving logic would go here in the future
 
     handleCloseItemEditDialog();
     toast({ title: "Item Updated", description: "Checklist item details saved." });
@@ -280,41 +244,20 @@ export function TaskCard({
       <CardHeader className={cn("pb-2", !task.backgroundImageUrl && "p-4")}>
         <div className="flex items-start justify-between">
           <div className="flex-grow mr-2">
-            {isEditingTitle && isOwner ? (
-              <Input
-                ref={titleInputRef}
-                type="text"
-                value={editableTitle}
-                onChange={handleTitleChange}
-                onKeyDown={handleTitleKeyDown}
-                onBlur={handleTitleBlur}
-                className={cn(
-                    "text-xl font-bold h-auto p-0 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none",
+             <EditableTitle
+                initialValue={task.title}
+                onSave={(newTitle) => onUpdateTaskTitle(task.id, newTitle)}
+                isEditable={isOwner}
+                textElement="div" // CardTitle is a div
+                containerClassName={cn("text-xl font-bold")} // Matches CardTitle styling
+                textClassName={cn(task.backgroundImageUrl ? "text-white" : "text-card-foreground")}
+                inputClassName={cn(
+                    "text-xl font-bold", // Basic styling for input
                     task.backgroundImageUrl ? "bg-transparent text-white placeholder-gray-300" : "bg-transparent"
                 )}
-                aria-label="Edit task title"
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <CardTitle
-                className={cn(
-                  "text-xl font-bold break-words",
-                  isOwner && "cursor-pointer hover:opacity-80 transition-opacity",
-                   task.backgroundImageUrl ? "text-white" : "text-card-foreground"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isOwner) {
-                    setEditableTitle(task.title);
-                    setIsEditingTitle(true);
-                  }
-                }}
-                title={isOwner ? "Click to edit title" : undefined}
-              >
-                {task.title}
-                 {isOwner && !isEditingTitle && <Edit3Icon className={cn("inline-block ml-2 h-3 w-3 opacity-0 group-hover/card:opacity-50 transition-opacity", task.backgroundImageUrl ? "text-gray-300" : "text-muted-foreground")} />}
-              </CardTitle>
-            )}
+                editIconClassName={cn(task.backgroundImageUrl ? "text-gray-300" : "text-muted-foreground")}
+                ariaLabel="Task title"
+             />
           </div>
           <div className="flex items-center space-x-1 shrink-0">
              {task.completed && (
@@ -352,7 +295,13 @@ export function TaskCard({
                    !isOwner && "cursor-default"
                 )}
                 onClick={(e) => {
-                    e.stopPropagation(); 
+                    // Stop propagation to prevent card-level click if any
+                    e.stopPropagation();
+                    // Check if the click was on the checkbox; if so, don't open dialog
+                    const target = e.target as HTMLElement;
+                    if (target.closest('button[role="checkbox"]')) {
+                        return;
+                    }
                     if (isOwner) handleOpenItemEditDialog(item);
                 }}
               >
@@ -374,11 +323,11 @@ export function TaskCard({
                           ? "opacity-100" 
                           : "opacity-50 cursor-not-allowed"
                       )}
-                      onClick={(e) => e.stopPropagation()} 
+                      onClick={(e) => e.stopPropagation()} // Prevent dialog open on checkbox click
                       aria-label={`Toggle completion for ${item.title}`}
                     />
                       <label
-                        htmlFor={`checklist-${task.id}-${item.id}`}
+                        htmlFor={`checklist-${task.id}-${item.id}`} // Should not be needed if Checkbox has id
                         className={cn(
                           "flex-grow break-all truncate",
                           "transition-all duration-200 ease-in-out",
@@ -513,7 +462,9 @@ export function TaskCard({
             onClick={(e) => e.stopPropagation()}
           >
             <DialogHeader className="pb-2 border-b border-border">
-              <DialogTitle className={cn("text-xl", task.backgroundImageUrl && "text-white")}>Edit Item: {editingItemAllDetails.title}</DialogTitle>
+              <DialogTitle className={cn("text-xl", task.backgroundImageUrl && "text-white")}>
+                Edit Item: {editingItemAllDetails.title}
+              </DialogTitle>
             </DialogHeader>
             
             <div className="py-3 flex-grow overflow-y-auto grid grid-cols-1 gap-x-6 gap-y-4 items-start">
@@ -543,12 +494,16 @@ export function TaskCard({
                 <div className="md:col-span-2 space-y-3 pr-1">
                   <div>
                     <Label htmlFor="dialogItemTitle" className={cn(task.backgroundImageUrl && "text-gray-200")}>Title</Label>
-                    <Input
-                      id="dialogItemTitle"
-                      value={dialogTempTitle}
-                      onChange={(e) => setDialogTempTitle(e.target.value)}
-                      className={cn(task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                    />
+                     <EditableTitle
+                        initialValue={dialogTempTitle}
+                        onSave={(newTitle) => setDialogTempTitle(newTitle)}
+                        isEditable={true} // Always editable within this dialog
+                        textElement='div'
+                        inputClassName={cn("text-lg", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                        textClassName={cn("text-lg py-1",task.backgroundImageUrl && "text-gray-200")} // Style to look like an input placeholder if empty
+                        placeholder="Item title..."
+                        showEditIcon={false} // No need for edit icon inside dialog input
+                     />
                   </div>
 
                   {/* Attachment Section */}
