@@ -16,6 +16,7 @@ export interface Applicant {
 export interface ChecklistItem {
   id: string;
   title: string;
+  description?: string; // New field for item description
   completed: boolean;
   dueDate?: string | null;
   assignedUserId?: string | null;
@@ -23,10 +24,11 @@ export interface ChecklistItem {
   assignedUserAvatarUrl?: string | null;
   imageUrl?: string | null;
   imageAiHint?: string | null;
+  comments?: string[]; // New field for comments
 }
 
 export interface Task {
-  id: string;
+  id:string;
   title: string;
   description: string;
   completed: boolean;

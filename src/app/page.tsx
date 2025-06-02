@@ -87,6 +87,7 @@ function HomePageContent() {
         ...item,
         id: item.id || generateId(),
         title: item.title || "Untitled Item",
+        description: item.description || "", // Initialize new field
         completed: item.completed || false,
         dueDate: item.dueDate || null,
         assignedUserId: item.assignedUserId || null,
@@ -94,6 +95,7 @@ function HomePageContent() {
         assignedUserAvatarUrl: item.assignedUserAvatarUrl || null,
         imageUrl: item.imageUrl || null,
         imageAiHint: item.imageAiHint || null,
+        comments: item.comments || [], // Initialize new field
       })),
       order: task.order ?? index,
       userId: task.userId || 'unknown_user',
@@ -180,6 +182,7 @@ function HomePageContent() {
           const newItem: ChecklistItem = {
             id: generateId(),
             title: itemTitle.trim(),
+            description: "", // Initialize new field
             completed: false,
             dueDate: null,
             assignedUserId: null,
@@ -187,6 +190,7 @@ function HomePageContent() {
             assignedUserAvatarUrl: null,
             imageUrl: null,
             imageAiHint: null,
+            comments: [], // Initialize new field
           };
           const updatedChecklistItems = [...(task.checklistItems || []), newItem];
           return {
@@ -280,6 +284,32 @@ function HomePageContent() {
     toast({
       title: "Checklist Item Updated!",
       description: "The item title has been changed.",
+    });
+  };
+
+  const handleUpdateChecklistItemDescription = (taskId: string, itemId: string, newDescription: string) => {
+    if (!currentUser) {
+      toast({ title: "Permission Denied", description: "You must be logged in to update items.", variant: "destructive" });
+      return;
+    }
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        if (task.id === taskId) {
+          if (currentUser.id !== task.userId) {
+            toast({ title: "Permission Denied", description: "You can only update item descriptions in your own tasks.", variant: "destructive" });
+            return task;
+          }
+          const updatedChecklistItems = (task.checklistItems || []).map(item =>
+            item.id === itemId ? { ...item, description: newDescription } : item
+          );
+          return { ...task, checklistItems: updatedChecklistItems };
+        }
+        return task;
+      })
+    );
+    toast({
+      title: "Checklist Item Updated!",
+      description: "The item description has been changed.",
     });
   };
 
@@ -677,6 +707,7 @@ function HomePageContent() {
                         onToggleChecklistItem={handleToggleChecklistItem}
                         onDeleteChecklistItem={handleDeleteChecklistItem}
                         onUpdateChecklistItemTitle={handleUpdateChecklistItemTitle}
+                        onUpdateChecklistItemDescription={handleUpdateChecklistItemDescription}
                         onSetChecklistItemDueDate={handleSetChecklistItemDueDate}
                         onAssignUserToChecklistItem={handleAssignUserToChecklistItem}
                         onSetChecklistItemImage={handleSetChecklistItemImage}

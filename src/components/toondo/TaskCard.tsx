@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Edit3Icon, CalendarDaysIcon, PartyPopperIcon, PlusCircleIcon, Trash2Icon, UserPlusIcon, UserCircleIcon, ImagePlusIcon, Image as ImageIcon, UploadIcon, TrashIcon } from "lucide-react";
+import { PrinterIcon, Edit3Icon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -18,12 +18,13 @@ import {
   TooltipProvider
 } from "@/components/ui/tooltip";
 import React, { useState, useEffect, useRef, type ChangeEvent } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea"; // Import Textarea
 
 
 interface TaskCardProps {
@@ -35,6 +36,7 @@ interface TaskCardProps {
   onToggleChecklistItem: (taskId: string, itemId: string) => void;
   onDeleteChecklistItem: (taskId: string, itemId: string) => void;
   onUpdateChecklistItemTitle: (taskId: string, itemId: string, newTitle: string) => void;
+  onUpdateChecklistItemDescription: (taskId: string, itemId: string, newDescription: string) => void;
   onSetChecklistItemDueDate: (taskId: string, itemId: string, date: Date | null) => void;
   onAssignUserToChecklistItem: (taskId: string, itemId: string, userId: string | null, userName: string | null, userAvatarUrl: string | null) => void;
   onSetChecklistItemImage: (taskId: string, itemId: string, imageUrl: string | null, imageAiHint: string | null) => void;
@@ -45,10 +47,10 @@ interface TaskCardProps {
 }
 
 const suggestedImages = [
-  { src: 'https://placehold.co/300x200.png', alt: 'Desert Oasis placeholder', aiHint: 'desert oasis' },
-  { src: 'https://placehold.co/250x150.png', alt: 'City Skyline placeholder', aiHint: 'city skyline' },
-  { src: 'https://placehold.co/350x250.png', alt: 'Autumn Forest placeholder', aiHint: 'autumn forest' },
-  { src: 'https://placehold.co/200x300.png', alt: 'Coastal Cliff placeholder', aiHint: 'coastal cliff' },
+  { src: 'https://placehold.co/600x400.png', alt: 'Mountain Landscape placeholder', aiHint: 'mountain landscape' },
+  { src: 'https://placehold.co/400x600.png', alt: 'Forest Path placeholder', aiHint: 'forest path' },
+  { src: 'https://placehold.co/500x500.png', alt: 'Beach Sunset placeholder', aiHint: 'beach sunset' },
+  { src: 'https://placehold.co/600x300.png', alt: 'Abstract Colors placeholder', aiHint: 'abstract colors' },
 ];
 
 
@@ -61,6 +63,7 @@ export function TaskCard({
   onToggleChecklistItem,
   onDeleteChecklistItem,
   onUpdateChecklistItemTitle,
+  onUpdateChecklistItemDescription,
   onSetChecklistItemDueDate,
   onAssignUserToChecklistItem,
   onSetChecklistItemImage,
@@ -79,6 +82,7 @@ export function TaskCard({
 
   const [editingItemAllDetails, setEditingItemAllDetails] = useState<ChecklistItem | null>(null);
   const [dialogTempTitle, setDialogTempTitle] = useState("");
+  const [dialogTempDescription, setDialogTempDescription] = useState("");
   const [dialogTempDueDate, setDialogTempDueDate] = useState<Date | undefined>(undefined);
   const [dialogTempIsDatePickerOpen, setDialogTempIsDatePickerOpen] = useState(false);
   const [dialogTempAssignedUserId, setDialogTempAssignedUserId] = useState<string | null | undefined>(null);
@@ -86,6 +90,7 @@ export function TaskCard({
   const [dialogTempAssignedUserAvatarUrl, setDialogTempAssignedUserAvatarUrl] = useState<string | null | undefined>(null);
   const [dialogTempImageUrl, setDialogTempImageUrl] = useState("");
   const [dialogTempImageAiHint, setDialogTempImageAiHint] = useState("");
+  const [dialogTempComments, setDialogTempComments] = useState<string[]>([]); // For future use
   const dialogFileInpuRef = useRef<HTMLInputElement>(null);
 
 
@@ -139,12 +144,14 @@ export function TaskCard({
     if (!isOwner) return;
     setEditingItemAllDetails(item);
     setDialogTempTitle(item.title);
+    setDialogTempDescription(item.description || "");
     setDialogTempDueDate(item.dueDate ? new Date(item.dueDate) : undefined);
     setDialogTempAssignedUserId(item.assignedUserId);
     setDialogTempAssignedUserName(item.assignedUserName);
     setDialogTempAssignedUserAvatarUrl(item.assignedUserAvatarUrl);
     setDialogTempImageUrl(item.imageUrl || "");
     setDialogTempImageAiHint(item.imageAiHint || "");
+    setDialogTempComments(item.comments || []);
     if (dialogFileInpuRef.current) {
         dialogFileInpuRef.current.value = "";
     }
@@ -152,8 +159,8 @@ export function TaskCard({
 
   const handleCloseItemEditDialog = () => {
     setEditingItemAllDetails(null);
-    // Reset all temporary states
     setDialogTempTitle("");
+    setDialogTempDescription("");
     setDialogTempDueDate(undefined);
     setDialogTempIsDatePickerOpen(false);
     setDialogTempAssignedUserId(null);
@@ -161,6 +168,7 @@ export function TaskCard({
     setDialogTempAssignedUserAvatarUrl(null);
     setDialogTempImageUrl("");
     setDialogTempImageAiHint("");
+    setDialogTempComments([]);
     if (dialogFileInpuRef.current) {
         dialogFileInpuRef.current.value = "";
     }
@@ -171,6 +179,10 @@ export function TaskCard({
 
     if (dialogTempTitle.trim() && dialogTempTitle.trim() !== editingItemAllDetails.title) {
       onUpdateChecklistItemTitle(task.id, editingItemAllDetails.id, dialogTempTitle.trim());
+    }
+
+    if (dialogTempDescription.trim() !== (editingItemAllDetails.description || "").trim()) {
+      onUpdateChecklistItemDescription(task.id, editingItemAllDetails.id, dialogTempDescription.trim());
     }
     
     const currentDueDate = editingItemAllDetails.dueDate ? new Date(editingItemAllDetails.dueDate).toISOString() : null;
@@ -194,6 +206,8 @@ export function TaskCard({
     if (finalImageUrl !== editingItemAllDetails.imageUrl || finalImageAiHint !== editingItemAllDetails.imageAiHint) {
         onSetChecklistItemImage(task.id, editingItemAllDetails.id, finalImageUrl, finalImageAiHint);
     }
+
+    // Comment saving logic would go here in the future
 
     handleCloseItemEditDialog();
     toast({ title: "Item Updated", description: "Checklist item details saved." });
@@ -320,7 +334,18 @@ export function TaskCard({
             )}
           </div>
           <div className="flex items-center space-x-1 shrink-0">
-             {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0 h-5 w-5", task.backgroundImageUrl ? "text-yellow-300" : "text-yellow-400")} />}
+             {task.completed && (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("text-yellow-300", task.backgroundImageUrl ? "text-yellow-300" : "text-yellow-400")}><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className={cn(task.backgroundImageUrl && "bg-black/70 text-white border-white/20" )}>
+                            <p>Completed!</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+             )}
           </div>
         </div>
       </CardHeader>
@@ -344,7 +369,7 @@ export function TaskCard({
                    !isOwner && "cursor-default"
                 )}
                 onClick={(e) => {
-                    e.stopPropagation(); // Prevent card drag/drop or other parent clicks
+                    e.stopPropagation(); 
                     if (isOwner) handleOpenItemEditDialog(item);
                 }}
               >
@@ -366,7 +391,7 @@ export function TaskCard({
                           ? "opacity-100" 
                           : "opacity-50 cursor-not-allowed"
                       )}
-                      onClick={(e) => e.stopPropagation()} // Isolate checkbox click
+                      onClick={(e) => e.stopPropagation()} 
                       aria-label={`Toggle completion for ${item.title}`}
                     />
                       <label
@@ -374,17 +399,17 @@ export function TaskCard({
                         className={cn(
                           "flex-grow break-all truncate",
                           "transition-all duration-200 ease-in-out",
-                          "pl-[calc(0.875rem+0.5rem)]", // Always apply padding as checkbox is always there
+                          "pl-[calc(0.875rem+0.5rem)]", 
                           item.completed && "line-through opacity-70",
                            task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
-                           "pointer-events-none" // Label click is handled by parent div
+                           "pointer-events-none" 
                         )}
                       >
                         {item.title}
                       </label>
                   </div>
                 </div>
-                {(item.dueDate || item.assignedUserId || item.imageUrl) && (
+                {(item.description || item.dueDate || item.assignedUserId || item.imageUrl) && (
                   <div className={cn("mt-1 pt-1 border-t text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "border-white/20 text-gray-200" : "border-border/30 text-muted-foreground", "pointer-events-none")}>
                     {item.imageUrl && (
                       <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
@@ -398,6 +423,11 @@ export function TaskCard({
                           />
                       </div>
                     )}
+                     {item.description && (
+                        <p className="italic truncate w-full text-ellipsis text-gray-400/90 dark:text-gray-500/90">
+                          {item.description.length > 50 ? `${item.description.substring(0, 47)}...` : item.description}
+                        </p>
+                      )}
                     <div className="flex items-center gap-x-3 w-full">
                       {item.dueDate && (
                         <div className="flex items-center">
@@ -493,169 +523,210 @@ export function TaskCard({
       </CardFooter>
       </div>
 
-       {/* Unified Edit Dialog for Checklist Items */}
       {editingItemAllDetails && isOwner && (
         <Dialog open={!!editingItemAllDetails} onOpenChange={(isOpen) => { if (!isOpen) handleCloseItemEditDialog(); }}>
           <DialogContent
-            className={cn("sm:max-w-lg bg-card text-card-foreground max-h-[90vh] flex flex-col", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
+            className={cn("sm:max-w-3xl bg-card text-card-foreground max-h-[90vh] flex flex-col", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
             onClick={(e) => e.stopPropagation()}
           >
-            <DialogHeader>
-              <DialogTitle className={cn(task.backgroundImageUrl && "text-white")}>Edit Item: {editingItemAllDetails.title}</DialogTitle>
+            <DialogHeader className="pb-2 border-b border-border">
+              <DialogTitle className={cn("text-xl", task.backgroundImageUrl && "text-white")}>Edit Item: {editingItemAllDetails.title}</DialogTitle>
             </DialogHeader>
             
-            <div className="py-2 space-y-3 overflow-y-auto px-1 flex-grow">
-              {/* Title */}
-              <div>
-                <Label htmlFor="dialogItemTitle" className={cn(task.backgroundImageUrl && "text-gray-200")}>Title</Label>
-                <Input
-                  id="dialogItemTitle"
-                  value={dialogTempTitle}
-                  onChange={(e) => setDialogTempTitle(e.target.value)}
-                  className={cn(task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                />
-              </div>
-
-              {/* Due Date */}
-              <div>
-                <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Due Date</Label>
-                 <Popover open={dialogTempIsDatePickerOpen} onOpenChange={setDialogTempIsDatePickerOpen}>
-                    <PopoverTrigger asChild>
-                        <Button
-                        variant={"outline"}
-                        className={cn(
-                            "w-full justify-start text-left font-normal h-auto py-2",
-                            !dialogTempDueDate && "text-muted-foreground",
-                            task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
-                        )}
-                        >
-                        <CalendarDaysIcon className="mr-2 h-4 w-4" />
-                        {dialogTempDueDate ? format(dialogTempDueDate, "PPP") : <span>Pick a date</span>}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                        mode="single"
-                        selected={dialogTempDueDate}
-                        onSelect={(date) => { setDialogTempDueDate(date || undefined); setDialogTempIsDatePickerOpen(false); }}
-                        initialFocus
-                        className={cn(task.backgroundImageUrl && "bg-card text-card-foreground border-white/30")}
-                        />
-                    </PopoverContent>
-                </Popover>
-              </div>
-
-              {/* Assign User */}
-              <div>
-                <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Assigned User</Label>
-                {dialogTempAssignedUserId && dialogTempAssignedUserName ? (
-                  <div className="flex items-center space-x-2 text-sm p-2 rounded-md border bg-muted/50 border-muted">
-                    <Avatar className="h-6 w-6">
-                        <AvatarImage src={dialogTempAssignedUserAvatarUrl || undefined} alt={dialogTempAssignedUserName} data-ai-hint="user portrait"/>
-                        <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{dialogTempAssignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <span>{dialogTempAssignedUserName}</span>
+            <div className="py-3 flex-grow overflow-y-auto grid grid-cols-1 gap-x-6 gap-y-4 items-start">
+              {/* Top Image */}
+              <div className="col-span-1 mb-1">
+                {dialogTempImageUrl ? (
+                  <div className="w-full h-48 relative overflow-hidden rounded-md border border-border">
+                    <Image 
+                      src={dialogTempImageUrl} 
+                      alt={dialogTempImageAiHint || dialogTempTitle || "Checklist item image"}
+                      layout="fill" 
+                      objectFit="cover" 
+                      className="rounded-md"
+                      data-ai-hint={dialogTempImageAiHint || dialogTempTitle.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
+                    />
                   </div>
                 ) : (
-                  <p className={cn("text-sm p-2 rounded-md border bg-muted/50 border-muted", task.backgroundImageUrl ? "text-gray-300 bg-white/5 border-white/20" : "text-muted-foreground")}>Not assigned.</p>
+                  <div className="w-full h-24 flex items-center justify-center bg-muted rounded-md border border-dashed border-border">
+                    <ImageIcon className={cn("h-10 w-10", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")} />
+                  </div>
                 )}
-                <div className="mt-1.5 space-y-1.5">
-                    {currentUser && dialogTempAssignedUserId !== currentUser.id && (
-                        <Button onClick={handleDialogAssignToMe} className={cn("w-full text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}>
-                            <UserCircleIcon className="mr-2 h-3.5 w-3.5" /> Assign to Me
-                        </Button>
-                    )}
-                    {dialogTempAssignedUserId && (
-                         <Button variant="outline" onClick={handleDialogUnassign} className={cn("w-full text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-transparent border-white/40 hover:bg-white/10 text-white")}>
-                            Unassign
-                        </Button>
-                    )}
-                </div>
               </div>
-              
-              {/* Image Management */}
-              <div>
-                 <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Image</Label>
-                 { (dialogTempImageUrl) && (
-                    <div className="mb-2 w-full h-32 relative overflow-hidden rounded-md border border-border">
-                        <Image 
-                        src={dialogTempImageUrl} 
-                        alt={dialogTempImageAiHint || "Checklist item image"}
-                        layout="fill" 
-                        objectFit="cover" 
-                        className="rounded-md"
-                        data-ai-hint={dialogTempImageAiHint || dialogTempTitle.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
-                        />
-                    </div>
-                    )}
-                <div>
-                  <Label htmlFor="dialogItemImageUrl" className={cn("text-xs",task.backgroundImageUrl && "text-gray-200")}>Image URL</Label>
-                  <Input 
-                    id="dialogItemImageUrl" 
-                    value={dialogTempImageUrl} 
-                    onChange={(e) => setDialogTempImageUrl(e.target.value)} 
-                    placeholder="https://..." 
-                    className={cn("text-sm h-9",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                  />
-                </div>
-                <div className="mt-1.5">
-                   <Label htmlFor="dialogItemImageFile" className={cn("text-xs", task.backgroundImageUrl && "text-gray-200")}>Or Upload Image</Label>
-                   <Input 
-                      id="dialogItemImageFile" 
-                      type="file"
-                      accept="image/*"
-                      ref={dialogFileInpuRef}
-                      onChange={handleDialogImageFileChange}
-                      className={cn("text-xs p-1 h-auto file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-input file:bg-transparent file:text-xs file:font-medium file:text-foreground", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 file:text-gray-200 file:border-white/30 hover:file:bg-white/5")}
+
+              {/* Main Content Area (Two Columns) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 items-start">
+                {/* Left Column */}
+                <div className="md:col-span-2 space-y-3 pr-1">
+                  <div>
+                    <Label htmlFor="dialogItemTitle" className={cn(task.backgroundImageUrl && "text-gray-200")}>Title</Label>
+                    <Input
+                      id="dialogItemTitle"
+                      value={dialogTempTitle}
+                      onChange={(e) => setDialogTempTitle(e.target.value)}
+                      className={cn(task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
                     />
-                    <p className={cn("text-xs mt-0.5", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>Max 2MB. Upload generates a Data URI.</p>
-                </div>
-                 <div className="mt-1.5">
-                  <Label htmlFor="dialogItemImageAiHint" className={cn("text-xs",task.backgroundImageUrl && "text-gray-200")}>AI Hint (1-2 words)</Label>
-                  <Input 
-                    id="dialogItemImageAiHint" 
-                    value={dialogTempImageAiHint} 
-                    onChange={(e) => setDialogTempImageAiHint(e.target.value)} 
-                    placeholder="e.g., 'nature forest'" 
-                    className={cn("text-sm h-9",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                  />
-                   <p className={cn("text-xs mt-0.5", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>
-                      If no URL/upload, placeholder used with this hint. If no hint, title words used.
-                    </p>
-                </div>
-                <div className="mt-2 pt-2 border-t border-border/50">
-                  <Label className={cn("block mb-1.5 text-xs font-medium", task.backgroundImageUrl ? "text-gray-200" : "text-foreground")}>Or select a suggestion:</Label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                    {suggestedImages.map((img) => (
-                      <div
-                        key={img.aiHint}
-                        onClick={() => {
-                          setDialogTempImageUrl(img.src);
-                          setDialogTempImageAiHint(img.aiHint);
-                        }}
-                        className="cursor-pointer rounded-md overflow-hidden border-2 border-transparent hover:border-primary transition-all focus:outline-none focus:ring-2 focus:ring-primary"
-                        tabIndex={0}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') {setDialogTempImageUrl(img.src); setDialogTempImageAiHint(img.aiHint);}}}
-                      >
-                        <div className="w-full h-[45px] sm:h-[50px] relative">
-                          <Image
-                            src={img.src}
-                            alt={img.alt}
-                            layout="fill"
-                            objectFit="cover"
-                            className="rounded-sm"
-                            data-ai-hint={img.aiHint}
-                          />
+                  </div>
+
+                  {/* Attachment Section */}
+                  <div className="space-y-2 pt-2 border-t border-border/50">
+                    <h4 className={cn("text-sm font-medium mb-1", task.backgroundImageUrl && "text-gray-200")}>Attachment</h4>
+                    <div>
+                      <Label htmlFor="dialogItemImageUrl" className={cn("text-xs",task.backgroundImageUrl && "text-gray-200")}>Image URL</Label>
+                      <Input 
+                        id="dialogItemImageUrl" 
+                        value={dialogTempImageUrl} 
+                        onChange={(e) => setDialogTempImageUrl(e.target.value)} 
+                        placeholder="https://..." 
+                        className={cn("text-sm h-9",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                      />
+                    </div>
+                    <div className="mt-1.5">
+                      <Label htmlFor="dialogItemImageFile" className={cn("text-xs", task.backgroundImageUrl && "text-gray-200")}>Or Upload Image</Label>
+                      <Input 
+                          id="dialogItemImageFile" 
+                          type="file"
+                          accept="image/*"
+                          ref={dialogFileInpuRef}
+                          onChange={handleDialogImageFileChange}
+                          className={cn("text-xs p-1 h-auto file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-input file:bg-transparent file:text-xs file:font-medium file:text-foreground", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 file:text-gray-200 file:border-white/30 hover:file:bg-white/5")}
+                        />
+                        <p className={cn("text-xs mt-0.5", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>Max 2MB. Upload generates a Data URI.</p>
+                    </div>
+                    <div className="mt-1.5">
+                      <Label htmlFor="dialogItemImageAiHint" className={cn("text-xs",task.backgroundImageUrl && "text-gray-200")}>AI Hint (1-2 words)</Label>
+                      <Input 
+                        id="dialogItemImageAiHint" 
+                        value={dialogTempImageAiHint} 
+                        onChange={(e) => setDialogTempImageAiHint(e.target.value)} 
+                        placeholder="e.g., 'nature forest'" 
+                        className={cn("text-sm h-9",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                      />
+                      <p className={cn("text-xs mt-0.5", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>
+                          If no URL/upload, placeholder used with this hint. If no hint, title words used.
+                        </p>
+                    </div>
+                     <div className="mt-2 pt-2 border-t border-border/50">
+                        <Label className={cn("block mb-1.5 text-xs font-medium", task.backgroundImageUrl ? "text-gray-200" : "text-foreground")}>Or select a suggestion:</Label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                            {suggestedImages.map((img) => (
+                            <div
+                                key={img.aiHint}
+                                onClick={() => {
+                                setDialogTempImageUrl(img.src);
+                                setDialogTempImageAiHint(img.aiHint);
+                                }}
+                                className="cursor-pointer rounded-md overflow-hidden border-2 border-transparent hover:border-primary transition-all focus:outline-none focus:ring-2 focus:ring-primary"
+                                tabIndex={0}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') {setDialogTempImageUrl(img.src); setDialogTempImageAiHint(img.aiHint);}}}
+                            >
+                                <div className="w-full h-[45px] sm:h-[50px] relative">
+                                <Image
+                                    src={img.src}
+                                    alt={img.alt}
+                                    layout="fill"
+                                    objectFit="cover"
+                                    className="rounded-sm"
+                                    data-ai-hint={img.aiHint}
+                                />
+                                </div>
+                            </div>
+                            ))}
                         </div>
-                      </div>
-                    ))}
+                        </div>
+                    { (dialogTempImageUrl || (editingItemAllDetails && editingItemAllDetails.imageUrl)) && 
+                        <Button size="sm" variant="outline" onClick={handleDialogRemoveImage} className={cn("w-full mt-2 text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-red-500/20 border-red-500/50 hover:bg-red-500/30 text-red-300")}>
+                            <TrashIcon className="mr-2 h-3.5 w-3.5"/>Remove Current Image
+                        </Button>
+                    }
+                  </div>
+
+                  {/* Description Section */}
+                  <div className="pt-2 border-t border-border/50">
+                    <Label htmlFor="dialogItemDescription" className={cn(task.backgroundImageUrl && "text-gray-200")}>Description</Label>
+                    <Textarea
+                      id="dialogItemDescription"
+                      value={dialogTempDescription}
+                      onChange={(e) => setDialogTempDescription(e.target.value)}
+                      placeholder="Add more details about this item..."
+                      className={cn("min-h-[60px]",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Details Section (Due Date & Assign User) */}
+                  <div className="space-y-3 pt-2 border-t border-border/50">
+                     <div>
+                        <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Due Date</Label>
+                        <Popover open={dialogTempIsDatePickerOpen} onOpenChange={setDialogTempIsDatePickerOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full justify-start text-left font-normal h-auto py-2",
+                                    !dialogTempDueDate && "text-muted-foreground",
+                                    task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
+                                )}
+                                >
+                                <CalendarDaysIcon className="mr-2 h-4 w-4" />
+                                {dialogTempDueDate ? format(dialogTempDueDate, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                mode="single"
+                                selected={dialogTempDueDate}
+                                onSelect={(date) => { setDialogTempDueDate(date || undefined); setDialogTempIsDatePickerOpen(false); }}
+                                initialFocus
+                                className={cn(task.backgroundImageUrl && "bg-card text-card-foreground border-white/30")}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                    <div>
+                        <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Assigned User</Label>
+                        {dialogTempAssignedUserId && dialogTempAssignedUserName ? (
+                        <div className="flex items-center space-x-2 text-sm p-2 rounded-md border bg-muted/50 border-muted">
+                            <Avatar className="h-6 w-6">
+                                <AvatarImage src={dialogTempAssignedUserAvatarUrl || undefined} alt={dialogTempAssignedUserName} data-ai-hint="user portrait"/>
+                                <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{dialogTempAssignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <span>{dialogTempAssignedUserName}</span>
+                        </div>
+                        ) : (
+                        <p className={cn("text-sm p-2 rounded-md border bg-muted/50 border-muted", task.backgroundImageUrl ? "text-gray-300 bg-white/5 border-white/20" : "text-muted-foreground")}>Not assigned.</p>
+                        )}
+                        <div className="mt-1.5 space-y-1.5">
+                            {currentUser && dialogTempAssignedUserId !== currentUser.id && (
+                                <Button onClick={handleDialogAssignToMe} className={cn("w-full text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}>
+                                    <UserCircleIcon className="mr-2 h-3.5 w-3.5" /> Assign to Me
+                                </Button>
+                            )}
+                            {dialogTempAssignedUserId && (
+                                <Button variant="outline" onClick={handleDialogUnassign} className={cn("w-full text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-transparent border-white/40 hover:bg-white/10 text-white")}>
+                                    Unassign
+                                </Button>
+                            )}
+                        </div>
+                    </div>
                   </div>
                 </div>
-                 { (dialogTempImageUrl || editingItemAllDetails.imageUrl) && 
-                    <Button size="sm" variant="outline" onClick={handleDialogRemoveImage} className={cn("w-full mt-2 text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-red-500/20 border-red-500/50 hover:bg-red-500/30 text-red-300")}>
-                        <TrashIcon className="mr-2 h-3.5 w-3.5"/>Remove Current Image
-                    </Button>
-                }
+
+                {/* Right Column - Comments */}
+                <div className="md:col-span-1 space-y-3 border-t md:border-t-0 md:border-l border-border/50 pt-3 md:pt-0 md:pl-4">
+                  <h4 className={cn("text-sm font-medium flex items-center", task.backgroundImageUrl && "text-gray-200")}>
+                    <MessageSquareIcon className="mr-2 h-4 w-4" /> Comments
+                  </h4>
+                  <div className={cn("h-40 p-2 border border-dashed rounded-md flex items-center justify-center", task.backgroundImageUrl ? "border-white/30 bg-white/5" : "border-border bg-muted/30")}>
+                    <p className={cn("text-xs", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>
+                      Comments functionality coming soon.
+                      {dialogTempComments && dialogTempComments.length > 0 && (
+                        <span className="block mt-2">Current comments: {dialogTempComments.join(', ')}</span>
+                      )}
+                    </p>
+                  </div>
+                   {/* Placeholder for future comment input and display list */}
+                </div>
               </div>
             </div>
 
