@@ -314,7 +314,7 @@ export function TaskCard({
           <div className="mt-2 pt-2 border-t border-dashed border-border/50">
             <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
               {task.checklistItems.map(item => (
-                <div key={item.id} className="flex items-center justify-between group/checklist text-sm text-card-foreground border-b border-dashed border-border/50 py-1.5">
+                <div key={item.id} className="flex items-center justify-between group/checklist text-sm text-card-foreground border border-border/60 rounded-md p-1.5">
                   <div className="flex items-center flex-grow min-w-0 relative"> 
                     <Checkbox
                       id={`checklist-${task.id}-${item.id}`}
@@ -459,4 +459,5 @@ export function TaskCard({
 
 
     
+
 
