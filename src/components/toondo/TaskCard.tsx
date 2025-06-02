@@ -480,7 +480,7 @@ export function TaskCard({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
-                        side="right" 
+                        side="left" 
                         align="start"   
                         onClick={(e) => e.stopPropagation()}
                         className={cn("bg-popover text-popover-foreground", task.backgroundImageUrl && "bg-background/80 backdrop-blur-sm border-white/30 text-white")}
@@ -524,7 +524,7 @@ export function TaskCard({
                                 {item.assignedUserId && item.assignedUserName && (
                                    <div className="flex items-center space-x-2 text-sm">
                                       <Avatar className="h-6 w-6">
-                                          <AvatarImage src={item.assignedUserAvatarUrl} alt={item.assignedUserName} data-ai-hint="user portrait"/>
+                                          <AvatarImage src={item.assignedUserAvatarUrl || undefined} alt={item.assignedUserName} data-ai-hint="user portrait"/>
                                           <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
                                       </Avatar>
                                       <span>Currently assigned to: <strong>{item.assignedUserName}</strong></span>
@@ -665,7 +665,7 @@ export function TaskCard({
                       {item.assignedUserId && item.assignedUserName && (
                         <div className="flex items-center">
                           <Avatar className="h-4 w-4 mr-1">
-                             <AvatarImage src={item.assignedUserAvatarUrl} alt={item.assignedUserName} data-ai-hint="user"/>
+                             <AvatarImage src={item.assignedUserAvatarUrl || undefined} alt={item.assignedUserName} data-ai-hint="user"/>
                              <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary" )}>{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
                           </Avatar>
                           {item.assignedUserName}
