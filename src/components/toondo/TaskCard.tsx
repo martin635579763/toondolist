@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon, Circle, CheckCircle2 } from "lucide-react";
+import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -162,7 +162,7 @@ export function TaskCard({
     const finalImageUrl = dialogTempImageUrl.trim() || null;
     let finalImageAiHint: string | null = null;
 
-    if (finalImageUrl) {
+    if (finalImageUrl && trimmedTitle) {
       finalImageAiHint = trimmedTitle.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
     }
 
@@ -507,7 +507,6 @@ export function TaskCard({
                         onCheckedChange={(checked) => setDialogTempCompleted(Boolean(checked))}
                         className={cn("h-5 w-5 rounded-sm", task.backgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
                       />
-                     <Circle className={cn("h-4 w-4 flex-shrink-0", task.backgroundImageUrl ? "text-gray-300" : "text-muted-foreground")} />
                      <EditableTitle
                         initialValue={dialogTempTitle}
                         onSave={(newTitle) => setDialogTempTitle(newTitle)}
@@ -679,4 +678,3 @@ export function TaskCard({
     </Card>
   );
 }
-
