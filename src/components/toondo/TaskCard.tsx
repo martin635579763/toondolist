@@ -338,7 +338,7 @@ export function TaskCard({
                     <div className={cn("h-1.5 w-full", item.label)} />
                 )}
                 <div 
-                  className={cn("p-1.5",isOwner && "cursor-pointer hover:bg-opacity-20", !item.label && "pt-1.5" )} // Ensure padding consistency
+                  className={cn("p-1.5",isOwner && "cursor-pointer hover:bg-opacity-20", !item.label && "pt-1.5" )} 
                   onClick={(e) => {
                     if (!isOwner) return;
                     const target = e.target as HTMLElement;
@@ -386,8 +386,8 @@ export function TaskCard({
                     )}
                   </div>
 
-                  {(item.imageUrl || item.description || item.dueDate || item.assignedUserId ) && ( // Removed item.label from this condition as it's handled by top bar
-                    <div className={cn("mt-1 pt-1 text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")}> {/* Removed border-t */}
+                  {(item.imageUrl || item.description || item.dueDate || item.assignedUserId ) && ( 
+                    <div className={cn("mt-1 pt-1 text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")}> 
                         {item.imageUrl && (
                         <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
                             <Image 
@@ -507,9 +507,9 @@ export function TaskCard({
             onClick={(e) => e.stopPropagation()}
           >
             <DialogHeader className="pb-2 border-b border-border">
-                <DialogTitle className="sr-only">
+                 <DialogTitle className="sr-only">
                     {editingItemAllDetails && dialogTempTitle ? `Edit item: ${dialogTempTitle}` : "Edit Item"}
-                </DialogTitle>
+                 </DialogTitle>
                  <div className="flex items-center space-x-2">
                      <Checkbox
                         id={`dialog-item-completed-${editingItemAllDetails.id}`}
@@ -543,8 +543,11 @@ export function TaskCard({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 flex-grow overflow-y-auto py-3">
               {/* Left Column */}
               <div className="md:col-span-2 space-y-3">
+                {dialogTempLabel && (
+                  <div className={cn("h-1.5 w-full rounded-sm mb-2", dialogTempLabel)} />
+                )}
                   {/* Action Buttons Row */}
-                  <div className="flex flex-wrap items-center gap-2 my-3">
+                  <div className="flex flex-wrap items-center gap-2">
                         <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
@@ -599,7 +602,7 @@ export function TaskCard({
                                     ) : (
                                         <TagIcon className="mr-1.5 h-3.5 w-3.5" />
                                     )}
-                                    {dialogTempLabel ? "Color" : "Label"}
+                                    Label
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
@@ -741,5 +744,7 @@ export function TaskCard({
     </Card>
   );
 }
+
+    
 
     
