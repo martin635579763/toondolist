@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Edit3Icon, CalendarDaysIcon, PartyPopperIcon, PlusCircleIcon, Trash2Icon, UserPlusIcon, MoreHorizontalIcon, UserCircleIcon, ImagePlusIcon, Image as ImageIcon } from "lucide-react";
+import { PrinterIcon, Edit3Icon, CalendarDaysIcon, PartyPopperIcon, PlusCircleIcon, Trash2Icon, UserPlusIcon, MoreHorizontalIcon, UserCircleIcon, ImagePlusIcon, Image as ImageIcon, UploadIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -17,7 +17,7 @@ import {
   TooltipTrigger,
   TooltipProvider
 } from "@/components/ui/tooltip";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, type ChangeEvent } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,10 +63,10 @@ export function TaskCard({
   onSetChecklistItemDueDate,
   onAssignUserToChecklistItem,
   onSetChecklistItemImage,
-  onApplyForRole,
+  // onApplyForRole, // This prop seems unused currently
   onUpdateTaskTitle,
-  onSetDueDate,
-  onSetBackgroundImage,
+  // onSetDueDate, // This prop seems unused for the main card footer options
+  // onSetBackgroundImage, // This prop seems unused for the main card footer options
 }: TaskCardProps) {
   const isOwner = currentUser && currentUser.id === task.userId;
   const { toast } = useToast();
@@ -93,6 +93,7 @@ export function TaskCard({
   const [currentImageUrlInput, setCurrentImageUrlInput] = useState("");
   const [currentImageAiHintInput, setCurrentImageAiHintInput] = useState("");
   const [itemForImageDialog, setItemForImageDialog] = useState<ChecklistItem | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
 
   useEffect(() => {
@@ -206,6 +207,43 @@ export function TaskCard({
     setCurrentImageUrlInput(item.imageUrl || "");
     setCurrentImageAiHintInput(item.imageAiHint || "");
     setEditingImageItemId(item.id);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // Reset file input
+    }
+  };
+
+  const handleImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { // Example: 2MB limit
+        toast({
+          title: "File Too Large",
+          description: "Please select an image smaller than 2MB.",
+          variant: "destructive",
+        });
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCurrentImageUrlInput(reader.result as string);
+        // Optionally auto-fill AI hint from filename if empty
+        if (!currentImageAiHintInput.trim()) {
+            const fileNameNoExt = file.name.split('.').slice(0, -1).join('.');
+            setCurrentImageAiHintInput(fileNameNoExt.split(/\s+/).slice(0, 2).join(' ').toLowerCase());
+        }
+      };
+      reader.onerror = () => {
+        toast({
+          title: "Error Reading File",
+          description: "Could not read the selected image file.",
+          variant: "destructive",
+        });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSaveImage = () => {
@@ -216,6 +254,7 @@ export function TaskCard({
       if (!finalImageUrl && finalImageAiHint) {
         finalImageUrl = `https://placehold.co/80x45.png`;
       } else if (finalImageUrl && !finalImageAiHint && itemForImageDialog) {
+        // If URL is present (could be Data URI) and hint is empty, generate from title
         finalImageAiHint = itemForImageDialog.title.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
       }
       
@@ -224,6 +263,9 @@ export function TaskCard({
     }
     setEditingImageItemId(null);
     setItemForImageDialog(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // Reset file input
+    }
   };
 
   const handleRemoveImage = () => {
@@ -231,8 +273,13 @@ export function TaskCard({
       onSetChecklistItemImage(task.id, editingImageItemId, null, null);
       toast({ title: "Image Removed", description: "Checklist item image removed." });
     }
+    setCurrentImageUrlInput("");
+    setCurrentImageAiHintInput("");
     setEditingImageItemId(null);
     setItemForImageDialog(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // Reset file input
+    }
   };
 
 
@@ -533,10 +580,29 @@ export function TaskCard({
                                     id="itemImageUrl" 
                                     value={currentImageUrlInput} 
                                     onChange={(e) => setCurrentImageUrlInput(e.target.value)} 
-                                    placeholder="https://example.com/image.png" 
+                                    placeholder="https://example.com/image.png or /images/my-image.jpg" 
                                     className={cn(task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
                                   />
                                 </div>
+
+                                <div className="space-y-1">
+                                   <Label htmlFor="itemImageFile" className={cn(task.backgroundImageUrl && "text-gray-200")}>Or Upload Image</Label>
+                                   <div className="flex items-center space-x-2">
+                                    <Input 
+                                      id="itemImageFile" 
+                                      type="file"
+                                      accept="image/*"
+                                      ref={fileInputRef}
+                                      onChange={handleImageFileChange}
+                                      className={cn("text-sm p-1 h-auto file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-input file:bg-transparent file:text-sm file:font-medium file:text-foreground", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 file:text-gray-200 file:border-white/30 hover:file:bg-white/5")}
+                                    />
+                                   </div>
+                                  <p className={cn("text-xs", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>
+                                    Max 2MB. Uploading will generate a Data URI.
+                                  </p>
+                                </div>
+
+
                                 <div>
                                   <Label htmlFor="itemImageAiHint" className={cn(task.backgroundImageUrl && "text-gray-200")}>AI Hint (1-2 words)</Label>
                                   <Input 
@@ -547,7 +613,7 @@ export function TaskCard({
                                     className={cn(task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
                                   />
                                   <p className={cn("text-xs mt-1", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>
-                                    If no URL, placeholder image will be used with this hint. If no hint, first 2 words of title used.
+                                    If no URL/upload, placeholder used with this hint. If no hint, first 2 words of title used.
                                   </p>
                                 </div>
                               </div>
@@ -686,4 +752,3 @@ export function TaskCard({
     </Card>
   );
 }
-
