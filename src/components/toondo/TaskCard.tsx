@@ -31,7 +31,7 @@ interface TaskCardProps {
   onDeleteChecklistItem: (taskId: string, itemId: string) => void;
   onApplyForRole: (taskId: string, roleName: string) => void;
   hasIncompleteChecklistItems: boolean;
-  onUpdateTaskTitle: (taskId: string, newTitle: string) => void; // New prop
+  onUpdateTaskTitle: (taskId: string, newTitle: string) => void;
 }
 
 export function TaskCard({
@@ -84,7 +84,6 @@ export function TaskCard({
     }
   }, [isEditingTitle]);
 
-  // Update editableTitle if task.title changes from props (e.g., after successful save)
   useEffect(() => {
     if (!isEditingTitle) {
       setEditableTitle(task.title);
@@ -107,7 +106,7 @@ export function TaskCard({
     if (e.key === 'Enter') {
       saveTitle();
     } else if (e.key === 'Escape') {
-      setEditableTitle(task.title); // Revert to original
+      setEditableTitle(task.title); 
       setIsEditingTitle(false);
     }
   };
@@ -201,7 +200,7 @@ export function TaskCard({
                 )}
                 onClick={() => {
                   if (isOwner) {
-                    setEditableTitle(task.title); // Ensure editableTitle is current
+                    setEditableTitle(task.title); 
                     setIsEditingTitle(true);
                   }
                 }}
@@ -341,7 +340,7 @@ export function TaskCard({
             </h4>
             <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
               {task.checklistItems.map(item => (
-                <div key={item.id} className="flex items-center justify-between group text-sm text-card-foreground">
+                <div key={item.id} className="flex items-center justify-between group/checklist text-sm text-card-foreground">
                   <div className="flex items-center flex-grow">
                     <Checkbox
                       id={`checklist-${task.id}-${item.id}`}
@@ -349,8 +348,8 @@ export function TaskCard({
                       onCheckedChange={() => onToggleChecklistItem(task.id, item.id)}
                       disabled={!isOwner}
                       className={cn(
-                        "h-3.5 w-3.5 mr-2 border-2 data-[state=checked]:bg-green-400 data-[state=checked]:text-primary-foreground border-muted-foreground",
-                         !isOwner && "cursor-not-allowed opacity-70"
+                        "h-3.5 w-3.5 mr-2 border-2 data-[state=checked]:bg-green-400 data-[state=checked]:text-primary-foreground border-muted-foreground rounded-full transition-opacity duration-150",
+                         isOwner ? "opacity-0 group-hover/checklist:opacity-100 focus:opacity-100 group-focus-within/checklist:opacity-100" : "opacity-50 cursor-not-allowed"
                       )}
                     />
                     <label
@@ -364,7 +363,7 @@ export function TaskCard({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 p-0 opacity-50 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                      className="h-5 w-5 p-0 opacity-0 group-hover/checklist:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-opacity duration-150"
                       onClick={() => onDeleteChecklistItem(task.id, item.id)}
                       aria-label="Delete checklist item"
                     >
@@ -470,5 +469,4 @@ export function TaskCard({
     </Card>
   );
 }
-
     
