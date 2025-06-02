@@ -39,9 +39,10 @@ type TaskFormData = z.infer<typeof taskFormSchema>;
 
 interface CreateTaskFormProps {
   onAddTask: (task: Task) => void;
+  onTaskCreated?: () => void; // Optional: Callback after task is created
 }
 
-export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
+export function CreateTaskForm({ onAddTask, onTaskCreated }: CreateTaskFormProps) {
   const { currentUser } = useAuth();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSuggestingDate, setIsSuggestingDate] = useState(false);
@@ -149,7 +150,7 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       createdAt: currentTime,
       assignedRoles: rolesArray.length > 0 ? rolesArray : undefined,
       applicants: [], 
-      order: 0, // Will be set properly in page.tsx based on current tasks count for user
+      order: 0, 
       userId: currentUser.id,
       userDisplayName: currentUser.displayName,
       userAvatarUrl: currentUser.avatarUrl,
@@ -169,10 +170,9 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
         createdAt: currentTime + index + 1, 
         parentId: mainTaskId,
         applicants: [],
-        userId: currentUser.id, // Sub-tasks also belong to the user
+        userId: currentUser.id, 
         userDisplayName: currentUser.displayName,
         userAvatarUrl: currentUser.avatarUrl,
-        // order is not set for sub-tasks directly, they follow parent
       };
       onAddTask(subTask);
     });
@@ -181,9 +181,12 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
     setSuggestedDateReasoning(null);
     setManualBreakdownSummaryText("");
     setManualBreakdownSteps([]);
+    if (onTaskCreated) {
+      onTaskCreated();
+    }
   };
 
-  if (!currentUser) {
+  if (!currentUser && !onTaskCreated) { // Only show this message if not in a popover context or similar
     return (
       <Card className="p-6 bg-card shadow-xl rounded-xl mb-8 border border-border text-center">
         <CardTitle className="text-xl">Welcome, Adventurer!</CardTitle>
@@ -192,9 +195,11 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
     );
   }
 
+
   return (
     <TooltipProvider>
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 p-6 bg-card shadow-xl rounded-xl mb-8 border border-border">
+    {/* Removed fixed mb-8, styling should be handled by parent if needed */}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 p-4 md:p-6 bg-popover text-popover-foreground rounded-xl border-border">
       <div className="space-y-2">
         <Label htmlFor="title" className="text-lg font-semibold">Task Title</Label>
         <Input
@@ -295,12 +300,12 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
       </div>
 
 
-      <Card className="border-dashed border-primary/50">
-        <CardHeader className="pb-3">
+      <Card className="border-dashed border-primary/50 bg-background/30">
+        <CardHeader className="pb-3 pt-4">
           <CardTitle className="text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Task Breakdown to Sub-Tasks</CardTitle>
           <CardDescription className="text-sm">Optionally, break this main task into smaller sub-tasks. Each step will become its own ToonDo card linked to this one.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pb-4">
           <div>
             <Label htmlFor="breakdownSummary" className="text-sm font-medium">Overall Notes for Breakdown (Optional)</Label>
             <Textarea
@@ -373,3 +378,4 @@ export function CreateTaskForm({ onAddTask }: CreateTaskFormProps) {
     </TooltipProvider>
   );
 }
+

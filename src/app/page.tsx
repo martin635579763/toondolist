@@ -3,10 +3,10 @@
 
 import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Task, Applicant } from '@/types/task';
+import type { Task } from '@/types/task';
 import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
 import { TaskCard } from '@/components/toondo/TaskCard';
-import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, CaseSensitiveIcon, UserCircleIcon } from 'lucide-react';
+import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, CaseSensitiveIcon, UserCircleIcon, PlusSquareIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { cn, generateId } from '@/lib/utils';
 import {
@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { parseMarkdownToTasks, type ParseMarkdownInput, type ParseMarkdownOutput } from '@/ai/flows/parse-markdown-tasks-flow';
 import { getRandomColor } from '@/lib/colors';
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
@@ -34,7 +35,7 @@ interface TaskGroup {
 
 function HomePageContent() {
   const { currentUser, logout, isLoading: authIsLoading } = useAuth();
-  const { toast, dismiss } = useToast();
+  const { toast } = useToast();
   const printableAreaRef = useRef<HTMLDivElement>(null);
   const [taskToPrint, setTaskToPrint] = useState<Task | null>(null);
 
@@ -46,6 +47,7 @@ function HomePageContent() {
 
   const [markdownInput, setMarkdownInput] = useState<string>('');
   const [isParsingMarkdown, setIsParsingMarkdown] = useState<boolean>(false);
+  const [isCreateTaskPopoverOpen, setIsCreateTaskPopoverOpen] = useState(false);
 
 
   useEffect(() => {
@@ -117,6 +119,10 @@ function HomePageContent() {
       title: "ToonDo Added!",
       description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
     });
+  };
+
+  const handleTaskCreatedInPopover = () => {
+    setIsCreateTaskPopoverOpen(false);
   };
 
   const handleParseAndAddTasks = async () => {
@@ -566,42 +572,56 @@ function HomePageContent() {
             </div>
           ) : (
             <>
-              <CreateTaskForm onAddTask={handleAddTask} />
+              <div className="mb-8 flex space-x-4">
+                <Popover open={isCreateTaskPopoverOpen} onOpenChange={setIsCreateTaskPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="default" size="lg" className="shadow-lg hover:shadow-xl transition-shadow">
+                      <PlusSquareIcon className="mr-2 h-5 w-5" /> Add New ToonDo
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full max-w-lg p-0" side="bottom" align="start">
+                    <CreateTaskForm 
+                      onAddTask={handleAddTask} 
+                      onTaskCreated={handleTaskCreatedInPopover} 
+                    />
+                  </PopoverContent>
+                </Popover>
 
-              <Card className="p-6 bg-card shadow-xl rounded-xl mb-8 border border-border">
-                <CardHeader className="p-0 pb-4">
-                  <CardTitle className="text-xl flex items-center">
-                    <CaseSensitiveIcon className="mr-2 h-6 w-6 text-primary" />
-                    Create Tasks from Markdown
-                  </CardTitle>
-                  <CardDescription>
-                    Paste your structured markdown below. The parser will try to create main tasks and sub-tasks.
-                    Example: "# Main Task Title\\n- Subtask 1\\n- Subtask 2\\n## Another Main Task"
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-0 space-y-3">
-                  <Textarea
-                    placeholder="Paste your markdown here..."
-                    value={markdownInput}
-                    onChange={(e) => setMarkdownInput(e.target.value)}
-                    rows={6}
-                    className="text-sm"
-                    disabled={isParsingMarkdown}
-                  />
-                  <Button
-                    onClick={handleParseAndAddTasks}
-                    disabled={isParsingMarkdown || !markdownInput.trim()}
-                    className="w-full"
-                  >
-                    {isParsingMarkdown ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <CaseSensitiveIcon className="mr-2 h-4 w-4" />
-                    )}
-                    Create from Markdown
-                  </Button>
-                </CardContent>
-              </Card>
+                <Card className="flex-grow p-0 bg-card shadow-xl rounded-xl border border-border">
+                  <CardHeader className="p-3 pb-2">
+                    <CardTitle className="text-lg flex items-center">
+                      <CaseSensitiveIcon className="mr-2 h-5 w-5 text-primary" />
+                      Bulk Create from Markdown
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Paste markdown. Ex: "# Task\n- Subtask"
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0 space-y-2">
+                    <Textarea
+                      placeholder="Paste your markdown here..."
+                      value={markdownInput}
+                      onChange={(e) => setMarkdownInput(e.target.value)}
+                      rows={3}
+                      className="text-sm"
+                      disabled={isParsingMarkdown}
+                    />
+                    <Button
+                      onClick={handleParseAndAddTasks}
+                      disabled={isParsingMarkdown || !markdownInput.trim()}
+                      className="w-full h-9 text-sm"
+                      size="sm"
+                    >
+                      {isParsingMarkdown ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CaseSensitiveIcon className="mr-2 h-4 w-4" />
+                      )}
+                      Create from Markdown
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
               
               {taskGroups.length === 0 && !isLoadingTasks && !markdownInput ? (
                  <div className="text-center py-16">
