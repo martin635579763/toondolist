@@ -23,7 +23,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { TaskSummarySidebar } from '@/components/toondo/TaskSummarySidebar';
+// Removed TaskSummarySidebar import
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
@@ -32,6 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { parseMarkdownToTasks, type ParseMarkdownInput, type ParseMarkdownOutput } from '@/ai/flows/parse-markdown-tasks-flow';
 import { getRandomColor } from '@/lib/colors';
+import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
 
 
 interface TaskGroup {
@@ -599,7 +600,10 @@ function HomePageContent() {
   return (
     <SidebarProvider>
       <Sidebar side="left" variant="sidebar" collapsible="icon">
-        <TaskSummarySidebar tasks={tasks.filter(t => currentUser && t.userId === currentUser.id)} />
+        {/* TaskSummarySidebar removed from here */}
+        <SidebarContent>
+          {/* You can add other sidebar content here if needed in the future */}
+        </SidebarContent>
       </Sidebar>
       <SidebarInset>
         <TooltipProvider>
@@ -608,7 +612,7 @@ function HomePageContent() {
               <div className="container flex h-16 items-center justify-between">
                 <div className="flex items-center">
                   <SidebarTrigger className="mr-3" /> 
-                  <h1 className="text-3xl sm:text-4xl font-bold text-primary" style={{ fontFamily: 'var(--font-medieval-sharp), cursive' }}>
+                  <h1 className="text-3xl sm:text-4xl font-bold text-primary" style={{ fontFamily: 'var(--font-aldrich), cursive' }}>
                     ToonDo List
                   </h1>
                 </div>
@@ -793,31 +797,9 @@ function HomePageContent() {
   );
 }
 
-const PrintableTaskCard = ({ task }: {task: Task}) => (
-  <div className="printable-card-content p-6 border rounded-lg shadow-none" style={{ backgroundColor: task.color, color: '#000000', width: '18cm', height:'10cm', margin: '1cm auto', breakInside: 'avoid' }}>
-    <h2 className="text-3xl font-bold mb-2" style={{ color: '#000000' }}>{task.title}</h2>
-    {task.description && (
-      <p className="text-base mb-4" style={{ color: '#000000' }}>{task.description}</p>
-    )}
-    {task.dueDate && (
-      <p className="text-sm mb-2" style={{ color: '#000000' }}>
-        <strong>Due Date:</strong> {new Date(task.dueDate).toLocaleDateString()}
-      </p>
-    )}
-    <p className="text-sm" style={{ color: '#000000' }}>
-      <strong>Status:</strong> {task.completed ? "Completed" : "Pending"}
-    </p>
-     <div style={{ marginTop: '20px', borderTop: '1px dashed #666', paddingTop: '10px', textAlign: 'center' }}>
-      <p style={{ fontSize: '0.8em', color: '#333' }}>ToonDo List - Your Awesome Task!</p>
-    </div>
-  </div>
-);
-
 
 export default function HomePage() {
   return (
       <HomePageContent />
   );
 }
-
-    
