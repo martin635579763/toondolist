@@ -10,7 +10,7 @@ export default {
   theme: {
   	extend: {
       fontFamily: {
-        sans: ['var(--font-medieval-sharp)', 'serif'], // Changed to MedievalSharp, added serif fallback
+        sans: ['var(--font-nunito)', 'sans-serif'], // Changed to Nunito, added sans-serif fallback
       },
   		colors: {
   			background: 'hsl(var(--background))',
@@ -66,8 +66,8 @@ export default {
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 1px)', // Adjusted for sharper feel
-  			sm: 'calc(var(--radius) - 2px)'  // Adjusted for sharper feel
+  			md: 'calc(var(--radius) - 0.5px)', // Adjusted slightly from original calc
+  			sm: 'calc(var(--radius) - 1px)'  // Adjusted slightly from original calc
   		},
   		keyframes: {
   			'accordion-down': {

@@ -1,16 +1,16 @@
 export const cartoonColors: string[] = [
-  '#FFADAD', // Light Pink
-  '#FFD6A5', // Light Orange
-  '#FDFFB6', // Pale Yellow
-  '#CAFFBF', // Light Green
-  '#9BF6FF', // Light Blue
-  '#A0C4FF', // Cornflower Blue
-  '#BDB2FF', // Light Purple
-  '#FFC6FF', // Light Magenta
-  '#FFB7C3', // Pastel Pink
-  '#FFFFE0', // Light Yellow
-  '#E0FFFF', // Pale Cyan
-  '#FFE5B4', // Peach
+  '#D9000D', // Lego Bright Red
+  '#FFD400', // Lego Bright Yellow
+  '#0057A8', // Lego Bright Blue
+  '#009624', // Lego Dark Green
+  '#FF7F00', // Lego Bright Orange
+  '#A0D2DB', // Lego Light Blue
+  '#95B90B', // Lego Lime
+  '#DF1A87', // Lego Bright Purple (Magenta-ish)
+  '#FECBCB', // Lego Light Pink
+  '#BBE90B', // Lego Bright Green
+  '#00A29F', // Lego Teal
+  '#C3900B', // Lego Dark Orange (Earth Orange)
 ];
 
 export function getRandomColor(): string {

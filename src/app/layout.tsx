@@ -1,20 +1,19 @@
 
 import type {Metadata} from 'next';
-import { MedievalSharp } from 'next/font/google'; // Changed font
+import { Nunito } from 'next/font/google'; // Changed font to Nunito
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import { AuthProvider } from '@/contexts/AuthContext';
 
-const medievalSharp = MedievalSharp({ // Changed font
-  weight: ["400"], // MedievalSharp typically only has a 400 weight
+const nunito = Nunito({ // Initialize Nunito
   subsets: ['latin'],
-  variable: '--font-medieval-sharp', // Changed variable name
+  variable: '--font-nunito', // Set CSS variable for Nunito
 });
 
 export const metadata: Metadata = {
-  title: 'ToonDo List - Realm of Tasks', // Updated title
-  description: 'A fantasy-style ToDo list for your epic quests!', // Updated description
+  title: 'BrickBuild ToDo - Assemble Your Tasks', // Updated title for Lego theme
+  description: 'A Lego-style ToDo list for your creative projects!', // Updated description for Lego theme
 };
 
 export default function RootLayout({
@@ -24,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn("min-h-screen bg-background font-sans antialiased", medievalSharp.variable)}>
+      <body className={cn("min-h-screen bg-background font-sans antialiased", nunito.variable)}> {/* Apply Nunito font */}
         <AuthProvider>
           <main>{children}</main>
           <Toaster />
