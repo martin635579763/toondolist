@@ -371,7 +371,7 @@ function HomePageContent() {
             if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
             if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
             if (a.userId === currentUser.id && b.userId === currentUser.id) {
-                if (!a.parentId && !b.parentId) return (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (b.createdAt ?? 0));
+                if (!a.parentId && !b.parentId) return (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (a.createdAt ?? 0));
             }
         }
         if (!a.parentId && !b.parentId) return (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (b.createdAt ?? 0));
@@ -550,6 +550,7 @@ function HomePageContent() {
                         onToggleComplete={handleToggleComplete}
                         onDelete={handleDeleteTask} 
                         onPrint={handleInitiatePrint}
+                        onAddTask={handleAddTask} 
                         onApplyForRole={handleApplyForRole}
                         isMainTaskWithIncompleteSubtasks={groupHasIncompleteSubtasks}
                       />
@@ -562,6 +563,7 @@ function HomePageContent() {
                           onToggleComplete={handleToggleComplete}
                           onDelete={handleDeleteTask} 
                           onPrint={handleInitiatePrint}
+                          onAddTask={handleAddTask}
                           onApplyForRole={handleApplyForRole} 
                           isMainTaskWithIncompleteSubtasks={false} 
                         />

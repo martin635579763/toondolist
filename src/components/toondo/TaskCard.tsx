@@ -6,7 +6,7 @@ import type { User } from "@/types/user";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, Link2Icon, ListChecks, CircleDot, CheckCircle2, ArrowRightIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon, PlusCircleIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getContrastingTextColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +14,12 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  TooltipProvider // Ensure TooltipProvider is imported if not already at page level
 } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useState, useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AddSubTaskForm } from "./AddSubTaskForm";
 
 
 interface TaskCardProps {
@@ -26,6 +29,7 @@ interface TaskCardProps {
   onToggleComplete: (id: string) => void;
   onDelete: (task: Task) => void;
   onPrint: (task: Task) => void;
+  onAddTask: (task: Task) => void; // Added for adding sub-tasks
   onApplyForRole: (taskId: string, roleName: string) => void;
   isMainTaskWithIncompleteSubtasks: boolean;
 }
@@ -37,6 +41,7 @@ export function TaskCard({
   onToggleComplete,
   onDelete,
   onPrint,
+  onAddTask, // Consuming the new prop
   onApplyForRole,
   isMainTaskWithIncompleteSubtasks
 }: TaskCardProps) {
@@ -72,6 +77,8 @@ export function TaskCard({
 
   const [showFireworks, setShowFireworks] = useState(false);
   const prevCompleted = useRef(task.completed);
+
+  const [isAddSubTaskPopoverOpen, setIsAddSubTaskPopoverOpen] = useState(false);
 
   useEffect(() => {
     if (task.completed && !prevCompleted.current && isMainTask) { 
@@ -154,6 +161,7 @@ export function TaskCard({
           </div>
           <div className="flex items-center space-x-1 shrink-0">
             {isMainTask && (task.userAvatarUrl || task.userDisplayName) && (
+             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Avatar className="h-7 w-7 border" style={{borderColor: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)'}}>
@@ -167,6 +175,7 @@ export function TaskCard({
                   <p className="text-xs">Quest Giver: {task.userDisplayName}</p>
                 </TooltipContent>
               </Tooltip>
+              </TooltipProvider>
             )}
             {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0", isSubTask ? "h-3 w-3 mt-0.5": "h-5 w-5" )} style={{color: textColor === '#FFFFFF' ? '#FFFF00' : '#FFD700'}} />}
           </div>
@@ -251,22 +260,28 @@ export function TaskCard({
                              {totalPendingForRole} Pending
                            </Badge>
                         )}
-                        {/* Task owner role management UI was here, removed with Edit Dialog */}
                         {currentUser && !isOwner && !currentUserApplication && ( 
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-5 px-1 py-0 text-[10px]" 
-                            style={{
-                              backgroundColor: 'rgba(255,255,255,0.15)', 
-                              borderColor: textColor, 
-                              color: textColor,
-                              lineHeight: 'normal'
-                            }}
-                            onClick={(e) => { e.stopPropagation(); onApplyForRole(task.id, role); }}
-                          >
-                            <ApplyIcon className="h-2.5 w-2.5 mr-0.5"/> Apply
-                          </Button>
+                         <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-5 px-1 py-0 text-[10px]" 
+                                style={{
+                                  backgroundColor: 'rgba(255,255,255,0.15)', 
+                                  borderColor: textColor, 
+                                  color: textColor,
+                                  lineHeight: 'normal'
+                                }}
+                                onClick={(e) => { e.stopPropagation(); onApplyForRole(task.id, role); }}
+                              >
+                                <ApplyIcon className="h-2.5 w-2.5 mr-0.5"/> Apply
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top"><p className="text-xs">Apply for {role}</p></TooltipContent>
+                          </Tooltip>
+                          </TooltipProvider>
                         )}
                         {!currentUser && totalPendingForRole === 0 && ( 
                             <Badge variant="outline" className="py-0 px-1 text-[10px]" style={{borderColor: textColor, color: textColor}}>
@@ -321,6 +336,7 @@ export function TaskCard({
         )}
 
         <div className={cn("flex items-center", isSubTask ? "pt-1 space-x-1" : "pt-1.5 space-x-1.5")}>
+          <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild disabled={checkboxDisabled}>
                 <Checkbox
@@ -349,6 +365,7 @@ export function TaskCard({
                 </TooltipContent>
             )}
           </Tooltip>
+          </TooltipProvider>
           <label
             htmlFor={`complete-${task.id}`}
             id={`label-complete-${task.id}`}
@@ -369,7 +386,34 @@ export function TaskCard({
         "flex justify-end space-x-0.5",
         isSubTask ? "p-2 pt-1 pb-1" : "p-3 pt-1" 
       )}>
-        {/* Edit button removed as per user request */}
+         {isMainTask && isOwner && (
+           <Popover open={isAddSubTaskPopoverOpen} onOpenChange={setIsAddSubTaskPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("hover:bg-white/20 dark:hover:bg-black/20", isSubTask ? "h-5 w-5 p-0.5" : "h-7 w-7")}
+                style={{color: textColor}}
+                aria-label="Add sub-task"
+                onClick={(e) => e.stopPropagation()} 
+              >
+                <PlusCircleIcon className={isSubTask ? "h-3 w-3" : "h-4 w-4"} />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent 
+                className="p-0 w-auto" 
+                side="bottom" 
+                align="end"
+                onClick={(e) => e.stopPropagation()} // Prevent card drag/click
+            >
+              <AddSubTaskForm 
+                parentId={task.id} 
+                onAddTask={onAddTask} 
+                onSubTaskAdded={() => setIsAddSubTaskPopoverOpen(false)}
+              />
+            </PopoverContent>
+          </Popover>
+        )}
         <Button
           variant="ghost"
           size={isSubTask ? "icon" : "icon"} 
@@ -396,5 +440,3 @@ export function TaskCard({
     </Card>
   );
 }
-
-    
