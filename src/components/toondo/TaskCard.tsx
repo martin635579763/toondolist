@@ -3,11 +3,11 @@
 
 import type { Task, ChecklistItem } from "@/types/task";
 import type { User } from "@/types/user";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon, PlusCircleIcon, XIcon, ListChecksIcon, Edit3Icon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon, PlusCircleIcon, XIcon, Edit3Icon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -212,31 +212,9 @@ export function TaskCard({
             )}
           </div>
           <div className="flex items-center space-x-1 shrink-0">
-            {(task.userAvatarUrl || task.userDisplayName) && (
-             <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Avatar className="h-7 w-7 border border-border">
-                      <AvatarImage src={task.userAvatarUrl} alt={task.userDisplayName} data-ai-hint="user portrait"/>
-                      <AvatarFallback className="bg-muted text-muted-foreground text-xs">
-                          {task.userDisplayName?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                  </Avatar>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p className="text-xs">Quest Giver: {task.userDisplayName}</p>
-                </TooltipContent>
-              </Tooltip>
-              </TooltipProvider>
-            )}
             {task.completed && <PartyPopperIcon className="ml-1 shrink-0 h-5 w-5 text-yellow-400" />}
           </div>
         </div>
-        {task.description && (
-            <CardDescription className="mt-1 break-words text-sm text-muted-foreground">
-                {task.description}
-            </CardDescription>
-        )}
       </CardHeader>
       <CardContent className="flex-grow space-y-2 p-4 pt-1 min-h-7">
         {task.dueDate && (
@@ -334,36 +312,32 @@ export function TaskCard({
 
         {(task.checklistItems && task.checklistItems.length > 0) && (
           <div className="mt-2 pt-2 border-t border-dashed border-border/50">
-            <h4 className="text-xs font-semibold uppercase flex items-center mb-1 text-muted-foreground">
-              <ListChecksIcon className="mr-1 h-3 w-3" />
-              Checklist
-            </h4>
             <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
               {task.checklistItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between group/checklist text-sm text-card-foreground">
-                  <div className="flex items-center flex-grow min-w-0 relative"> {/* Parent is relative */}
+                  <div className="flex items-center flex-grow min-w-0 relative"> 
                     <Checkbox
                       id={`checklist-${task.id}-${item.id}`}
                       checked={item.completed}
                       onCheckedChange={() => onToggleChecklistItem(task.id, item.id)}
                       disabled={!isOwner}
                       className={cn(
-                        "h-3.5 w-3.5 border-2 rounded-full data-[state=checked]:bg-green-400 data-[state=checked]:text-primary-foreground border-muted-foreground shrink-0", // Base style
-                        "transition-opacity duration-200 ease-in-out", // Transition
-                        "absolute left-0 top-1/2 -translate-y-1/2 z-10", // Positioning
+                        "h-3.5 w-3.5 border-2 rounded-full data-[state=checked]:bg-green-400 data-[state=checked]:text-primary-foreground border-muted-foreground shrink-0", 
+                        "transition-opacity duration-200 ease-in-out", 
+                        "absolute left-0 top-1/2 -translate-y-1/2 z-10", 
                         isOwner 
-                          ? "opacity-0 group-hover/checklist:opacity-100 group-focus-within/checklist:opacity-100" // Owner visibility
-                          : "opacity-50 cursor-not-allowed" // Non-owner visibility
+                          ? "opacity-0 group-hover/checklist:opacity-100 group-focus-within/checklist:opacity-100" 
+                          : "opacity-50 cursor-not-allowed" 
                       )}
                     />
                     <label
                       htmlFor={`checklist-${task.id}-${item.id}`}
                       className={cn(
-                        "flex-grow break-all truncate", // Base style
-                        "transition-all duration-200 ease-in-out", // Transition for padding
+                        "flex-grow break-all truncate", 
+                        "transition-all duration-200 ease-in-out", 
                         isOwner 
-                          ? "pl-0 group-hover/checklist:pl-[calc(0.875rem+0.5rem)] group-focus-within/checklist:pl-[calc(0.875rem+0.5rem)]" // Owner padding: 0.875rem (checkbox width w-3.5) + 0.5rem (gap like mr-2)
-                          : "pl-[calc(0.875rem+0.5rem)]", // Non-owner padding
+                          ? "pl-0 group-hover/checklist:pl-[calc(0.875rem+0.5rem)] group-focus-within/checklist:pl-[calc(0.875rem+0.5rem)]" 
+                          : "pl-[calc(0.875rem+0.5rem)]", 
                         item.completed && "line-through opacity-70",
                         !isOwner && "cursor-not-allowed"
                       )}
