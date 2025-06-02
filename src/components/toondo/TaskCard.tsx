@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { Task, ChecklistItem } from "@/types/task";
@@ -349,7 +348,11 @@ export function TaskCard({
                 )}
               >
                 {item.label && item.label.length > 0 && (
-                    <div className={cn("h-1.5 w-full", item.label[0])} />
+                    <div className="flex h-1.5 w-full">
+                        {item.label.map((colorClass, index) => (
+                            <div key={index} className={cn("flex-1", colorClass)} />
+                        ))}
+                    </div>
                 )}
                 <div
                   className={cn("p-1.5",isOwner && "cursor-pointer hover:bg-opacity-20", (!item.label || item.label.length === 0) && "pt-1.5" )}
@@ -400,7 +403,7 @@ export function TaskCard({
                     )}
                   </div>
 
-                  {(item.imageUrl || item.description || item.dueDate || item.assignedUserId || (item.label && item.label.length > 0) ) && (
+                  {(item.imageUrl || item.description || item.dueDate || item.assignedUserId || (item.label && item.label.length > 1) ) && ( // Check if there are multiple labels to avoid double rendering for single label
                     <div className={cn("mt-1 pt-1 text-xs flex flex-wrap gap-x-2 gap-y-1 items-start", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")}>
                         {item.imageUrl && (
                         <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
@@ -434,9 +437,9 @@ export function TaskCard({
                             {item.assignedUserName}
                         </div>
                         )}
-                        {item.label && item.label.length > 0 && (
+                        {item.label && item.label.length > 1 && ( // Only show individual dots if more than one label exists, as first is bar
                             <div className="flex items-center gap-1">
-                                {item.label.map(labelColor => (
+                                {item.label.slice(1).map(labelColor => ( // Start from second label
                                     <span key={labelColor} className={cn("w-3 h-3 rounded-sm", labelColor)} />
                                 ))}
                             </div>
@@ -528,6 +531,7 @@ export function TaskCard({
             onClick={(e) => e.stopPropagation()}
           >
              <DialogHeader className="pb-2 border-b border-border">
+                 {/* Visually hidden DialogTitle for accessibility */}
                 <DialogTitle className="sr-only">
                     {editingItemAllDetails && dialogTempTitle ? `Edit item: ${dialogTempTitle}` : "Edit Item"}
                 </DialogTitle>
@@ -617,6 +621,13 @@ export function TaskCard({
                                 <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0 items-center", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
                                     <TagIcon className="mr-1.5 h-3.5 w-3.5" />
                                     Label
+                                    {dialogTempLabel.length > 0 && (
+                                        <div className="flex items-center gap-0.5 ml-1.5">
+                                            {dialogTempLabel.map(color => (
+                                                <span key={color} className={cn("w-2.5 h-2.5 rounded-sm", color)} />
+                                            ))}
+                                        </div>
+                                    )}
                                 </Button>
                             </PopoverTrigger>
                              <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
@@ -642,13 +653,6 @@ export function TaskCard({
                                 </Button>
                             </PopoverContent>
                         </Popover>
-                        {dialogTempLabel.length > 0 && (
-                            <div className="flex items-center gap-1 ml-1">
-                                {dialogTempLabel.map(color => (
-                                    <span key={color} className={cn("w-3.5 h-3.5 rounded-sm", color)} />
-                                ))}
-                            </div>
-                        )}
                      </div>
 
 
