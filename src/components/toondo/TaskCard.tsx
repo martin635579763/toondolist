@@ -52,10 +52,10 @@ interface TaskCardProps {
 }
 
 const suggestedImages = [
-  { src: 'https://placehold.co/300x200.png?text=Peaceful+Lake', alt: 'Peaceful lake scenery', aiHint: 'lake mountain' },
-  { src: 'https://placehold.co/300x200.png?text=Forest+Trail', alt: 'Sunlit forest trail', aiHint: 'forest trail' },
-  { src: 'https://placehold.co/300x200.png?text=Sandy+Beach', alt: 'Tropical sandy beach', aiHint: 'beach ocean' },
-  { src: 'https://placehold.co/300x200.png?text=Snowy+Peaks', alt: 'Majestic snowy mountains', aiHint: 'mountain snow' },
+  { src: 'https://placehold.co/300x200.png', alt: 'Desert Oasis placeholder', aiHint: 'desert oasis' },
+  { src: 'https://placehold.co/300x200.png', alt: 'City Skyline placeholder', aiHint: 'city skyline' },
+  { src: 'https://placehold.co/300x200.png', alt: 'Autumn Forest placeholder', aiHint: 'autumn forest' },
+  { src: 'https://placehold.co/300x200.png', alt: 'Coastal Cliff placeholder', aiHint: 'coastal cliff' },
 ];
 
 
@@ -790,3 +790,4 @@ export function TaskCard({
     </Card>
   );
 }
+
