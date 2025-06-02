@@ -4,8 +4,6 @@
 import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Task, ChecklistItem } from '@/types/task';
-// CreateTaskForm is no longer used directly here, its logic is inlined
-// import { CreateTaskForm } from '@/components/toondo/CreateTaskForm'; 
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, UserCircleIcon, PlusSquareIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -17,12 +15,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // Added Input
+import { Input } from '@/components/ui/input'; 
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-// Popover is removed for task creation
-// import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; 
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
 
 function HomePageContent() {
@@ -37,7 +33,6 @@ function HomePageContent() {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
 
-  // State for the new inline task title input
   const [newTaskTitle, setNewTaskTitle] = useState('');
 
 
@@ -88,6 +83,7 @@ function HomePageContent() {
       userId: task.userId || 'unknown_user',
       userDisplayName: task.userDisplayName || 'Unknown User',
       userAvatarUrl: task.userAvatarUrl || '',
+      completed: task.completed || false, // Ensure completed status has a default
     }));
 
     setTasks(tasksWithDefaults);
@@ -101,33 +97,6 @@ function HomePageContent() {
     }
   }, [tasks, isLoadingTasks]);
 
-  // This function is now effectively replaced by handleDirectAddTask
-  // const handleAddTask = (newTaskData: Omit<Task, 'id' | 'createdAt' | 'order' | 'userId' | 'userDisplayName' | 'userAvatarUrl' | 'applicants' | 'checklistItems'>) => {
-  //   if (!currentUser) {
-  //     toast({ title: "Not Logged In", description: "You must be logged in to add tasks.", variant: "destructive" });
-  //     return;
-  //   }
-
-  //   const tasksForCurrentUser = tasks.filter(t => t.userId === currentUser.id);
-  //   const taskWithUserAndDefaults: Task = {
-  //     ...newTaskData,
-  //     id: generateId(),
-  //     createdAt: Date.now(),
-  //     applicants: [],
-  //     checklistItems: [],
-  //     order: tasksForCurrentUser.length, 
-  //     userId: currentUser.id,
-  //     userDisplayName: currentUser.displayName,
-  //     userAvatarUrl: currentUser.avatarUrl,
-  //   };
-
-  //   setTasks(prevTasks => [...prevTasks, taskWithUserAndDefaults]);
-
-  //   toast({
-  //     title: "ToonDo Added!",
-  //     description: `"${newTaskData.title}" is ready to be tackled!`,
-  //   });
-  // };
 
   const handleDirectAddTask = () => {
     if (!newTaskTitle.trim()) {
@@ -143,13 +112,13 @@ function HomePageContent() {
     const taskWithUserAndDefaults: Task = {
       id: generateId(),
       title: newTaskTitle.trim(),
-      description: "", // Default empty description
+      description: "", 
       completed: false,
-      dueDate: null, // Default null due date
+      dueDate: null, 
       createdAt: Date.now(),
-      assignedRoles: [], // Default empty roles
+      assignedRoles: [], 
       applicants: [],
-      checklistItems: [], // Default empty checklist
+      checklistItems: [], 
       order: tasksForCurrentUser.length,
       userId: currentUser.id,
       userDisplayName: currentUser.displayName,
@@ -157,47 +126,11 @@ function HomePageContent() {
     };
 
     setTasks(prevTasks => [...prevTasks, taskWithUserAndDefaults]);
-    setNewTaskTitle(''); // Clear input after adding
+    setNewTaskTitle(''); 
     toast({
       title: "ToonDo Added!",
       description: `"${taskWithUserAndDefaults.title}" is ready to be tackled!`,
     });
-  };
-
-
-  const taskHasIncompleteChecklistItems = (taskId: string): boolean => {
-    const task = tasks.find(t => t.id === taskId);
-    if (task && task.checklistItems && task.checklistItems.length > 0) {
-      return task.checklistItems.some(item => !item.completed);
-    }
-    return false;
-  };
-
- const handleToggleComplete = (id: string) => {
-    const taskToToggle = tasks.find(t => t.id === id);
-    if (!taskToToggle) return;
-
-    if (!currentUser || currentUser.id !== taskToToggle.userId) {
-        toast({ title: "Permission Denied", description: "You can only change the completion status of your own tasks.", variant: "destructive" });
-        return;
-    }
-
-    const newCompletedStatus = !taskToToggle.completed;
-
-    if (newCompletedStatus && taskHasIncompleteChecklistItems(id)) {
-        toast({
-            title: "Still have work to do!",
-            description: `"${taskToToggle.title}" cannot be completed until all its checklist items are done.`,
-            variant: "default",
-        });
-        return;
-    }
-
-    setTasks(prevTasks =>
-      prevTasks.map(task =>
-        task.id === id ? { ...task, completed: newCompletedStatus } : task
-      )
-    );
   };
 
   const handleDeleteTask = (taskToDelete: Task) => {
@@ -223,17 +156,20 @@ function HomePageContent() {
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId) {
+          if (!currentUser || currentUser.id !== task.userId) {
+            toast({ title: "Permission Denied", description: "You can only add checklist items to your own tasks.", variant: "destructive" });
+            return task;
+          }
           const newItem: ChecklistItem = {
             id: generateId(),
             title: itemTitle.trim(),
             completed: false,
           };
           const updatedChecklistItems = [...(task.checklistItems || []), newItem];
-          const taskNowIncomplete = task.completed;
           return {
             ...task,
             checklistItems: updatedChecklistItems,
-            completed: taskNowIncomplete ? false : task.completed,
+            completed: false, // Adding an item makes the task incomplete
           };
         }
         return task;
@@ -245,15 +181,23 @@ function HomePageContent() {
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId) {
+           if (!currentUser || currentUser.id !== task.userId) {
+            toast({ title: "Permission Denied", description: "You can only modify checklist items on your own tasks.", variant: "destructive" });
+            return task;
+          }
           const updatedChecklistItems = (task.checklistItems || []).map(item =>
             item.id === itemId ? { ...item, completed: !item.completed } : item
           );
-          const becomesIncomplete = updatedChecklistItems.some(item => !item.completed && task.completed);
+          
+          let newCompletedStatus = false;
+          if (updatedChecklistItems.length > 0 && updatedChecklistItems.every(item => item.completed)) {
+            newCompletedStatus = true;
+          }
 
           return {
             ...task,
             checklistItems: updatedChecklistItems,
-            completed: becomesIncomplete ? false : task.completed,
+            completed: newCompletedStatus,
           };
         }
         return task;
@@ -265,8 +209,22 @@ function HomePageContent() {
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId) {
+          if (!currentUser || currentUser.id !== task.userId) {
+            toast({ title: "Permission Denied", description: "You can only delete checklist items from your own tasks.", variant: "destructive" });
+            return task;
+          }
           const updatedChecklistItems = (task.checklistItems || []).filter(item => item.id !== itemId);
-          return { ...task, checklistItems: updatedChecklistItems };
+          
+          let newCompletedStatus = false;
+          if (updatedChecklistItems.length > 0 && updatedChecklistItems.every(item => item.completed)) {
+            newCompletedStatus = true;
+          }
+
+          return { 
+            ...task, 
+            checklistItems: updatedChecklistItems,
+            completed: newCompletedStatus 
+          };
         }
         return task;
       })
@@ -326,9 +284,21 @@ function HomePageContent() {
   };
 
   const handleUpdateTaskTitle = (taskId: string, newTitle: string) => {
+     if (!currentUser) {
+        toast({ title: "Permission Denied", description: "You must be logged in to update tasks.", variant: "destructive" });
+        return;
+    }
     setTasks(prevTasks =>
-      prevTasks.map(task =>
-        task.id === taskId ? { ...task, title: newTitle } : task
+      prevTasks.map(task => {
+        if (task.id === taskId) {
+          if (currentUser.id !== task.userId) {
+            toast({ title: "Permission Denied", description: "You can only update titles of your own tasks.", variant: "destructive" });
+            return task;
+          }
+          return { ...task, title: newTitle };
+        }
+        return task;
+      }
       )
     );
     toast({
@@ -562,14 +532,12 @@ function HomePageContent() {
             </div>
           ) : (
             <>
-              {/* Removed Popover for CreateTaskForm, replaced with inline input area */}
               <div
                 className={cn(
-                  'flex overflow-x-auto space-x-6 py-4 items-start' // Keep this for the list of tasks
+                  'flex overflow-x-auto space-x-6 py-4 items-start' 
                 )}
               >
-                 {/* Inline Task Creation Area */}
-                <div className="flex-shrink-0 w-80 bg-card shadow-lg rounded-xl border border-border p-4 sticky left-4 z-10 self-start"> {/* Made sticky */}
+                <div className="flex-shrink-0 w-80 bg-card shadow-lg rounded-xl border border-border p-4 sticky left-4 z-10 self-start"> 
                   <h3 className="text-xl font-semibold mb-4 text-primary">Add New ToonDo</h3>
                   <div className="space-y-3">
                     <Input
@@ -594,8 +562,8 @@ function HomePageContent() {
                   </div>
                 </div>
 
-                {displayTasks.length === 0 && !isLoadingTasks && !defaultTasksAddedForUser(currentUser.id) ? (
-                  <div className="text-center py-16 pl-6"> {/* Added pl-6 to account for sticky adder */}
+                {displayTasks.filter(task => task.userId === currentUser.id).length === 0 && !isLoadingTasks && !defaultTasksAddedForUser(currentUser.id, tasks) ? (
+                  <div className="text-center py-16 pl-6"> 
                     <FileTextIcon className="mx-auto h-24 w-24 text-muted-foreground opacity-50 mb-4" />
                     <h2 className="text-3xl font-semibold mb-2">No ToonDos Yet, {currentUser.displayName}!</h2>
                     <p className="text-muted-foreground text-lg">Time to add some epic quests to your list.</p>
@@ -621,14 +589,12 @@ function HomePageContent() {
                       <TaskCard
                         task={task}
                         currentUser={currentUser}
-                        onToggleComplete={handleToggleComplete}
                         onDelete={handleDeleteTask}
                         onPrint={handleInitiatePrint}
                         onAddChecklistItem={handleAddChecklistItem}
                         onToggleChecklistItem={handleToggleChecklistItem}
                         onDeleteChecklistItem={handleDeleteChecklistItem}
                         onApplyForRole={handleApplyForRole}
-                        hasIncompleteChecklistItems={taskHasIncompleteChecklistItems(task.id)}
                         onUpdateTaskTitle={handleUpdateTaskTitle}
                       />
                     </div>
@@ -653,13 +619,14 @@ function HomePageContent() {
   );
 }
 
-// Helper function to check if default tasks were the only ones added
 function defaultTasksAddedForUser(userId: string, allTasks?: Task[]): boolean {
-  if (!allTasks) return false;
+  if (!allTasks) return false; // Should not happen if called after tasks are loaded
   const userTasks = allTasks.filter(t => t.userId === userId);
+  // Check if the only tasks present are the default ones
   if (userTasks.length === 3) {
     const titles = userTasks.map(t => t.title).sort();
-    return titles[0] === "Later" && titles[1] === "This Week" && titles[2] === "Today";
+    const defaultTitles = ["Later", "This Week", "Today"].sort();
+    return JSON.stringify(titles) === JSON.stringify(defaultTitles);
   }
   return false;
 }
@@ -670,3 +637,4 @@ export default function HomePage() {
       <HomePageContent />
   );
 }
+

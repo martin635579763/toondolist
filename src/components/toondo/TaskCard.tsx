@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, InfoIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon, PlusCircleIcon, XIcon, Edit3Icon } from "lucide-react";
+import { PrinterIcon, Trash2Icon, CalendarDaysIcon, PartyPopperIcon, UsersIcon, UserCheckIcon, ClockIcon, UserPlusIcon as ApplyIcon, PlusCircleIcon, XIcon, Edit3Icon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -23,28 +23,24 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 interface TaskCardProps {
   task: Task;
   currentUser: User | null;
-  onToggleComplete: (id: string) => void;
   onDelete: (task: Task) => void;
   onPrint: (task: Task) => void;
   onAddChecklistItem: (taskId: string, itemTitle: string) => void;
   onToggleChecklistItem: (taskId: string, itemId: string) => void;
   onDeleteChecklistItem: (taskId: string, itemId: string) => void;
   onApplyForRole: (taskId: string, roleName: string) => void;
-  hasIncompleteChecklistItems: boolean;
   onUpdateTaskTitle: (taskId: string, newTitle: string) => void;
 }
 
 export function TaskCard({
   task,
   currentUser,
-  onToggleComplete,
   onDelete,
   onPrint,
   onAddChecklistItem,
   onToggleChecklistItem,
   onDeleteChecklistItem,
   onApplyForRole,
-  hasIncompleteChecklistItems,
   onUpdateTaskTitle,
 }: TaskCardProps) {
   const isOwner = currentUser && currentUser.id === task.userId;
@@ -53,17 +49,6 @@ export function TaskCard({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editableTitle, setEditableTitle] = useState(task.title);
   const titleInputRef = useRef<HTMLInputElement>(null);
-
-  let mainCheckboxDisabled = false;
-  let mainCheckboxTooltipContent: React.ReactNode = null;
-
-  if (!isOwner) {
-    mainCheckboxDisabled = true;
-    mainCheckboxTooltipContent = <p className="flex items-center text-xs"><InfoIcon className="h-3 w-3 mr-1.5"/>Only the owner can change completion status.</p>;
-  } else if (hasIncompleteChecklistItems && !task.completed) {
-    mainCheckboxDisabled = true;
-    mainCheckboxTooltipContent = <p className="flex items-center text-xs"><InfoIcon className="h-3 w-3 mr-1.5"/>Complete all checklist items first.</p>;
-  }
 
   const [showFireworks, setShowFireworks] = useState(false);
   const prevCompleted = useRef(task.completed);
@@ -386,49 +371,6 @@ export function TaskCard({
             </div>
           </div>
         )}
-
-
-        <div className="flex items-center pt-1.5 space-x-1.5 mt-2">
-          <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild disabled={mainCheckboxDisabled}>
-                <Checkbox
-                    id={`complete-${task.id}`}
-                    checked={task.completed}
-                    onCheckedChange={() => {
-                        if (!mainCheckboxDisabled) {
-                            onToggleComplete(task.id);
-                        }
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={mainCheckboxDisabled}
-                    className={cn(
-                      "border-2 rounded data-[state=checked]:bg-green-500 data-[state=checked]:text-primary-foreground h-4 w-4 border-muted-foreground",
-                       mainCheckboxDisabled && "cursor-not-allowed opacity-70"
-                    )}
-                    aria-labelledby={`label-complete-${task.id}`}
-                />
-            </TooltipTrigger>
-            {mainCheckboxTooltipContent && (
-                <TooltipContent>
-                    {mainCheckboxTooltipContent}
-                </TooltipContent>
-            )}
-          </Tooltip>
-          </TooltipProvider>
-          <label
-            htmlFor={`complete-${task.id}`}
-            id={`label-complete-${task.id}`}
-            className={cn(
-              "font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-sm text-card-foreground",
-              task.completed && "line-through",
-              mainCheckboxDisabled && "cursor-not-allowed opacity-70"
-            )}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {task.completed ? "Mark Incomplete" : "Mark Complete"}
-          </label>
-        </div>
       </CardContent>
       <CardFooter className="flex justify-end space-x-0.5 p-3 pt-1">
         <Button
@@ -456,9 +398,3 @@ export function TaskCard({
   );
 }
     
-
-
-    
-
-
-
