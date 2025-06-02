@@ -488,8 +488,8 @@ export function TaskCard({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
-                        side="left" 
-                        align="start"   
+                        side="right" 
+                        align="end"   
                         onClick={(e) => e.stopPropagation()}
                         className={cn("bg-popover text-popover-foreground w-44", task.backgroundImageUrl && "bg-background/80 backdrop-blur-sm border-white/30 text-white")}
                       >
@@ -790,4 +790,3 @@ export function TaskCard({
     </Card>
   );
 }
-
