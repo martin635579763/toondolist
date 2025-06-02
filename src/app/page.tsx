@@ -16,14 +16,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from '@/components/ui/sidebar';
-// Removed TaskSummarySidebar import
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
@@ -598,202 +590,192 @@ function HomePageContent() {
   }
 
   return (
-    <SidebarProvider>
-      <Sidebar side="left" variant="sidebar" collapsible="icon">
-        {/* TaskSummarySidebar removed from here */}
-        <SidebarContent>
-          {/* You can add other sidebar content here if needed in the future */}
-        </SidebarContent>
-      </Sidebar>
-      <SidebarInset>
-        <TooltipProvider>
-          <div className="flex flex-col min-h-screen">
-            <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-              <div className="container flex h-16 items-center justify-between">
-                <div className="flex items-center">
-                  <SidebarTrigger className="mr-3" /> 
-                  <h1 className="text-3xl sm:text-4xl font-bold text-primary" style={{ fontFamily: 'var(--font-aldrich), cursive' }}>
-                    ToonDo List
-                  </h1>
-                </div>
-                <div className="flex items-center space-x-3">
-                  {currentUser ? (
-                    <>
-                       <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Avatar className="h-9 w-9 border-2 border-primary/50">
-                               <AvatarImage src={currentUser.avatarUrl} alt={currentUser.displayName} data-ai-hint="user portrait"/>
-                               <AvatarFallback className="bg-primary/20 text-primary">
-                                   {currentUser.displayName?.charAt(0).toUpperCase()}
-                               </AvatarFallback>
-                            </Avatar>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                             <p className="text-xs">Logged in as {currentUser.displayName}</p>
-                          </TooltipContent>
-                       </Tooltip>
-                       <Button variant="ghost" size="sm" asChild>
-                         <Link href="/profile">
-                           <UserCircleIcon className="mr-2 h-4 w-4" /> Profile
-                         </Link>
-                       </Button>
-                      <Button variant="ghost" onClick={logout} size="sm">
-                        <LogOutIcon className="mr-2 h-4 w-4" /> Logout
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href="/login"><LogInIcon className="mr-2 h-4 w-4" />Login</Link>
-                      </Button>
-                      <Button variant="default" size="sm" asChild>
-                        <Link href="/register"><UserPlusIcon className="mr-2 h-4 w-4" />Register</Link>
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </header>
-
-            <main className="flex-grow container mx-auto px-4 py-8">
-              {!currentUser ? (
-                <div className="text-center py-16 bg-card shadow-xl rounded-xl border border-border">
-                  <UserPlusIcon className="mx-auto h-24 w-24 text-primary opacity-70 mb-6" />
-                  <h2 className="text-4xl font-semibold mb-3 text-primary">Welcome, Quest Seeker!</h2>
-                  <p className="text-muted-foreground text-lg mb-6">
-                    Your adventure awaits, but first, you must identify yourself.
-                  </p>
-                  <div className="flex justify-center space-x-4">
-                     <Button size="lg" asChild>
-                        <Link href="/login"><LogInIcon className="mr-2 h-5 w-5" />Log In to Your Guild</Link>
-                      </Button>
-                      <Button variant="outline" size="lg" asChild>
-                        <Link href="/register"><UserPlusIcon className="mr-2 h-5 w-5" />Forge a New Legend</Link>
-                      </Button>
-                  </div>
-                </div>
+    <TooltipProvider>
+      <div className="flex flex-col min-h-screen">
+        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+          <div className="container flex h-16 items-center justify-between">
+            <div className="flex items-center">
+              <h1 className="text-3xl sm:text-4xl font-bold text-primary" style={{ fontFamily: 'var(--font-aldrich), cursive' }}>
+                ToonDo List
+              </h1>
+            </div>
+            <div className="flex items-center space-x-3">
+              {currentUser ? (
+                <>
+                   <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Avatar className="h-9 w-9 border-2 border-primary/50">
+                           <AvatarImage src={currentUser.avatarUrl} alt={currentUser.displayName} data-ai-hint="user portrait"/>
+                           <AvatarFallback className="bg-primary/20 text-primary">
+                               {currentUser.displayName?.charAt(0).toUpperCase()}
+                           </AvatarFallback>
+                        </Avatar>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                         <p className="text-xs">Logged in as {currentUser.displayName}</p>
+                      </TooltipContent>
+                   </Tooltip>
+                   <Button variant="ghost" size="sm" asChild>
+                     <Link href="/profile">
+                       <UserCircleIcon className="mr-2 h-4 w-4" /> Profile
+                     </Link>
+                   </Button>
+                  <Button variant="ghost" onClick={logout} size="sm">
+                    <LogOutIcon className="mr-2 h-4 w-4" /> Logout
+                  </Button>
+                </>
               ) : (
                 <>
-                  <CreateTaskForm onAddTask={handleAddTask} />
-
-                  <Card className="p-6 bg-card shadow-xl rounded-xl mb-8 border border-border">
-                    <CardHeader className="p-0 pb-4">
-                      <CardTitle className="text-xl flex items-center">
-                        <CaseSensitiveIcon className="mr-2 h-6 w-6 text-primary" />
-                        Create Tasks from Markdown
-                      </CardTitle>
-                      <CardDescription>
-                        Paste your structured markdown below. The parser will try to create main tasks and sub-tasks.
-                        Example: "# Main Task Title\\n- Subtask 1\\n- Subtask 2\\n## Another Main Task"
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0 space-y-3">
-                      <Textarea
-                        placeholder="Paste your markdown here..."
-                        value={markdownInput}
-                        onChange={(e) => setMarkdownInput(e.target.value)}
-                        rows={6}
-                        className="text-sm"
-                        disabled={isParsingMarkdown}
-                      />
-                      <Button
-                        onClick={handleParseAndAddTasks}
-                        disabled={isParsingMarkdown || !markdownInput.trim()}
-                        className="w-full"
-                      >
-                        {isParsingMarkdown ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <CaseSensitiveIcon className="mr-2 h-4 w-4" />
-                        )}
-                        Create from Markdown
-                      </Button>
-                    </CardContent>
-                  </Card>
-                  
-                  {taskGroups.length === 0 && !isLoadingTasks && !markdownInput ? (
-                     <div className="text-center py-16">
-                      <FileTextIcon className="mx-auto h-24 w-24 text-muted-foreground opacity-50 mb-4" />
-                      <h2 className="text-3xl font-semibold mb-2">No ToonDos Yet, {currentUser.displayName}!</h2>
-                      <p className="text-muted-foreground text-lg">Time to add some epic quests to your list.</p>
-                    </div>
-                  ) : (
-                    <div
-                      className={cn(
-                        'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8 items-start'
-                      )}
-                    >
-                      {taskGroups.map(({ mainTask, subTasks, mainTaskHasIncompleteSubtasks: groupHasIncompleteSubtasks }) => (
-                        <div
-                          key={mainTask.id}
-                          className="flex flex-col gap-2" 
-                          draggable={currentUser && mainTask.userId === currentUser.id} 
-                          onDragStart={(e) => { e.stopPropagation(); handleDragStart(mainTask.id);}}
-                          onDragEnter={(e) => { e.stopPropagation(); handleDragEnter(mainTask.id);}}
-                          onDragLeave={(e) => { e.stopPropagation(); handleDragLeave();}}
-                          onDrop={(e) => { e.stopPropagation(); handleDrop(mainTask.id);}}
-                          onDragOver={(e) => { e.stopPropagation(); handleDragOver(e);}} 
-                          onDragEnd={(e) => { e.stopPropagation(); handleDragEnd();}}
-                        >
-                          <TaskCard
-                            task={mainTask}
-                            allTasks={tasks} 
-                            currentUser={currentUser}
-                            onToggleComplete={handleToggleComplete}
-                            onDelete={handleDeleteTask} 
-                            onPrint={handleInitiatePrint}
-                            onEdit={handleOpenEditDialog}
-                            onApplyForRole={handleApplyForRole}
-                            isDraggingSelf={draggedItemId === mainTask.id}
-                            isDragOverSelf={dragOverItemId === mainTask.id && draggedItemId !== mainTask.id}
-                            isMainTaskWithIncompleteSubtasks={groupHasIncompleteSubtasks}
-                          />
-                          {subTasks.map(subTask => (
-                            <TaskCard
-                              key={subTask.id}
-                              task={subTask}
-                              allTasks={tasks}
-                              currentUser={currentUser}
-                              onToggleComplete={handleToggleComplete}
-                              onDelete={handleDeleteTask} 
-                              onPrint={handleInitiatePrint}
-                              onEdit={handleOpenEditDialog}
-                              onApplyForRole={handleApplyForRole} 
-                              isDraggingSelf={false} 
-                              isDragOverSelf={false}
-                              isMainTaskWithIncompleteSubtasks={false} 
-                            />
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/login"><LogInIcon className="mr-2 h-4 w-4" />Login</Link>
+                  </Button>
+                  <Button variant="default" size="sm" asChild>
+                    <Link href="/register"><UserPlusIcon className="mr-2 h-4 w-4" />Register</Link>
+                  </Button>
                 </>
               )}
-            </main> 
-            
-            <div id="printable-area" ref={printableAreaRef} className="hidden print:block">
-              {taskToPrint && <PrintableTaskCard task={taskToPrint} />}
             </div>
-
-            {editingTask && (
-              <EditTaskDialog
-                isOpen={isEditDialogOpen}
-                onClose={handleCloseEditDialog}
-                taskToEdit={editingTask}
-                onSaveTask={handleUpdateTask}
-              />
-            )}
-
-            <footer className="text-center py-8 border-t border-border mt-auto">
-              <p className="text-muted-foreground">
-                &copy; {new Date().getFullYear()} ToonDo List. Make your tasks fun!
-              </p>
-            </footer>
           </div>
-        </TooltipProvider>
-      </SidebarInset>
-    </SidebarProvider>
+        </header>
+
+        <main className="flex-grow container mx-auto px-4 py-8">
+          {!currentUser ? (
+            <div className="text-center py-16 bg-card shadow-xl rounded-xl border border-border">
+              <UserPlusIcon className="mx-auto h-24 w-24 text-primary opacity-70 mb-6" />
+              <h2 className="text-4xl font-semibold mb-3 text-primary">Welcome, Quest Seeker!</h2>
+              <p className="text-muted-foreground text-lg mb-6">
+                Your adventure awaits, but first, you must identify yourself.
+              </p>
+              <div className="flex justify-center space-x-4">
+                 <Button size="lg" asChild>
+                    <Link href="/login"><LogInIcon className="mr-2 h-5 w-5" />Log In to Your Guild</Link>
+                  </Button>
+                  <Button variant="outline" size="lg" asChild>
+                    <Link href="/register"><UserPlusIcon className="mr-2 h-5 w-5" />Forge a New Legend</Link>
+                  </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <CreateTaskForm onAddTask={handleAddTask} />
+
+              <Card className="p-6 bg-card shadow-xl rounded-xl mb-8 border border-border">
+                <CardHeader className="p-0 pb-4">
+                  <CardTitle className="text-xl flex items-center">
+                    <CaseSensitiveIcon className="mr-2 h-6 w-6 text-primary" />
+                    Create Tasks from Markdown
+                  </CardTitle>
+                  <CardDescription>
+                    Paste your structured markdown below. The parser will try to create main tasks and sub-tasks.
+                    Example: "# Main Task Title\\n- Subtask 1\\n- Subtask 2\\n## Another Main Task"
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0 space-y-3">
+                  <Textarea
+                    placeholder="Paste your markdown here..."
+                    value={markdownInput}
+                    onChange={(e) => setMarkdownInput(e.target.value)}
+                    rows={6}
+                    className="text-sm"
+                    disabled={isParsingMarkdown}
+                  />
+                  <Button
+                    onClick={handleParseAndAddTasks}
+                    disabled={isParsingMarkdown || !markdownInput.trim()}
+                    className="w-full"
+                  >
+                    {isParsingMarkdown ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CaseSensitiveIcon className="mr-2 h-4 w-4" />
+                    )}
+                    Create from Markdown
+                  </Button>
+                </CardContent>
+              </Card>
+              
+              {taskGroups.length === 0 && !isLoadingTasks && !markdownInput ? (
+                 <div className="text-center py-16">
+                  <FileTextIcon className="mx-auto h-24 w-24 text-muted-foreground opacity-50 mb-4" />
+                  <h2 className="text-3xl font-semibold mb-2">No ToonDos Yet, {currentUser.displayName}!</h2>
+                  <p className="text-muted-foreground text-lg">Time to add some epic quests to your list.</p>
+                </div>
+              ) : (
+                <div
+                  className={cn(
+                    'flex overflow-x-auto space-x-6 py-4 items-start' // Trello-like horizontal scroll
+                  )}
+                >
+                  {taskGroups.map(({ mainTask, subTasks, mainTaskHasIncompleteSubtasks: groupHasIncompleteSubtasks }) => (
+                    <div
+                      key={mainTask.id}
+                      className={cn(
+                        "flex-shrink-0 w-80 space-y-4 rounded-lg", // Column style
+                        currentUser && mainTask.userId === currentUser.id && "cursor-grab",
+                        draggedItemId === mainTask.id && "opacity-50 ring-2 ring-primary ring-offset-2",
+                        dragOverItemId === mainTask.id && draggedItemId !== mainTask.id && "ring-2 ring-accent ring-offset-1 scale-102 shadow-xl z-10"
+                      )}
+                      draggable={currentUser && mainTask.userId === currentUser.id} 
+                      onDragStart={(e) => { e.stopPropagation(); handleDragStart(mainTask.id);}}
+                      onDragEnter={(e) => { e.stopPropagation(); handleDragEnter(mainTask.id);}}
+                      onDragLeave={(e) => { e.stopPropagation(); handleDragLeave();}}
+                      onDrop={(e) => { e.stopPropagation(); handleDrop(mainTask.id);}}
+                      onDragOver={(e) => { e.stopPropagation(); handleDragOver(e);}} 
+                      onDragEnd={(e) => { e.stopPropagation(); handleDragEnd();}}
+                    >
+                      <TaskCard
+                        task={mainTask}
+                        allTasks={tasks} 
+                        currentUser={currentUser}
+                        onToggleComplete={handleToggleComplete}
+                        onDelete={handleDeleteTask} 
+                        onPrint={handleInitiatePrint}
+                        onEdit={handleOpenEditDialog}
+                        onApplyForRole={handleApplyForRole}
+                        isMainTaskWithIncompleteSubtasks={groupHasIncompleteSubtasks}
+                      />
+                      {subTasks.map(subTask => (
+                        <TaskCard
+                          key={subTask.id}
+                          task={subTask}
+                          allTasks={tasks}
+                          currentUser={currentUser}
+                          onToggleComplete={handleToggleComplete}
+                          onDelete={handleDeleteTask} 
+                          onPrint={handleInitiatePrint}
+                          onEdit={handleOpenEditDialog}
+                          onApplyForRole={handleApplyForRole} 
+                          isMainTaskWithIncompleteSubtasks={false} 
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </main> 
+        
+        <div id="printable-area" ref={printableAreaRef} className="hidden print:block">
+          {taskToPrint && <PrintableTaskCard task={taskToPrint} />}
+        </div>
+
+        {editingTask && (
+          <EditTaskDialog
+            isOpen={isEditDialogOpen}
+            onClose={handleCloseEditDialog}
+            taskToEdit={editingTask}
+            onSaveTask={handleUpdateTask}
+          />
+        )}
+
+        <footer className="text-center py-8 border-t border-border mt-auto">
+          <p className="text-muted-foreground">
+            &copy; {new Date().getFullYear()} ToonDo List. Make your tasks fun!
+          </p>
+        </footer>
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -803,3 +785,4 @@ export default function HomePage() {
       <HomePageContent />
   );
 }
+
