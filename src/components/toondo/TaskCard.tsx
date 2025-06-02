@@ -35,8 +35,9 @@ const LABEL_COLORS = [
   "bg-blue-500",
   "bg-purple-500",
   "bg-pink-500",
-  "bg-orange-500", // Added orange
+  "bg-orange-500",
 ];
+const MAX_LABELS = 6;
 
 interface TaskCardProps {
   task: Task;
@@ -51,7 +52,7 @@ interface TaskCardProps {
   onSetChecklistItemDueDate: (taskId: string, itemId: string, date: Date | null) => void;
   onAssignUserToChecklistItem: (taskId: string, itemId: string, userId: string | null, userName: string | null, userAvatarUrl: string | null) => void;
   onSetChecklistItemImage: (taskId: string, itemId: string, imageUrl: string | null, imageAiHint: string | null) => void;
-  onSetChecklistItemLabel: (taskId: string, itemId: string, newLabel: string | null) => void;
+  onSetChecklistItemLabel: (taskId: string, itemId: string, newLabels: string[] | null) => void;
   onApplyForRole: (taskId: string, roleName: string) => void;
   onUpdateTaskTitle: (taskId: string, newTitle: string) => void;
   onSetDueDate: (taskId: string, date: Date | null) => void;
@@ -88,8 +89,8 @@ export function TaskCard({
   const [dialogTempAssignedUserName, setDialogTempAssignedUserName] = useState<string | null>(null);
   const [dialogTempAssignedUserAvatarUrl, setDialogTempAssignedUserAvatarUrl] = useState<string | null>(null);
   const [dialogTempImageUrl, setDialogTempImageUrl] = useState<string>("");
-  const [dialogTempLabel, setDialogTempLabel] = useState<string>("");
-  
+  const [dialogTempLabel, setDialogTempLabel] = useState<string[]>([]);
+
   // State for sub-dialogs/popovers within the main edit dialog
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
   const attachmentDialogFileInpuRef = useRef<HTMLInputElement>(null);
@@ -104,7 +105,7 @@ export function TaskCard({
       setNewChecklistItemTitle("");
     }
   };
-  
+
   const handleOpenItemEditDialog = (item: ChecklistItem) => {
     if (!isOwner) return;
     setEditingItemAllDetails(item);
@@ -116,7 +117,7 @@ export function TaskCard({
     setDialogTempAssignedUserName(item.assignedUserName || null);
     setDialogTempAssignedUserAvatarUrl(item.assignedUserAvatarUrl || null);
     setDialogTempImageUrl(item.imageUrl || "");
-    setDialogTempLabel(item.label || "");
+    setDialogTempLabel(Array.isArray(item.label) ? item.label : (item.label ? [item.label] : []));
   };
 
   const handleCloseItemEditDialog = () => {
@@ -130,7 +131,7 @@ export function TaskCard({
     setDialogTempAssignedUserName(null);
     setDialogTempAssignedUserAvatarUrl(null);
     setDialogTempImageUrl("");
-    setDialogTempLabel("");
+    setDialogTempLabel([]);
     // Close any open popovers
     setIsUserPopoverOpen(false);
     setIsDueDatePopoverOpen(false);
@@ -148,8 +149,8 @@ export function TaskCard({
     const trimmedTitle = dialogTempTitle.trim();
     if (!trimmedTitle) {
         toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
-        setDialogTempTitle(editingItemAllDetails.title); 
-        return; 
+        setDialogTempTitle(editingItemAllDetails.title);
+        return;
     }
     if (trimmedTitle !== editingItemAllDetails.title) {
       onUpdateChecklistItemTitle(task.id, editingItemAllDetails.id, trimmedTitle);
@@ -162,7 +163,7 @@ export function TaskCard({
     if ((dialogTempDueDate ? dialogTempDueDate.toISOString().split('T')[0] : null) !== (editingItemAllDetails.dueDate ? new Date(editingItemAllDetails.dueDate).toISOString().split('T')[0] : null)) {
       onSetChecklistItemDueDate(task.id, editingItemAllDetails.id, dialogTempDueDate || null);
     }
-    
+
     if (dialogTempAssignedUserId !== editingItemAllDetails.assignedUserId) {
       onAssignUserToChecklistItem(task.id, editingItemAllDetails.id, dialogTempAssignedUserId, dialogTempAssignedUserName, dialogTempAssignedUserAvatarUrl);
     }
@@ -175,11 +176,16 @@ export function TaskCard({
     if (finalImageUrl !== editingItemAllDetails.imageUrl) {
         onSetChecklistItemImage(task.id, editingItemAllDetails.id, finalImageUrl, finalImageAiHint);
     }
-    
-    if (dialogTempLabel.trim() !== (editingItemAllDetails.label || "").trim()){
-        onSetChecklistItemLabel(task.id, editingItemAllDetails.id, dialogTempLabel.trim() || null);
+
+    // Compare arrays for labels
+    const currentLabels = editingItemAllDetails.label || [];
+    const newLabels = dialogTempLabel;
+    const labelsChanged = currentLabels.length !== newLabels.length || !currentLabels.every(label => newLabels.includes(label));
+
+    if (labelsChanged) {
+        onSetChecklistItemLabel(task.id, editingItemAllDetails.id, newLabels.length > 0 ? newLabels : null);
     }
-    
+
     handleCloseItemEditDialog();
     toast({ title: "Item Updated", description: "Checklist item details saved." });
   };
@@ -204,7 +210,7 @@ export function TaskCard({
   const handleSaveAttachmentFromSubDialog = () => {
     setIsAttachmentDialogOpen(false);
   };
-  
+
   const handleAttachmentFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -247,12 +253,19 @@ export function TaskCard({
   };
 
   // Label Popover specific logic (within main dialog)
-  const handleSelectLabelColor = (colorClass: string) => {
-    setDialogTempLabel(colorClass);
-    setIsLabelPopoverOpen(false); 
+  const handleToggleLabelColor = (colorClass: string) => {
+    setDialogTempLabel(prev => {
+        if (prev.includes(colorClass)) {
+            return prev.filter(c => c !== colorClass);
+        } else if (prev.length < MAX_LABELS) {
+            return [...prev, colorClass];
+        }
+        toast({title: "Label Limit Reached", description: `You can select up to ${MAX_LABELS} labels.`, variant: "default"});
+        return prev;
+    });
   };
-  const handleClearLabel = () => {
-    setDialogTempLabel("");
+  const handleClearAllLabels = () => {
+    setDialogTempLabel([]);
     setIsLabelPopoverOpen(false);
   }
 
@@ -264,8 +277,8 @@ export function TaskCard({
     cardStyle.backgroundImage = `url(${task.backgroundImageUrl})`;
     cardStyle.backgroundSize = 'cover';
     cardStyle.backgroundPosition = 'center';
-    contentOverlayStyle.backgroundColor = 'rgba(0, 0, 0, 0.5)'; 
-    contentOverlayStyle.color = 'white'; 
+    contentOverlayStyle.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    contentOverlayStyle.color = 'white';
   }
 
 
@@ -274,7 +287,7 @@ export function TaskCard({
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative border-border",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        !task.backgroundImageUrl && "bg-card text-card-foreground" 
+        !task.backgroundImageUrl && "bg-card text-card-foreground"
       )}
       style={cardStyle}
     >
@@ -290,11 +303,11 @@ export function TaskCard({
                 initialValue={task.title}
                 onSave={(newTitle) => onUpdateTaskTitle(task.id, newTitle)}
                 isEditable={isOwner}
-                textElement="div" 
-                containerClassName={cn("text-xl font-bold")} 
+                textElement="div"
+                containerClassName={cn("text-xl font-bold")}
                 textClassName={cn(task.backgroundImageUrl ? "text-white" : "text-card-foreground")}
                 inputClassName={cn(
-                    "text-xl font-bold", 
+                    "text-xl font-bold",
                     task.backgroundImageUrl ? "bg-transparent text-white placeholder-gray-300" : "bg-transparent"
                 )}
                 editIconClassName={cn(task.backgroundImageUrl ? "text-gray-300" : "text-muted-foreground")}
@@ -335,11 +348,11 @@ export function TaskCard({
                   task.backgroundImageUrl ? "border-white/30 bg-white/10 text-gray-100" : "border-border/60 bg-card text-card-foreground",
                 )}
               >
-                {item.label && (
-                    <div className={cn("h-1.5 w-full", item.label)} />
+                {item.label && item.label.length > 0 && (
+                    <div className={cn("h-1.5 w-full", item.label[0])} />
                 )}
-                <div 
-                  className={cn("p-1.5",isOwner && "cursor-pointer hover:bg-opacity-20", !item.label && "pt-1.5" )} 
+                <div
+                  className={cn("p-1.5",isOwner && "cursor-pointer hover:bg-opacity-20", (!item.label || item.label.length === 0) && "pt-1.5" )}
                   onClick={(e) => {
                     if (!isOwner) return;
                     const target = e.target as HTMLElement;
@@ -361,11 +374,11 @@ export function TaskCard({
                             task.backgroundImageUrl ? "border-gray-300 data-[state=checked]:text-gray-800" : "border-muted-foreground data-[state=checked]:text-primary-foreground",
                             !isOwner && "opacity-50 cursor-not-allowed"
                         )}
-                        onClick={(e) => e.stopPropagation()} 
+                        onClick={(e) => e.stopPropagation()}
                         aria-label={`Toggle completion for ${item.title}`}
                         />
                         <label
-                        htmlFor={`checklist-${task.id}-${item.id}`} 
+                        htmlFor={`checklist-${task.id}-${item.id}`}
                         className={cn(
                             "flex-grow break-all truncate ml-2",
                             item.completed && "line-through opacity-70",
@@ -387,15 +400,15 @@ export function TaskCard({
                     )}
                   </div>
 
-                  {(item.imageUrl || item.description || item.dueDate || item.assignedUserId ) && ( 
-                    <div className={cn("mt-1 pt-1 text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")}> 
+                  {(item.imageUrl || item.description || item.dueDate || item.assignedUserId || (item.label && item.label.length > 0) ) && (
+                    <div className={cn("mt-1 pt-1 text-xs flex flex-wrap gap-x-2 gap-y-1 items-start", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")}>
                         {item.imageUrl && (
                         <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
-                            <Image 
-                                src={item.imageUrl} 
+                            <Image
+                                src={item.imageUrl}
                                 alt={item.title || "Checklist item image"}
-                                fill 
-                                style={{objectFit: "cover"}} 
+                                fill
+                                style={{objectFit: "cover"}}
                                 className="rounded"
                                 data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
                             />
@@ -420,6 +433,13 @@ export function TaskCard({
                             </Avatar>
                             {item.assignedUserName}
                         </div>
+                        )}
+                        {item.label && item.label.length > 0 && (
+                            <div className="flex items-center gap-1">
+                                {item.label.map(labelColor => (
+                                    <span key={labelColor} className={cn("w-3 h-3 rounded-sm", labelColor)} />
+                                ))}
+                            </div>
                         )}
                     </div>
                   )}
@@ -507,10 +527,10 @@ export function TaskCard({
             className={cn("sm:max-w-3xl bg-card text-card-foreground max-h-[90vh] flex flex-col", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
             onClick={(e) => e.stopPropagation()}
           >
-            <DialogHeader className="pb-2 border-b border-border">
-                 <DialogTitle className="sr-only">
+             <DialogHeader className="pb-2 border-b border-border">
+                <DialogTitle className="sr-only">
                     {editingItemAllDetails && dialogTempTitle ? `Edit item: ${dialogTempTitle}` : "Edit Item"}
-                 </DialogTitle>
+                </DialogTitle>
                  <div className="flex items-center space-x-2">
                      <Checkbox
                         id={`dialog-item-completed-${editingItemAllDetails.id}`}
@@ -521,34 +541,31 @@ export function TaskCard({
                      <EditableTitle
                         initialValue={dialogTempTitle}
                         onSave={(newTitle) => setDialogTempTitle(newTitle)}
-                        isEditable={true} 
+                        isEditable={true}
                         textElement='div'
                         textClassName={cn(
                           "text-xl font-semibold py-1",
                           task.backgroundImageUrl && "text-gray-100",
                            dialogTempCompleted && "line-through text-muted-foreground"
-                        )} 
+                        )}
                         inputClassName={cn(
-                          "text-xl font-semibold h-auto p-0", 
+                          "text-xl font-semibold h-auto p-0",
                           task.backgroundImageUrl && "bg-transparent text-white placeholder-gray-300",
                            dialogTempCompleted && "line-through text-muted-foreground"
                         )}
                         placeholder="Item title..."
                         ariaLabel="Item title"
-                        showEditIcon={true} 
-                        containerClassName="flex-grow" 
+                        showEditIcon={true}
+                        containerClassName="flex-grow"
                      />
                   </div>
             </DialogHeader>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 flex-grow overflow-y-auto py-3">
               {/* Left Column */}
               <div className="md:col-span-2 space-y-3">
-                  {dialogTempLabel && (
-                     <div className={cn("h-1.5 w-full rounded-sm mb-2", dialogTempLabel)} />
-                  )}
                   {/* Action Buttons Row */}
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
                         <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
@@ -586,10 +603,10 @@ export function TaskCard({
                             </PopoverContent>
                         </Popover>
 
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             size="sm"
-                            onClick={handleOpenAttachmentDialog} 
+                            onClick={handleOpenAttachmentDialog}
                             className={cn("justify-start text-xs flex-grow sm:flex-grow-0", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
                         >
                             <PaperclipIcon className="mr-1.5 h-3.5 w-3.5" /> Image
@@ -598,37 +615,40 @@ export function TaskCard({
                         <Popover open={isLabelPopoverOpen} onOpenChange={setIsLabelPopoverOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0 items-center", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
-                                    {dialogTempLabel ? (
-                                        <span className={cn("w-3 h-3 rounded-sm mr-1.5", dialogTempLabel)}></span>
-                                    ) : (
-                                        <TagIcon className="mr-1.5 h-3.5 w-3.5" />
-                                    )}
+                                    <TagIcon className="mr-1.5 h-3.5 w-3.5" />
                                     Label
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
-                                <div className="grid grid-cols-3 gap-2">
+                             <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
+                                <div className="grid grid-cols-4 gap-1 mb-2">
                                     {LABEL_COLORS.map(colorClass => (
                                         <button
                                             key={colorClass}
                                             type="button"
-                                            className={cn("w-6 h-6 rounded-md cursor-pointer hover:ring-2 hover:ring-offset-1 ring-ring", colorClass, dialogTempLabel === colorClass && "ring-2 ring-offset-1 ring-ring")}
-                                            onClick={() => handleSelectLabelColor(colorClass)}
-                                            aria-label={`Set label to ${colorClass.split('-')[1]}`}
+                                            className={cn("w-5 h-5 rounded-md cursor-pointer hover:ring-2 hover:ring-offset-1 ring-ring", colorClass, dialogTempLabel.includes(colorClass) && "ring-2 ring-offset-1 ring-ring")}
+                                            onClick={() => handleToggleLabelColor(colorClass)}
+                                            aria-label={`Toggle label ${colorClass.split('-')[1]}`}
                                         />
                                     ))}
                                 </div>
-                                <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="w-full mt-2 text-xs" 
-                                    onClick={handleClearLabel}
-                                    disabled={!dialogTempLabel}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full text-xs"
+                                    onClick={handleClearAllLabels}
+                                    disabled={dialogTempLabel.length === 0}
                                 >
-                                    Clear Label
+                                    Clear All Labels
                                 </Button>
                             </PopoverContent>
                         </Popover>
+                        {dialogTempLabel.length > 0 && (
+                            <div className="flex items-center gap-1 ml-1">
+                                {dialogTempLabel.map(color => (
+                                    <span key={color} className={cn("w-3.5 h-3.5 rounded-sm", color)} />
+                                ))}
+                            </div>
+                        )}
                      </div>
 
 
@@ -671,7 +691,7 @@ export function TaskCard({
       {/* Attachment Management Sub-Dialog */}
       {isOwner && editingItemAllDetails && (
         <Dialog open={isAttachmentDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setIsAttachmentDialogOpen(false); }}>
-            <DialogContent 
+            <DialogContent
                 className={cn("sm:max-w-md bg-card text-card-foreground", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
                 onClick={(e) => e.stopPropagation()}
             >
@@ -681,8 +701,8 @@ export function TaskCard({
                 <div className="space-y-4 py-2">
                     {dialogTempImageUrl ? (
                         <div className="w-full h-40 relative overflow-hidden rounded-md border border-border">
-                            <Image 
-                                src={dialogTempImageUrl} 
+                            <Image
+                                src={dialogTempImageUrl}
                                 alt={"Attachment preview"}
                                 fill
                                 style={{objectFit: "cover"}}
@@ -697,18 +717,18 @@ export function TaskCard({
                     )}
                     <div>
                         <Label htmlFor="dialogAttachmentImageUrl" className={cn("text-xs", task.backgroundImageUrl && "text-gray-200")}>Image URL</Label>
-                        <Input 
-                            id="dialogAttachmentImageUrl" 
-                            value={dialogTempImageUrl} 
-                            onChange={(e) => setDialogTempImageUrl(e.target.value)} 
-                            placeholder="https://example.com/image.png" 
+                        <Input
+                            id="dialogAttachmentImageUrl"
+                            value={dialogTempImageUrl}
+                            onChange={(e) => setDialogTempImageUrl(e.target.value)}
+                            placeholder="https://example.com/image.png"
                             className={cn("text-sm h-9", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
                         />
                     </div>
                     <div>
                         <Label htmlFor="dialogAttachmentImageFile" className={cn("text-xs", task.backgroundImageUrl && "text-gray-200")}>Or Upload Image (Max 2MB)</Label>
-                        <Input 
-                            id="dialogAttachmentImageFile" 
+                        <Input
+                            id="dialogAttachmentImageFile"
                             type="file"
                             accept="image/*"
                             ref={attachmentDialogFileInpuRef}
@@ -716,11 +736,11 @@ export function TaskCard({
                             className={cn("text-xs p-1 h-auto file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-input file:bg-transparent file:text-xs file:font-medium file:text-foreground", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 file:text-gray-200 file:border-white/30 hover:file:bg-white/5")}
                         />
                     </div>
-                    {(dialogTempImageUrl) && 
-                        <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={handleRemoveAttachmentInSubDialog} 
+                    {(dialogTempImageUrl) &&
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleRemoveAttachmentInSubDialog}
                             className={cn("w-full mt-2 text-xs h-auto py-1.5", task.backgroundImageUrl ? "bg-red-500/20 border-red-500/50 hover:bg-red-500/30 text-red-300" : "border-destructive text-destructive hover:bg-destructive/5")}
                         >
                             <TrashIcon className="mr-2 h-3.5 w-3.5"/>Remove Current Image
@@ -731,8 +751,8 @@ export function TaskCard({
                     <DialogClose asChild>
                          <Button variant="ghost" onClick={() => { setIsAttachmentDialogOpen(false); }} className={cn(task.backgroundImageUrl && "text-gray-300 hover:bg-white/10")}>Cancel</Button>
                     </DialogClose>
-                    <Button 
-                        onClick={handleSaveAttachmentFromSubDialog} 
+                    <Button
+                        onClick={handleSaveAttachmentFromSubDialog}
                         className={cn(task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}
                     >
                         Done
@@ -745,7 +765,3 @@ export function TaskCard({
     </Card>
   );
 }
-
-    
-
-    

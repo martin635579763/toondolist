@@ -96,7 +96,7 @@ function HomePageContent() {
         imageUrl: item.imageUrl || null,
         imageAiHint: item.imageAiHint || null,
         comments: item.comments || [],
-        label: item.label || null, // Initialize new label field
+        label: Array.isArray(item.label) ? item.label : (item.label ? [item.label] : []), // Ensure label is an array
       })),
       order: task.order ?? index,
       userId: task.userId || 'unknown_user',
@@ -183,7 +183,7 @@ function HomePageContent() {
           const newItem: ChecklistItem = {
             id: generateId(),
             title: itemTitle.trim(),
-            description: "", 
+            description: "",
             completed: false,
             dueDate: null,
             assignedUserId: null,
@@ -191,14 +191,14 @@ function HomePageContent() {
             assignedUserAvatarUrl: null,
             imageUrl: null,
             imageAiHint: null,
-            comments: [], 
-            label: null,
+            comments: [],
+            label: [], // Initialize as empty array
           };
           const updatedChecklistItems = [...(task.checklistItems || []), newItem];
           return {
             ...task,
             checklistItems: updatedChecklistItems,
-            completed: false, 
+            completed: false,
           };
         }
         return task;
@@ -248,7 +248,7 @@ function HomePageContent() {
           if (updatedChecklistItems.length > 0 && updatedChecklistItems.every(item => item.completed)) {
             newCompletedStatus = true;
           } else if (updatedChecklistItems.length === 0) {
-            newCompletedStatus = task.completed; 
+            newCompletedStatus = task.completed;
           }
 
 
@@ -335,7 +335,7 @@ function HomePageContent() {
     if (!currentUser) return;
      setTasks(prevTasks =>
       prevTasks.map(task => {
-        if (task.id === taskId && task.userId === currentUser.id) { 
+        if (task.id === taskId && task.userId === currentUser.id) {
           const updatedChecklistItems = (task.checklistItems || []).map(item =>
             item.id === itemId ? { ...item, assignedUserId: userId, assignedUserName: userName, assignedUserAvatarUrl: userAvatarUrl } : item
           );
@@ -362,20 +362,20 @@ function HomePageContent() {
     );
   };
 
-  const handleSetChecklistItemLabel = (taskId: string, itemId: string, newLabel: string | null) => {
+  const handleSetChecklistItemLabel = (taskId: string, itemId: string, newLabels: string[] | null) => {
     if (!currentUser) return;
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId && task.userId === currentUser.id) {
           const updatedChecklistItems = (task.checklistItems || []).map(item =>
-            item.id === itemId ? { ...item, label: newLabel } : item
+            item.id === itemId ? { ...item, label: newLabels || [] } : item
           );
           return { ...task, checklistItems: updatedChecklistItems };
         }
         return task;
       })
     );
-    toast({ title: "Item Label Updated!", description: newLabel ? `Label set to "${newLabel}".` : "Label removed." });
+    toast({ title: "Item Labels Updated!", description: newLabels && newLabels.length > 0 ? `Labels updated.` : "Labels cleared." });
   };
 
 
@@ -729,7 +729,7 @@ function HomePageContent() {
                         onSetChecklistItemDueDate={handleSetChecklistItemDueDate}
                         onAssignUserToChecklistItem={handleAssignUserToChecklistItem}
                         onSetChecklistItemImage={handleSetChecklistItemImage}
-                        onSetChecklistItemLabel={handleSetChecklistItemLabel} // Pass new handler
+                        onSetChecklistItemLabel={handleSetChecklistItemLabel}
                         onApplyForRole={handleApplyForRole}
                         onUpdateTaskTitle={handleUpdateTaskTitle}
                         onSetDueDate={handleSetTaskDueDate}
@@ -766,7 +766,7 @@ function defaultTasksAddedForUser(userId: string, allTasks?: Task[]): boolean {
     const defaultTitles = ["Later", "This Week", "Today"].sort();
     return JSON.stringify(titles) === JSON.stringify(defaultTitles);
   }
-  return userTasks.length > 0 && userTasks.length < 3; 
+  return userTasks.length > 0 && userTasks.length < 3;
 }
 
 
@@ -775,3 +775,4 @@ export default function HomePage() {
       <HomePageContent />
   );
 }
+
