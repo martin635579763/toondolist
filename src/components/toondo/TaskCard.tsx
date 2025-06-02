@@ -527,27 +527,16 @@ export function TaskCard({
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 flex-grow overflow-y-auto py-3">
               {/* Left Column */}
-              <div className="md:col-span-2 space-y-4">
-                  <div>
-                    <Label htmlFor="dialogItemDescription" className={cn(task.backgroundImageUrl && "text-gray-200")}>Description</Label>
-                    <Textarea
-                      id="dialogItemDescription"
-                      value={dialogTempDescription}
-                      onChange={(e) => setDialogTempDescription(e.target.value)}
-                      placeholder="Add more details about this item..."
-                      className={cn("min-h-[100px]",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                      rows={4}
-                    />
-                  </div>
-                  <div className="space-y-2 pt-2">
-                     <Label className={cn(task.backgroundImageUrl && "text-gray-200")}>Details</Label>
-                     <div className="grid grid-cols-2 gap-2">
+              <div className="md:col-span-2 space-y-3">
+
+                  {/* Action Buttons Row */}
+                  <div className="flex flex-wrap items-center gap-2 my-3">
                         {/* Assign User Button & Popover */}
                         <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" className={cn("w-full justify-start text-sm", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
-                                    <UserCircleIcon className="mr-2 h-4 w-4" />
-                                    {dialogTempAssignedUserName || "Assign User"}
+                                <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                                    <UserCircleIcon className="mr-1.5 h-3.5 w-3.5" />
+                                    {dialogTempAssignedUserName || "Assign"}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
@@ -560,11 +549,11 @@ export function TaskCard({
                         {/* Due Date Button & Popover */}
                         <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" className={cn("w-full justify-start text-sm", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
-                                    <CalendarDaysIcon className="mr-2 h-4 w-4" />
-                                    {dialogTempDueDate ? format(dialogTempDueDate, "MMM d, yyyy") : "Set Due Date"}
+                                <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                                    <CalendarDaysIcon className="mr-1.5 h-3.5 w-3.5" />
+                                    {dialogTempDueDate ? format(dialogTempDueDate, "MMM d") : "Due Date"}
                                     {dialogTempCompleted && dialogTempDueDate && (
-                                        <Badge variant="secondary" className={cn("ml-auto text-xs px-1.5 py-0.5", task.backgroundImageUrl ? "bg-green-300/30 text-green-100 border-green-300/50" : "bg-green-100 text-green-700")}>
+                                        <Badge variant="secondary" className={cn("ml-1.5 text-xs px-1 py-0", task.backgroundImageUrl ? "bg-green-300/30 text-green-100 border-green-300/50" : "bg-green-100 text-green-700")}>
                                            <CheckCircle2 className="mr-1 h-3 w-3"/> Done
                                         </Badge>
                                     )}
@@ -584,18 +573,19 @@ export function TaskCard({
                         {/* Manage Attachment Button */}
                         <Button 
                             variant="outline" 
+                            size="sm"
                             onClick={handleOpenAttachmentDialog} 
-                            className={cn("w-full justify-start text-sm", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
+                            className={cn("justify-start text-xs flex-grow sm:flex-grow-0", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
                         >
-                            <PaperclipIcon className="mr-2 h-4 w-4" /> Manage Attachment
+                            <PaperclipIcon className="mr-1.5 h-3.5 w-3.5" /> Image
                         </Button>
 
                         {/* Label Button & Popover */}
                         <Popover open={isLabelPopoverOpen} onOpenChange={setIsLabelPopoverOpen}>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" className={cn("w-full justify-start text-sm", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
-                                    <TagIcon className="mr-2 h-4 w-4" />
-                                    {dialogTempLabel || "Set Label"}
+                                <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                                    <TagIcon className="mr-1.5 h-3.5 w-3.5" />
+                                    {dialogTempLabel || "Label"}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-48 p-2 space-y-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
@@ -612,6 +602,18 @@ export function TaskCard({
                             </PopoverContent>
                         </Popover>
                      </div>
+
+
+                  <div>
+                    <Label htmlFor="dialogItemDescription" className={cn("text-sm", task.backgroundImageUrl && "text-gray-200")}>Description</Label>
+                    <Textarea
+                      id="dialogItemDescription"
+                      value={dialogTempDescription}
+                      onChange={(e) => setDialogTempDescription(e.target.value)}
+                      placeholder="Add more details about this item..."
+                      className={cn("min-h-[100px]",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                      rows={3}
+                    />
                   </div>
               </div>
 
@@ -715,3 +717,6 @@ export function TaskCard({
     </Card>
   );
 }
+
+
+    
