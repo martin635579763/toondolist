@@ -24,7 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Textarea } from "@/components/ui/textarea"; // Import Textarea
+import { Textarea } from "@/components/ui/textarea";
 
 
 interface TaskCardProps {
@@ -45,14 +45,6 @@ interface TaskCardProps {
   onSetDueDate: (taskId: string, date: Date | null) => void;
   onSetBackgroundImage: (taskId: string, imageUrl: string | null) => void;
 }
-
-const suggestedImages = [
-  { src: 'https://placehold.co/600x400.png', alt: 'Mountain Landscape placeholder', aiHint: 'mountain landscape' },
-  { src: 'https://placehold.co/400x600.png', alt: 'Forest Path placeholder', aiHint: 'forest path' },
-  { src: 'https://placehold.co/500x500.png', alt: 'Beach Sunset placeholder', aiHint: 'beach sunset' },
-  { src: 'https://placehold.co/600x300.png', alt: 'Abstract Colors placeholder', aiHint: 'abstract colors' },
-];
-
 
 export function TaskCard({
   task,
@@ -89,7 +81,6 @@ export function TaskCard({
   const [dialogTempAssignedUserName, setDialogTempAssignedUserName] = useState<string | null | undefined>(null);
   const [dialogTempAssignedUserAvatarUrl, setDialogTempAssignedUserAvatarUrl] = useState<string | null | undefined>(null);
   const [dialogTempImageUrl, setDialogTempImageUrl] = useState("");
-  const [dialogTempImageAiHint, setDialogTempImageAiHint] = useState("");
   const [dialogTempComments, setDialogTempComments] = useState<string[]>([]); // For future use
   const dialogFileInpuRef = useRef<HTMLInputElement>(null);
 
@@ -150,7 +141,6 @@ export function TaskCard({
     setDialogTempAssignedUserName(item.assignedUserName);
     setDialogTempAssignedUserAvatarUrl(item.assignedUserAvatarUrl);
     setDialogTempImageUrl(item.imageUrl || "");
-    setDialogTempImageAiHint(item.imageAiHint || "");
     setDialogTempComments(item.comments || []);
     if (dialogFileInpuRef.current) {
         dialogFileInpuRef.current.value = "";
@@ -167,7 +157,6 @@ export function TaskCard({
     setDialogTempAssignedUserName(null);
     setDialogTempAssignedUserAvatarUrl(null);
     setDialogTempImageUrl("");
-    setDialogTempImageAiHint("");
     setDialogTempComments([]);
     if (dialogFileInpuRef.current) {
         dialogFileInpuRef.current.value = "";
@@ -195,14 +184,13 @@ export function TaskCard({
         onAssignUserToChecklistItem(task.id, editingItemAllDetails.id, dialogTempAssignedUserId || null, dialogTempAssignedUserName || null, dialogTempAssignedUserAvatarUrl || null);
     }
 
-    let finalImageUrl = dialogTempImageUrl.trim() || null;
-    let finalImageAiHint = dialogTempImageAiHint.trim() || null;
+    const finalImageUrl = dialogTempImageUrl.trim() || null;
+    let finalImageAiHint: string | null = null;
 
-    if (!finalImageUrl && finalImageAiHint) {
-        finalImageUrl = `https://placehold.co/80x45.png`;
-    } else if (finalImageUrl && !finalImageAiHint) {
-        finalImageAiHint = dialogTempTitle.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
+    if (finalImageUrl) {
+        finalImageAiHint = dialogTempTitle.trim().split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
     }
+
     if (finalImageUrl !== editingItemAllDetails.imageUrl || finalImageAiHint !== editingItemAllDetails.imageAiHint) {
         onSetChecklistItemImage(task.id, editingItemAllDetails.id, finalImageUrl, finalImageAiHint);
     }
@@ -251,10 +239,6 @@ export function TaskCard({
       const reader = new FileReader();
       reader.onloadend = () => {
         setDialogTempImageUrl(reader.result as string);
-        if (!dialogTempImageAiHint.trim()) {
-            const fileNameNoExt = file.name.split('.').slice(0, -1).join('.');
-            setDialogTempImageAiHint(fileNameNoExt.split(/\s+/).slice(0, 2).join(' ').toLowerCase());
-        }
       };
       reader.onerror = () => toast({ title: "Error Reading File", variant: "destructive" });
       reader.readAsDataURL(file);
@@ -263,7 +247,6 @@ export function TaskCard({
 
   const handleDialogRemoveImage = () => {
     setDialogTempImageUrl("");
-    setDialogTempImageAiHint("");
     if (dialogFileInpuRef.current) dialogFileInpuRef.current.value = "";
   };
 
@@ -540,11 +523,11 @@ export function TaskCard({
                   <div className="w-full h-48 relative overflow-hidden rounded-md border border-border">
                     <Image 
                       src={dialogTempImageUrl} 
-                      alt={dialogTempImageAiHint || dialogTempTitle || "Checklist item image"}
+                      alt={dialogTempTitle || "Checklist item image"}
                       layout="fill" 
                       objectFit="cover" 
                       className="rounded-md"
-                      data-ai-hint={dialogTempImageAiHint || dialogTempTitle.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
+                      data-ai-hint={dialogTempTitle.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
                     />
                   </div>
                 ) : (
@@ -593,47 +576,7 @@ export function TaskCard({
                         />
                         <p className={cn("text-xs mt-0.5", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>Max 2MB. Upload generates a Data URI.</p>
                     </div>
-                    <div className="mt-1.5">
-                      <Label htmlFor="dialogItemImageAiHint" className={cn("text-xs",task.backgroundImageUrl && "text-gray-200")}>AI Hint (1-2 words)</Label>
-                      <Input 
-                        id="dialogItemImageAiHint" 
-                        value={dialogTempImageAiHint} 
-                        onChange={(e) => setDialogTempImageAiHint(e.target.value)} 
-                        placeholder="e.g., 'nature forest'" 
-                        className={cn("text-sm h-9",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                      />
-                      <p className={cn("text-xs mt-0.5", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>
-                          If no URL/upload, placeholder used with this hint. If no hint, title words used.
-                        </p>
-                    </div>
-                     <div className="mt-2 pt-2 border-t border-border/50">
-                        <Label className={cn("block mb-1.5 text-xs font-medium", task.backgroundImageUrl ? "text-gray-200" : "text-foreground")}>Or select a suggestion:</Label>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                            {suggestedImages.map((img) => (
-                            <div
-                                key={img.aiHint}
-                                onClick={() => {
-                                setDialogTempImageUrl(img.src);
-                                setDialogTempImageAiHint(img.aiHint);
-                                }}
-                                className="cursor-pointer rounded-md overflow-hidden border-2 border-transparent hover:border-primary transition-all focus:outline-none focus:ring-2 focus:ring-primary"
-                                tabIndex={0}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') {setDialogTempImageUrl(img.src); setDialogTempImageAiHint(img.aiHint);}}}
-                            >
-                                <div className="w-full h-[45px] sm:h-[50px] relative">
-                                <Image
-                                    src={img.src}
-                                    alt={img.alt}
-                                    layout="fill"
-                                    objectFit="cover"
-                                    className="rounded-sm"
-                                    data-ai-hint={img.aiHint}
-                                />
-                                </div>
-                            </div>
-                            ))}
-                        </div>
-                        </div>
+                    
                     { (dialogTempImageUrl || (editingItemAllDetails && editingItemAllDetails.imageUrl)) && 
                         <Button size="sm" variant="outline" onClick={handleDialogRemoveImage} className={cn("w-full mt-2 text-xs h-auto py-1.5", task.backgroundImageUrl && "bg-red-500/20 border-red-500/50 hover:bg-red-500/30 text-red-300")}>
                             <TrashIcon className="mr-2 h-3.5 w-3.5"/>Remove Current Image
@@ -672,7 +615,7 @@ export function TaskCard({
                                 {dialogTempDueDate ? format(dialogTempDueDate, "PPP") : <span>Pick a date</span>}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
+                            <PopoverContent className="w-auto p-0" align="start" side="right">
                                 <Calendar
                                 mode="single"
                                 selected={dialogTempDueDate}
@@ -746,3 +689,4 @@ export function TaskCard({
     </Card>
   );
 }
+
