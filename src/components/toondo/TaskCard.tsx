@@ -450,7 +450,7 @@ export function TaskCard({
                             </Button>
                           </PopoverTrigger>
                           {editingItemDueDateId === item.id && (
-                            <PopoverContent className="w-auto p-0" align="start" side="right" sideOffset={5}>
+                            <PopoverContent className="w-auto p-0" side="right" align="start" sideOffset={5}>
                               <Calendar
                                 mode="single"
                                 selected={selectedItemDate}
@@ -686,3 +686,4 @@ export function TaskCard({
     </Card>
   );
 }
+
