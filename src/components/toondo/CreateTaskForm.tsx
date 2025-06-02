@@ -12,11 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, ListChecks, PlusCircleIcon, XCircleIcon, UsersIcon } from "lucide-react";
+import { CalendarIcon, SparklesIcon, InfoIcon, Loader2, UsersIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn, generateId } from "@/lib/utils";
 import { getRandomColor } from "@/lib/colors";
-import type { Task, TaskBreakdownStep } from "@/types/task";
+import type { Task } from "@/types/task"; // TaskBreakdownStep removed as it's no longer used here
 import { suggestDueDate } from "@/ai/flows/suggest-due-date";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -47,12 +47,9 @@ export function CreateTaskForm({ onAddTask, onTaskCreated }: CreateTaskFormProps
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSuggestingDate, setIsSuggestingDate] = useState(false);
   const [suggestedDateReasoning, setSuggestedDateReasoning] = useState<string | null>(null);
-  
-  const [manualBreakdownSummaryText, setManualBreakdownSummaryText] = useState<string>("");
-  const [manualBreakdownSteps, setManualBreakdownSteps] = useState<TaskBreakdownStep[]>([]);
 
   const { toast } = useToast();
-  
+
   const { register, handleSubmit, setValue, watch, formState: { errors }, reset } = useForm<TaskFormData>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
@@ -88,7 +85,7 @@ export function CreateTaskForm({ onAddTask, onTaskCreated }: CreateTaskFormProps
           title: "Due Date Suggested!",
           description: `AI suggested ${format(parsedDate, "PPP")}. ${result.reasoning ? `Reason: ${result.reasoning.substring(0,50)}...` : ''}`,
         });
-      } else if (result.reasoning) { 
+      } else if (result.reasoning) {
          toast({
           title: "AI Suggestion",
           description: result.reasoning,
@@ -113,35 +110,20 @@ export function CreateTaskForm({ onAddTask, onTaskCreated }: CreateTaskFormProps
     }
   };
 
-  const handleAddBreakdownStep = () => {
-    setManualBreakdownSteps(prev => [...prev, { step: '', details: '', requiredRole: '' }]);
-  };
-
-  const handleRemoveBreakdownStep = (index: number) => {
-    setManualBreakdownSteps(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleBreakdownStepChange = (index: number, field: keyof TaskBreakdownStep, value: string) => {
-    setManualBreakdownSteps(prev => 
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
-    );
-  };
-
   const onSubmit: SubmitHandler<TaskFormData> = (data) => {
     if (!currentUser) {
       toast({ title: "Not Logged In", description: "You must be logged in to create tasks.", variant: "destructive" });
       return;
     }
 
-    const mainTaskId = generateId(); 
-    const rolesArray = data.assignedRoles 
-      ? data.assignedRoles.split(',').map(role => role.trim()).filter(role => role !== "") 
+    const rolesArray = data.assignedRoles
+      ? data.assignedRoles.split(',').map(role => role.trim()).filter(role => role !== "")
       : [];
-    
+
     const currentTime = Date.now();
 
     const mainTask: Task = {
-      id: mainTaskId,
+      id: generateId(),
       title: data.title,
       description: data.description || "",
       completed: false,
@@ -149,44 +131,23 @@ export function CreateTaskForm({ onAddTask, onTaskCreated }: CreateTaskFormProps
       color: getRandomColor(),
       createdAt: currentTime,
       assignedRoles: rolesArray.length > 0 ? rolesArray : undefined,
-      applicants: [], 
-      order: 0, 
+      applicants: [],
+      checklistItems: [], // Initialize with empty checklist
+      order: 0,
       userId: currentUser.id,
       userDisplayName: currentUser.displayName,
       userAvatarUrl: currentUser.avatarUrl,
     };
     onAddTask(mainTask);
 
-    manualBreakdownSteps.forEach((step, index) => {
-      if (step.step.trim() === "") return; 
-
-      const subTask: Task = {
-        id: generateId(),
-        title: step.step,
-        description: `${step.details || ""}${step.requiredRole ? ` (Role: ${step.requiredRole})` : ""}`.trim(),
-        completed: false,
-        dueDate: null, 
-        color: getRandomColor(),
-        createdAt: currentTime + index + 1, 
-        parentId: mainTaskId,
-        applicants: [],
-        userId: currentUser.id, 
-        userDisplayName: currentUser.displayName,
-        userAvatarUrl: currentUser.avatarUrl,
-      };
-      onAddTask(subTask);
-    });
-
-    reset(); 
+    reset();
     setSuggestedDateReasoning(null);
-    setManualBreakdownSummaryText("");
-    setManualBreakdownSteps([]);
     if (onTaskCreated) {
       onTaskCreated();
     }
   };
 
-  if (!currentUser && !onTaskCreated) { // Only show this message if not in a popover context or similar
+  if (!currentUser && !onTaskCreated) {
     return (
       <Card className="p-6 bg-card shadow-xl rounded-xl mb-8 border border-border text-center">
         <CardTitle className="text-xl">Welcome, Adventurer!</CardTitle>
@@ -195,10 +156,8 @@ export function CreateTaskForm({ onAddTask, onTaskCreated }: CreateTaskFormProps
     );
   }
 
-
   return (
     <TooltipProvider>
-    {/* Removed fixed mb-8, styling should be handled by parent if needed */}
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 p-4 md:p-6 bg-popover text-popover-foreground rounded-xl border-border">
       <div className="space-y-2">
         <Label htmlFor="title" className="text-lg font-semibold">Task Title</Label>
@@ -221,7 +180,7 @@ export function CreateTaskForm({ onAddTask, onTaskCreated }: CreateTaskFormProps
         />
         {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2 flex-grow">
           <Label htmlFor="dueDate" className="text-lg font-semibold">Due Date (Optional)</Label>
@@ -246,7 +205,7 @@ export function CreateTaskForm({ onAddTask, onTaskCreated }: CreateTaskFormProps
                   onSelect={(date) => {
                     setValue("dueDate", date || null, { shouldValidate: true });
                     setShowDatePicker(false);
-                    setSuggestedDateReasoning(null); 
+                    setSuggestedDateReasoning(null);
                   }}
                   initialFocus
                 />
@@ -299,83 +258,12 @@ export function CreateTaskForm({ onAddTask, onTaskCreated }: CreateTaskFormProps
         </div>
       </div>
 
-
-      <Card className="border-dashed border-primary/50 bg-background/30">
-        <CardHeader className="pb-3 pt-4">
-          <CardTitle className="text-md flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Task Breakdown to Sub-Tasks</CardTitle>
-          <CardDescription className="text-sm">Optionally, break this main task into smaller sub-tasks. Each step will become its own ToonDo card linked to this one.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 pb-4">
-          <div>
-            <Label htmlFor="breakdownSummary" className="text-sm font-medium">Overall Notes for Breakdown (Optional)</Label>
-            <Textarea
-              id="breakdownSummary"
-              value={manualBreakdownSummaryText}
-              onChange={(e) => setManualBreakdownSummaryText(e.target.value)}
-              placeholder="e.g., This task involves multiple parts like design and coding. These notes are for your reference and won't be part of the main task description."
-              className="text-sm mt-1"
-            />
-          </div>
-
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Sub-Task Steps</Label>
-            {manualBreakdownSteps.map((step, index) => (
-              <div key={index} className="p-3 border rounded-md space-y-2 relative bg-background/50">
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="icon" 
-                  className="absolute top-1 right-1 h-6 w-6 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleRemoveBreakdownStep(index)}
-                  aria-label="Remove step"
-                >
-                  <XCircleIcon className="h-4 w-4" />
-                </Button>
-                <div>
-                  <Label htmlFor={`step-title-${index}`} className="text-xs">Sub-Task Title (Step {index + 1})</Label>
-                  <Input
-                    id={`step-title-${index}`}
-                    value={step.step}
-                    onChange={(e) => handleBreakdownStepChange(index, 'step', e.target.value)}
-                    placeholder="Title for this sub-task (e.g., Design UI)"
-                    className="text-sm mt-0.5"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor={`step-details-${index}`} className="text-xs">Sub-Task Details (Optional)</Label>
-                  <Textarea
-                    id={`step-details-${index}`}
-                    value={step.details || ""}
-                    onChange={(e) => handleBreakdownStepChange(index, 'details', e.target.value)}
-                    placeholder="Further details for this sub-task"
-                    className="text-sm mt-0.5 min-h-[40px]"
-                    rows={2}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor={`step-role-${index}`} className="text-xs">Assigned Role for Sub-Task (Optional)</Label>
-                  <Input
-                    id={`step-role-${index}`}
-                    value={step.requiredRole || ""}
-                    onChange={(e) => handleBreakdownStepChange(index, 'requiredRole', e.target.value)}
-                    placeholder="e.g., Designer, Developer"
-                    className="text-sm mt-0.5"
-                  />
-                </div>
-              </div>
-            ))}
-            <Button type="button" variant="outline" size="sm" onClick={handleAddBreakdownStep} className="mt-2">
-              <PlusCircleIcon className="mr-2 h-4 w-4" /> Add Sub-Task Step
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Removed Task Breakdown Section */}
 
       <Button type="submit" className="w-full text-lg py-3 h-auto">
-        Add ToonDo Task(s)!
+        Add ToonDo Task!
       </Button>
     </form>
     </TooltipProvider>
   );
 }
-

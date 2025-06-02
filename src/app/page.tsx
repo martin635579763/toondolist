@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Task } from '@/types/task';
+import type { Task, ChecklistItem } from '@/types/task'; // Added ChecklistItem
 import { CreateTaskForm } from '@/components/toondo/CreateTaskForm';
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, UserCircleIcon, PlusSquareIcon } from 'lucide-react';
@@ -23,12 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { getRandomColor } from '@/lib/colors';
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
 
-
-interface TaskGroup {
-  mainTask: Task;
-  subTasks: Task[];
-  mainTaskHasIncompleteSubtasks: boolean;
-}
+// Removed TaskGroup interface
 
 function HomePageContent() {
   const { currentUser, logout, isLoading: authIsLoading } = useAuth();
@@ -57,13 +52,14 @@ function HomePageContent() {
         parsedTasks = [];
       }
     }
-    
+
     const tasksWithDefaults = parsedTasks.map((task, index) => ({
       ...task,
       applicants: task.applicants || [],
       assignedRoles: task.assignedRoles || [],
-      order: task.order ?? (task.parentId ? undefined : index), 
-      userId: task.userId || 'unknown_user', 
+      checklistItems: task.checklistItems || [], // Ensure checklistItems has a default
+      order: task.order ?? index, // All tasks are main tasks now
+      userId: task.userId || 'unknown_user',
       userDisplayName: task.userDisplayName || 'Unknown User',
       userAvatarUrl: task.userAvatarUrl || '',
     }));
@@ -73,7 +69,7 @@ function HomePageContent() {
 
 
   useEffect(() => {
-    if (!isLoadingTasks) { 
+    if (!isLoadingTasks) {
       localStorage.setItem('toondo-tasks', JSON.stringify(tasks));
     }
   }, [tasks, isLoadingTasks]);
@@ -85,39 +81,39 @@ function HomePageContent() {
       return;
     }
 
-    const mainTasksForCurrentUser = tasks.filter(t => !t.parentId && t.userId === currentUser.id);
+    const tasksForCurrentUser = tasks.filter(t => t.userId === currentUser.id);
     const taskWithUserAndDefaults: Task = {
       ...newTask,
       id: newTask.id || generateId(),
       createdAt: newTask.createdAt || Date.now(),
       applicants: newTask.applicants || [],
       assignedRoles: newTask.assignedRoles || [],
-      order: newTask.parentId ? undefined : mainTasksForCurrentUser.length,
+      checklistItems: newTask.checklistItems || [], // Ensure checklistItems
+      order: tasksForCurrentUser.length, // Simplified order for new tasks
       userId: currentUser.id,
       userDisplayName: currentUser.displayName,
       userAvatarUrl: currentUser.avatarUrl,
-      color: newTask.color || getRandomColor(), 
+      color: newTask.color || getRandomColor(),
     };
 
-    let newTasksList = [...tasks, taskWithUserAndDefaults];
-    if (newTask.parentId) {
-      const parentTask = newTasksList.find(t => t.id === newTask.parentId);
-      if (parentTask && parentTask.completed && !taskWithUserAndDefaults.completed) {
-        newTasksList = newTasksList.map(t =>
-          t.id === parentTask.id ? { ...t, completed: false } : t
-        );
-      }
-    }
-    setTasks(newTasksList);
+    setTasks(prevTasks => [...prevTasks, taskWithUserAndDefaults]);
 
     toast({
       title: "ToonDo Added!",
-      description: `"${newTask.title}" is ready ${newTask.parentId ? 'as a sub-task!' : 'to be tackled!'}`,
+      description: `"${newTask.title}" is ready to be tackled!`,
     });
   };
 
   const handleTaskCreatedInPopover = () => {
     setIsCreateTaskPopoverOpen(false);
+  };
+
+  const taskHasIncompleteChecklistItems = (taskId: string): boolean => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task && task.checklistItems && task.checklistItems.length > 0) {
+      return task.checklistItems.some(item => !item.completed);
+    }
+    return false;
   };
 
  const handleToggleComplete = (id: string) => {
@@ -131,38 +127,22 @@ function HomePageContent() {
 
     const newCompletedStatus = !taskToToggle.completed;
 
-    if (isMainTaskWithIncompleteSubtasks(id) && newCompletedStatus && !taskToToggle.parentId) {
+    if (newCompletedStatus && taskHasIncompleteChecklistItems(id)) {
         toast({
             title: "Still have work to do!",
-            description: `"${taskToToggle.title}" cannot be completed until all its sub-tasks are done.`,
+            description: `"${taskToToggle.title}" cannot be completed until all its checklist items are done.`,
             variant: "default",
         });
-        return; 
+        return;
     }
 
-    setTasks(prevTasks => {
-      let newTasks = prevTasks.map(task =>
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
         task.id === id ? { ...task, completed: newCompletedStatus } : task
-      );
-
-      if (taskToToggle.parentId) { 
-        const parentId = taskToToggle.parentId;
-        const parentTask = newTasks.find(t => t.id === parentId);
-        if (parentTask) {
-            const siblingSubTasks = newTasks.filter(t => t.parentId === parentId);
-            const allSubTasksNowComplete = siblingSubTasks.every(st => st.completed);
-
-            if (newCompletedStatus && allSubTasksNowComplete && !parentTask.completed) {
-                 newTasks = newTasks.map(t => t.id === parentId ? { ...t, completed: true } : t);
-            } else if (!newCompletedStatus && parentTask.completed) {
-                 newTasks = newTasks.map(t => t.id === parentId ? { ...t, completed: false } : t);
-            }
-        }
-      }
-      return newTasks;
-    });
+      )
+    );
   };
-  
+
   const handleDeleteTask = (taskToDelete: Task) => {
     if (!taskToDelete || !taskToDelete.id) {
       toast({ title: "Error", description: "Task data is invalid for deletion.", variant: "destructive" });
@@ -173,36 +153,71 @@ function HomePageContent() {
       return;
     }
 
-    let tasksToRemoveIds = [taskToDelete.id];
-    let parentIdOfDeletedSubTask: string | undefined = undefined;
+    setTasks(prevTasks => prevTasks.filter(task => task.id !== taskToDelete.id));
 
-    if (!taskToDelete.parentId) { 
-      const subTasksOfDeletedMain = tasks.filter(t => t.parentId === taskToDelete.id).map(st => st.id);
-      tasksToRemoveIds = [...tasksToRemoveIds, ...subTasksOfDeletedMain];
-    } else { 
-      parentIdOfDeletedSubTask = taskToDelete.parentId;
-    }
-
-    setTasks(prevTasks => {
-      let updatedTasks = prevTasks.filter(task => !tasksToRemoveIds.includes(task.id));
-      if (parentIdOfDeletedSubTask) {
-        const parentTask = updatedTasks.find(t => t.id === parentIdOfDeletedSubTask);
-        if (parentTask && !parentTask.completed) {
-          const remainingSubTasks = updatedTasks.filter(st => st.parentId === parentIdOfDeletedSubTask);
-          if (remainingSubTasks.length === 0 || remainingSubTasks.every(st => st.completed)) {
-            updatedTasks = updatedTasks.map(t => t.id === parentIdOfDeletedSubTask ? { ...t, completed: true } : t);
-          }
-        }
-      }
-      return updatedTasks;
-    });
-    
-    let toastDescription = `Task "${taskToDelete.title}" ${tasksToRemoveIds.length > 1 ? 'and its sub-tasks were' : 'was'} removed.`;
     toast({
       title: "ToonDo Removed!",
-      description: toastDescription,
+      description: `Task "${taskToDelete.title}" was removed.`,
     });
   };
+
+  const handleAddChecklistItem = (taskId: string, itemTitle: string) => {
+    if (!itemTitle.trim()) return;
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        if (task.id === taskId) {
+          const newItem: ChecklistItem = {
+            id: generateId(),
+            title: itemTitle.trim(),
+            completed: false,
+          };
+          const updatedChecklistItems = [...(task.checklistItems || []), newItem];
+          // If task was complete, and we're adding an incomplete item, mark task as incomplete
+          const taskNowIncomplete = task.completed;
+          return {
+            ...task,
+            checklistItems: updatedChecklistItems,
+            completed: taskNowIncomplete ? false : task.completed,
+          };
+        }
+        return task;
+      })
+    );
+  };
+
+  const handleToggleChecklistItem = (taskId: string, itemId: string) => {
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        if (task.id === taskId) {
+          const updatedChecklistItems = (task.checklistItems || []).map(item =>
+            item.id === itemId ? { ...item, completed: !item.completed } : item
+          );
+          // If an item becomes incomplete, and the task was complete, mark task incomplete
+          const becomesIncomplete = updatedChecklistItems.some(item => !item.completed && task.completed);
+
+          return {
+            ...task,
+            checklistItems: updatedChecklistItems,
+            completed: becomesIncomplete ? false : task.completed,
+          };
+        }
+        return task;
+      })
+    );
+  };
+
+  const handleDeleteChecklistItem = (taskId: string, itemId: string) => {
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        if (task.id === taskId) {
+          const updatedChecklistItems = (task.checklistItems || []).filter(item => item.id !== itemId);
+          return { ...task, checklistItems: updatedChecklistItems };
+        }
+        return task;
+      })
+    );
+  };
+
 
   const handleApplyForRole = (taskId: string, roleName: string) => {
     if (!currentUser) {
@@ -218,12 +233,12 @@ function HomePageContent() {
       }
 
       const taskToUpdate = { ...prevTasks[taskIndex] };
-      
+
       if (currentUser.id === taskToUpdate.userId) {
         toast({ title: "Cannot Apply", description: "You cannot apply for roles on your own task.", variant: "default" });
         return prevTasks;
       }
-      
+
       taskToUpdate.applicants = taskToUpdate.applicants || [];
 
       const existingApplication = taskToUpdate.applicants.find(
@@ -235,26 +250,26 @@ function HomePageContent() {
         return prevTasks;
       }
 
-      const newApplicant: Applicant = {
+      const newApplicant = { // Applicant type is defined in task.ts
         id: generateId(),
         role: roleName,
         name: currentUser.displayName,
         applicantUserId: currentUser.id,
-        status: 'pending',
+        status: 'pending' as 'pending' | 'accepted' | 'rejected',
       };
       taskToUpdate.applicants.push(newApplicant);
 
       const updatedTasks = [...prevTasks];
       updatedTasks[taskIndex] = taskToUpdate;
-      
-      toast({ 
-        title: "Application Submitted!", 
+
+      toast({
+        title: "Application Submitted!",
         description: `Your application for the role of '${roleName}' on task "${taskToUpdate.title}" has been sent. The task owner will be notified.`
       });
       return updatedTasks;
     });
   };
-  
+
   const actualPrint = useCallback(() => {
     if (printableAreaRef.current) {
       printableAreaRef.current.classList.remove('hidden');
@@ -270,13 +285,13 @@ function HomePageContent() {
   const handleInitiatePrint = (task: Task) => {
     setTaskToPrint(task);
   };
-  
+
   useEffect(() => {
     if (taskToPrint) {
       const timer = setTimeout(() => {
         actualPrint();
-        setTaskToPrint(null); 
-      }, 100); 
+        setTaskToPrint(null);
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [taskToPrint, actualPrint]);
@@ -296,41 +311,41 @@ function HomePageContent() {
     };
   }, []);
 
-  const handleDragStart = (mainTaskId: string) => {
-    if (!currentUser) return; 
-    const taskToDrag = tasks.find(t => t.id === mainTaskId);
+  const handleDragStart = (taskId: string) => { // Renamed mainTaskId to taskId
+    if (!currentUser) return;
+    const taskToDrag = tasks.find(t => t.id === taskId);
     if (taskToDrag && taskToDrag.userId === currentUser.id) {
-      setDraggedItemId(mainTaskId);
+      setDraggedItemId(taskId);
     } else {
       toast({title: "Cannot Reorder", description: "You can only reorder your own tasks.", variant: "default"});
     }
   };
 
-  const handleDragEnter = (mainTaskId: string) => {
+  const handleDragEnter = (taskId: string) => { // Renamed mainTaskId to taskId
     if (!currentUser) return;
-    const taskToDragOver = tasks.find(t => t.id === mainTaskId);
-    if (taskToDragOver && taskToDragOver.userId === currentUser.id && mainTaskId !== draggedItemId) {
-        setDragOverItemId(mainTaskId);
+    const taskToDragOver = tasks.find(t => t.id === taskId);
+    if (taskToDragOver && taskToDragOver.userId === currentUser.id && taskId !== draggedItemId) {
+        setDragOverItemId(taskId);
     }
   };
-  
+
   const handleDragLeave = () => {
     setDragOverItemId(null);
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault(); 
+    event.preventDefault();
   };
 
-  const handleDrop = (droppedOnMainTaskId: string) => {
-    if (!draggedItemId || draggedItemId === droppedOnMainTaskId || !droppedOnMainTaskId || !currentUser) {
+  const handleDrop = (droppedOnTaskId: string) => { // Renamed droppedOnMainTaskId to droppedOnTaskId
+    if (!draggedItemId || draggedItemId === droppedOnTaskId || !droppedOnTaskId || !currentUser) {
       setDraggedItemId(null);
       setDragOverItemId(null);
       return;
     }
-    
+
     const draggedTask = tasks.find(t => t.id === draggedItemId);
-    const droppedOnTask = tasks.find(t => t.id === droppedOnMainTaskId);
+    const droppedOnTask = tasks.find(t => t.id === droppedOnTaskId);
 
     if (!draggedTask || !droppedOnTask || draggedTask.userId !== currentUser.id || droppedOnTask.userId !== currentUser.id) {
       toast({title: "Cannot Reorder", description: "You can only reorder your own tasks within your own task list.", variant: "default"});
@@ -340,86 +355,64 @@ function HomePageContent() {
     }
 
     setTasks(prevTasks => {
-      const allMainTasksForCurrentUser = prevTasks
-        .filter(task => !task.parentId && task.userId === currentUser.id) 
+      const allTasksForCurrentUser = prevTasks
+        .filter(task => task.userId === currentUser.id) // Simplified filter
         .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
 
-      const mainTaskIds = allMainTasksForCurrentUser.map(t => t.id);
-      const draggedIdx = mainTaskIds.indexOf(draggedItemId);
-      const targetIdx = mainTaskIds.indexOf(droppedOnMainTaskId);
+      const taskIds = allTasksForCurrentUser.map(t => t.id);
+      const draggedIdx = taskIds.indexOf(draggedItemId);
+      const targetIdx = taskIds.indexOf(droppedOnTaskId);
 
       if (draggedIdx === -1 || targetIdx === -1) {
-        console.error("Drag and drop error: task ID not found in current user's main task list.");
+        console.error("Drag and drop error: task ID not found in current user's task list.");
         return prevTasks;
       }
 
-      const itemToMove = mainTaskIds.splice(draggedIdx, 1)[0];
-      mainTaskIds.splice(targetIdx, 0, itemToMove);
+      const itemToMove = taskIds.splice(draggedIdx, 1)[0];
+      taskIds.splice(targetIdx, 0, itemToMove);
 
       const newTasks = prevTasks.map(task => {
-        if (!task.parentId && task.userId === currentUser.id) {
-          const newOrder = mainTaskIds.indexOf(task.id);
+        if (task.userId === currentUser.id) { // Simplified condition
+          const newOrder = taskIds.indexOf(task.id);
           if (newOrder !== -1) {
             return { ...task, order: newOrder };
           }
         }
-        return task; 
+        return task;
       });
-      
-      return newTasks.sort((a, b) => { 
+
+      return newTasks.sort((a, b) => {
         if (currentUser) {
             if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
             if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
-            if (a.userId === currentUser.id && b.userId === currentUser.id) {
-                if (!a.parentId && !b.parentId) return (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (a.createdAt ?? 0));
-            }
         }
-        if (!a.parentId && !b.parentId) return (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (b.createdAt ?? 0));
-        if (a.parentId && b.parentId && a.parentId === b.parentId) return (a.createdAt ?? 0) - (b.createdAt ?? 0);
-        return (a.createdAt ?? 0) - (b.createdAt ?? 0); 
+        // All tasks are main tasks now
+        return (a.order ?? (a.createdAt ?? 0)) - (b.order ?? (b.createdAt ?? 0));
       });
     });
-    
+
     toast({ title: "Tasks Reordered!", description: "Your ToonDos have a new sequence."});
     setDraggedItemId(null);
     setDragOverItemId(null);
   };
-  
+
   const handleDragEnd = () => {
     setDraggedItemId(null);
     setDragOverItemId(null);
   };
-  
-  const isMainTaskWithIncompleteSubtasks = (mainTaskId: string) => {
-    const subTasksForMain = tasks.filter(t => t.parentId === mainTaskId);
-    return subTasksForMain.some(st => !st.completed);
-  };
 
-  const taskGroups: TaskGroup[] = [];
-  if (tasks && tasks.length > 0) {
-    const allMainDisplayTasks = tasks.filter(task => !task.parentId) 
-                                  .sort((a,b) => { 
-                                      if (currentUser) {
-                                        if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
-                                        if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
-                                        if (a.userId === currentUser.id && b.userId === currentUser.id) {
-                                            return ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number);
-                                        }
-                                      }
-                                      return ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number);
-                                  });
-    
-    allMainDisplayTasks.forEach(pt => {
-      const subTasksForThisParent = tasks.filter(st => st.parentId === pt.id) 
-                                      .sort((a,b) => ((a.createdAt || 0) as number) - ((b.createdAt || 0) as number)); 
-      const group: TaskGroup = {
-        mainTask: pt,
-        subTasks: subTasksForThisParent,
-        mainTaskHasIncompleteSubtasks: subTasksForThisParent.some(st => !st.completed)
-      };
-      taskGroups.push(group);
-    });
-  }
+  // Sort tasks for display
+  const displayTasks = [...tasks].sort((a,b) => {
+      if (currentUser) {
+        if (a.userId === currentUser.id && b.userId !== currentUser.id) return -1;
+        if (a.userId !== currentUser.id && b.userId === currentUser.id) return 1;
+        if (a.userId === currentUser.id && b.userId === currentUser.id) {
+            return ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number);
+        }
+      }
+      return ((a.order ?? (a.createdAt ?? 0)) as number) - ((b.order ?? (b.createdAt ?? 0)) as number);
+  });
+
 
   if (authIsLoading || isLoadingTasks) {
     return (
@@ -506,15 +499,15 @@ function HomePageContent() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-full max-w-lg p-0" side="bottom" align="start">
-                    <CreateTaskForm 
-                      onAddTask={handleAddTask} 
-                      onTaskCreated={handleTaskCreatedInPopover} 
+                    <CreateTaskForm
+                      onAddTask={handleAddTask}
+                      onTaskCreated={handleTaskCreatedInPopover}
                     />
                   </PopoverContent>
                 </Popover>
               </div>
-              
-              {taskGroups.length === 0 && !isLoadingTasks ? (
+
+              {displayTasks.length === 0 && !isLoadingTasks ? (
                  <div className="text-center py-16">
                   <FileTextIcon className="mx-auto h-24 w-24 text-muted-foreground opacity-50 mb-4" />
                   <h2 className="text-3xl font-semibold mb-2">No ToonDos Yet, {currentUser.displayName}!</h2>
@@ -523,59 +516,47 @@ function HomePageContent() {
               ) : (
                 <div
                   className={cn(
-                    'flex overflow-x-auto space-x-6 py-4 items-start' 
+                    'flex overflow-x-auto space-x-6 py-4 items-start'
                   )}
                 >
-                  {taskGroups.map(({ mainTask, subTasks, mainTaskHasIncompleteSubtasks: groupHasIncompleteSubtasks }) => (
+                  {displayTasks.map(task => (
                     <div
-                      key={mainTask.id}
+                      key={task.id}
                       className={cn(
-                        "flex-shrink-0 w-80 space-y-4 rounded-lg", 
-                        currentUser && mainTask.userId === currentUser.id && "cursor-grab",
-                        draggedItemId === mainTask.id && "opacity-50 ring-2 ring-primary ring-offset-2",
-                        dragOverItemId === mainTask.id && draggedItemId !== mainTask.id && "ring-2 ring-accent ring-offset-1 scale-102 shadow-xl z-10"
+                        "flex-shrink-0 w-80 space-y-4 rounded-lg", // Each task card is a column now
+                        currentUser && task.userId === currentUser.id && "cursor-grab",
+                        draggedItemId === task.id && "opacity-50 ring-2 ring-primary ring-offset-2",
+                        dragOverItemId === task.id && draggedItemId !== task.id && "ring-2 ring-accent ring-offset-1 scale-102 shadow-xl z-10"
                       )}
-                      draggable={currentUser && mainTask.userId === currentUser.id} 
-                      onDragStart={(e) => { e.stopPropagation(); handleDragStart(mainTask.id);}}
-                      onDragEnter={(e) => { e.stopPropagation(); handleDragEnter(mainTask.id);}}
+                      draggable={currentUser && task.userId === currentUser.id}
+                      onDragStart={(e) => { e.stopPropagation(); handleDragStart(task.id);}}
+                      onDragEnter={(e) => { e.stopPropagation(); handleDragEnter(task.id);}}
                       onDragLeave={(e) => { e.stopPropagation(); handleDragLeave();}}
-                      onDrop={(e) => { e.stopPropagation(); handleDrop(mainTask.id);}}
-                      onDragOver={(e) => { e.stopPropagation(); handleDragOver(e);}} 
+                      onDrop={(e) => { e.stopPropagation(); handleDrop(task.id);}}
+                      onDragOver={(e) => { e.stopPropagation(); handleDragOver(e);}}
                       onDragEnd={(e) => { e.stopPropagation(); handleDragEnd();}}
                     >
                       <TaskCard
-                        task={mainTask}
-                        allTasks={tasks} 
+                        task={task}
                         currentUser={currentUser}
                         onToggleComplete={handleToggleComplete}
-                        onDelete={handleDeleteTask} 
+                        onDelete={handleDeleteTask}
                         onPrint={handleInitiatePrint}
-                        onAddTask={handleAddTask} 
+                        onAddChecklistItem={handleAddChecklistItem}
+                        onToggleChecklistItem={handleToggleChecklistItem}
+                        onDeleteChecklistItem={handleDeleteChecklistItem}
                         onApplyForRole={handleApplyForRole}
-                        isMainTaskWithIncompleteSubtasks={groupHasIncompleteSubtasks}
+                        hasIncompleteChecklistItems={taskHasIncompleteChecklistItems(task.id)}
                       />
-                      {subTasks.map(subTask => (
-                        <TaskCard
-                          key={subTask.id}
-                          task={subTask}
-                          allTasks={tasks}
-                          currentUser={currentUser}
-                          onToggleComplete={handleToggleComplete}
-                          onDelete={handleDeleteTask} 
-                          onPrint={handleInitiatePrint}
-                          onAddTask={handleAddTask}
-                          onApplyForRole={handleApplyForRole} 
-                          isMainTaskWithIncompleteSubtasks={false} 
-                        />
-                      ))}
+                      {/* Sub-tasks are no longer rendered separately here */}
                     </div>
                   ))}
                 </div>
               )}
             </>
           )}
-        </main> 
-        
+        </main>
+
         <div id="printable-area" ref={printableAreaRef} className="hidden print:block">
           {taskToPrint && <PrintableTaskCard task={taskToPrint} />}
         </div>
@@ -596,4 +577,3 @@ export default function HomePage() {
       <HomePageContent />
   );
 }
-
