@@ -630,7 +630,7 @@ export function TaskCard({
                                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                     {suggestedImages.map((img) => (
                                       <div
-                                        key={img.src}
+                                        key={img.aiHint}
                                         onClick={() => {
                                           setCurrentImageUrlInput(img.src);
                                           setCurrentImageAiHintInput(img.aiHint);
