@@ -28,6 +28,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { EditableTitle } from "./EditableTitle";
 import { Badge } from "@/components/ui/badge";
 
+const LABEL_COLORS = [
+  "bg-red-500",
+  "bg-yellow-500",
+  "bg-green-500",
+  "bg-blue-500",
+  "bg-purple-500",
+  "bg-pink-500",
+];
 
 interface TaskCardProps {
   task: Task;
@@ -238,9 +246,14 @@ export function TaskCard({
   };
 
   // Label Popover specific logic (within main dialog)
-  const handleSaveLabelFromPopover = () => {
+  const handleSelectLabelColor = (colorClass: string) => {
+    setDialogTempLabel(colorClass);
     setIsLabelPopoverOpen(false); 
   };
+  const handleClearLabel = () => {
+    setDialogTempLabel("");
+    setIsLabelPopoverOpen(false);
+  }
 
 
   const cardStyle: React.CSSProperties = {};
@@ -317,12 +330,15 @@ export function TaskCard({
               <div
                 key={item.id}
                 className={cn(
-                  "flex flex-col group/checklist text-sm rounded-md p-1.5 border",
+                  "flex flex-col group/checklist text-sm rounded-md border overflow-hidden",
                   task.backgroundImageUrl ? "border-white/30 bg-white/10 text-gray-100" : "border-border/60 bg-card text-card-foreground",
                 )}
               >
+                {item.label && (
+                    <div className={cn("h-1.5 w-full", item.label)} />
+                )}
                 <div 
-                  className={cn("flex items-center justify-between", isOwner && "cursor-pointer hover:bg-opacity-20")}
+                  className={cn("p-1.5",isOwner && "cursor-pointer hover:bg-opacity-20", !item.label && "pt-1.5" )} // Ensure padding consistency
                   onClick={(e) => {
                     if (!isOwner) return;
                     const target = e.target as HTMLElement;
@@ -332,82 +348,81 @@ export function TaskCard({
                     handleOpenItemEditDialog(item);
                   }}
                 >
-                  <div className="flex items-center flex-grow min-w-0 relative">
-                    <Checkbox
-                      id={`checklist-${task.id}-${item.id}`}
-                      checked={item.completed}
-                      onCheckedChange={(checked) => onToggleChecklistItem(task.id, item.id)}
-                      disabled={!isOwner}
-                      className={cn(
-                        "h-3.5 w-3.5 border-2 rounded-sm data-[state=checked]:bg-green-400 shrink-0",
-                        task.backgroundImageUrl ? "border-gray-300 data-[state=checked]:text-gray-800" : "border-muted-foreground data-[state=checked]:text-primary-foreground",
-                        !isOwner && "opacity-50 cursor-not-allowed"
-                      )}
-                      onClick={(e) => e.stopPropagation()} 
-                      aria-label={`Toggle completion for ${item.title}`}
-                    />
-                    <label
-                      htmlFor={`checklist-${task.id}-${item.id}`} 
-                      className={cn(
-                        "flex-grow break-all truncate ml-2",
-                        item.completed && "line-through opacity-70",
-                        task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
-                        !isOwner && "pointer-events-none"
-                      )}
-                    >
-                      {item.title}
-                    </label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center flex-grow min-w-0 relative">
+                        <Checkbox
+                        id={`checklist-${task.id}-${item.id}`}
+                        checked={item.completed}
+                        onCheckedChange={(checked) => onToggleChecklistItem(task.id, item.id)}
+                        disabled={!isOwner}
+                        className={cn(
+                            "h-3.5 w-3.5 border-2 rounded-sm data-[state=checked]:bg-green-400 shrink-0",
+                            task.backgroundImageUrl ? "border-gray-300 data-[state=checked]:text-gray-800" : "border-muted-foreground data-[state=checked]:text-primary-foreground",
+                            !isOwner && "opacity-50 cursor-not-allowed"
+                        )}
+                        onClick={(e) => e.stopPropagation()} 
+                        aria-label={`Toggle completion for ${item.title}`}
+                        />
+                        <label
+                        htmlFor={`checklist-${task.id}-${item.id}`} 
+                        className={cn(
+                            "flex-grow break-all truncate ml-2",
+                            item.completed && "line-through opacity-70",
+                            task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
+                            !isOwner && "pointer-events-none"
+                        )}
+                        >
+                        {item.title}
+                        </label>
+                    </div>
+                    {isOwner && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleOpenItemEditDialog(item); }}
+                            className={cn("ml-2 p-0.5 rounded opacity-50 group-hover/checklist:opacity-100 focus:opacity-100 transition-opacity", task.backgroundImageUrl ? "text-gray-300 hover:text-white" : "text-muted-foreground hover:text-foreground")}
+                            aria-label="Edit item details"
+                        >
+                            <Edit3Icon className="h-3.5 w-3.5" />
+                        </button>
+                    )}
                   </div>
-                   {isOwner && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); handleOpenItemEditDialog(item); }}
-                        className={cn("ml-2 p-0.5 rounded opacity-50 group-hover/checklist:opacity-100 focus:opacity-100 transition-opacity", task.backgroundImageUrl ? "text-gray-300 hover:text-white" : "text-muted-foreground hover:text-foreground")}
-                        aria-label="Edit item details"
-                    >
-                        <Edit3Icon className="h-3.5 w-3.5" />
-                    </button>
-                   )}
-                </div>
 
-                {(item.imageUrl || item.description || item.dueDate || item.assignedUserId || item.label) && (
-                  <div className={cn("mt-1 pt-1 text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "border-t border-white/20 text-gray-200" : "border-t border-border/30 text-muted-foreground")}>
-                    {item.imageUrl && (
-                      <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
-                         <Image 
-                            src={item.imageUrl} 
-                            alt={item.title || "Checklist item image"}
-                            fill 
-                            style={{objectFit: "cover"}} 
-                            className="rounded"
-                            data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
-                          />
-                      </div>
-                    )}
-                    {item.description && (
-                      <p className="italic truncate w-full text-ellipsis text-gray-400/90 dark:text-gray-500/90">
-                        {item.description.length > 50 ? `${item.description.substring(0, 47)}...` : item.description}
-                      </p>
-                    )}
-                    {item.dueDate && (
-                      <div className="flex items-center">
-                        <CalendarDaysIcon className="mr-1 h-3 w-3" />
-                        {format(new Date(item.dueDate), "MMM d")}
-                      </div>
-                    )}
-                    {item.assignedUserId && item.assignedUserName && (
-                      <div className="flex items-center">
-                        <Avatar className="h-4 w-4 mr-1">
-                           <AvatarImage src={item.assignedUserAvatarUrl || undefined} alt={item.assignedUserName} data-ai-hint="user"/>
-                           <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        {item.assignedUserName}
-                      </div>
-                    )}
-                    {item.label && (
-                      <Badge variant={task.backgroundImageUrl ? "secondary" : "outline"} className={cn("px-1.5 py-0.5 text-xs", task.backgroundImageUrl && "bg-white/20 text-white border-white/30")}>{item.label}</Badge>
-                    )}
-                  </div>
-                )}
+                  {(item.imageUrl || item.description || item.dueDate || item.assignedUserId ) && ( // Removed item.label from this condition as it's handled by top bar
+                    <div className={cn("mt-1 pt-1 text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")}> {/* Removed border-t */}
+                        {item.imageUrl && (
+                        <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
+                            <Image 
+                                src={item.imageUrl} 
+                                alt={item.title || "Checklist item image"}
+                                fill 
+                                style={{objectFit: "cover"}} 
+                                className="rounded"
+                                data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
+                            />
+                        </div>
+                        )}
+                        {item.description && (
+                        <p className="italic truncate w-full text-ellipsis text-gray-400/90 dark:text-gray-500/90">
+                            {item.description.length > 50 ? `${item.description.substring(0, 47)}...` : item.description}
+                        </p>
+                        )}
+                        {item.dueDate && (
+                        <div className="flex items-center">
+                            <CalendarDaysIcon className="mr-1 h-3 w-3" />
+                            {format(new Date(item.dueDate), "MMM d")}
+                        </div>
+                        )}
+                        {item.assignedUserId && item.assignedUserName && (
+                        <div className="flex items-center">
+                            <Avatar className="h-4 w-4 mr-1">
+                            <AvatarImage src={item.assignedUserAvatarUrl || undefined} alt={item.assignedUserName} data-ai-hint="user"/>
+                            <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            {item.assignedUserName}
+                        </div>
+                        )}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -492,9 +507,9 @@ export function TaskCard({
             onClick={(e) => e.stopPropagation()}
           >
             <DialogHeader className="pb-2 border-b border-border">
-                 <DialogTitle className="sr-only">
-                    {dialogTempTitle ? `Edit item: ${dialogTempTitle}` : "Edit Item"}
-                 </DialogTitle>
+                <DialogTitle className="sr-only">
+                    {editingItemAllDetails && dialogTempTitle ? `Edit item: ${dialogTempTitle}` : "Edit Item"}
+                </DialogTitle>
                  <div className="flex items-center space-x-2">
                      <Checkbox
                         id={`dialog-item-completed-${editingItemAllDetails.id}`}
@@ -528,10 +543,8 @@ export function TaskCard({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 flex-grow overflow-y-auto py-3">
               {/* Left Column */}
               <div className="md:col-span-2 space-y-3">
-
                   {/* Action Buttons Row */}
                   <div className="flex flex-wrap items-center gap-2 my-3">
-                        {/* Assign User Button & Popover */}
                         <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
@@ -546,7 +559,6 @@ export function TaskCard({
                             </PopoverContent>
                         </Popover>
 
-                        {/* Due Date Button & Popover */}
                         <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
@@ -570,7 +582,6 @@ export function TaskCard({
                             </PopoverContent>
                         </Popover>
 
-                        {/* Manage Attachment Button */}
                         <Button 
                             variant="outline" 
                             size="sm"
@@ -580,25 +591,38 @@ export function TaskCard({
                             <PaperclipIcon className="mr-1.5 h-3.5 w-3.5" /> Image
                         </Button>
 
-                        {/* Label Button & Popover */}
                         <Popover open={isLabelPopoverOpen} onOpenChange={setIsLabelPopoverOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm" className={cn("justify-start text-xs flex-grow sm:flex-grow-0", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
-                                    <TagIcon className="mr-1.5 h-3.5 w-3.5" />
-                                    {dialogTempLabel || "Label"}
+                                    {dialogTempLabel ? (
+                                        <span className={cn("w-3 h-3 rounded-sm mr-1.5", dialogTempLabel)}></span>
+                                    ) : (
+                                        <TagIcon className="mr-1.5 h-3.5 w-3.5" />
+                                    )}
+                                    {dialogTempLabel ? "Color" : "Label"}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-48 p-2 space-y-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
-                                <Input 
-                                placeholder="Enter label..." 
-                                value={dialogTempLabel} 
-                                onChange={(e) => setDialogTempLabel(e.target.value)}
-                                className={cn("h-8 text-xs", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400")}
-                                />
-                                <div className="flex gap-1">
-                                    <Button size="sm" className="flex-grow text-xs h-7" onClick={handleSaveLabelFromPopover}>Set</Button>
-                                    {dialogTempLabel && <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => {setDialogTempLabel(""); handleSaveLabelFromPopover();}}>Clear</Button>}
+                            <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {LABEL_COLORS.map(colorClass => (
+                                        <button
+                                            key={colorClass}
+                                            type="button"
+                                            className={cn("w-6 h-6 rounded-md cursor-pointer hover:ring-2 hover:ring-offset-1 ring-ring", colorClass, dialogTempLabel === colorClass && "ring-2 ring-offset-1 ring-ring")}
+                                            onClick={() => handleSelectLabelColor(colorClass)}
+                                            aria-label={`Set label to ${colorClass.split('-')[1]}`}
+                                        />
+                                    ))}
                                 </div>
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="w-full mt-2 text-xs" 
+                                    onClick={handleClearLabel}
+                                    disabled={!dialogTempLabel}
+                                >
+                                    Clear Label
+                                </Button>
                             </PopoverContent>
                         </Popover>
                      </div>
@@ -717,6 +741,5 @@ export function TaskCard({
     </Card>
   );
 }
-
 
     
