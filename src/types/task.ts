@@ -17,8 +17,10 @@ export interface ChecklistItem {
   id: string;
   title: string;
   completed: boolean;
-  // dueDate?: string | null; // Example for future extension
-  // assignedUserId?: string | null; // Example for future extension
+  dueDate?: string | null;
+  assignedUserId?: string | null;
+  assignedUserName?: string | null;
+  assignedUserAvatarUrl?: string | null;
 }
 
 export interface Task {
@@ -31,7 +33,7 @@ export interface Task {
   createdAt: number; // Timestamp (number) for sorting for localStorage
   assignedRoles?: string[];
   applicants?: Applicant[];
-  checklistItems?: ChecklistItem[]; 
+  checklistItems?: ChecklistItem[];
   order?: number; // Optional field for drag-and-drop ordering
 
   // User association (owner of the task)

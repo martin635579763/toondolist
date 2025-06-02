@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Edit3Icon, CalendarDaysIcon, PartyPopperIcon, UsersIcon, PlusCircleIcon, Trash2Icon, UserPlusIcon, MoreHorizontalIcon } from "lucide-react";
+import { PrinterIcon, Edit3Icon, CalendarDaysIcon, PartyPopperIcon, UsersIcon, PlusCircleIcon, Trash2Icon, UserPlusIcon, MoreHorizontalIcon, UserCircleIcon, ImagePlusIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +28,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 
 
 interface TaskCardProps {
@@ -39,6 +41,8 @@ interface TaskCardProps {
   onToggleChecklistItem: (taskId: string, itemId: string) => void;
   onDeleteChecklistItem: (taskId: string, itemId: string) => void;
   onUpdateChecklistItemTitle: (taskId: string, itemId: string, newTitle: string) => void;
+  onSetChecklistItemDueDate: (taskId: string, itemId: string, date: Date | null) => void;
+  onAssignUserToChecklistItem: (taskId: string, itemId: string, userId: string | null, userName: string | null, userAvatarUrl: string | null) => void;
   onApplyForRole: (taskId: string, roleName: string) => void;
   onUpdateTaskTitle: (taskId: string, newTitle: string) => void;
   onSetDueDate: (taskId: string, date: Date | null) => void;
@@ -54,12 +58,15 @@ export function TaskCard({
   onToggleChecklistItem,
   onDeleteChecklistItem,
   onUpdateChecklistItemTitle,
+  onSetChecklistItemDueDate,
+  onAssignUserToChecklistItem,
   onApplyForRole,
   onUpdateTaskTitle,
   onSetDueDate,
   onSetBackgroundImage,
 }: TaskCardProps) {
   const isOwner = currentUser && currentUser.id === task.userId;
+  const { toast } = useToast();
   const [newChecklistItemTitle, setNewChecklistItemTitle] = useState("");
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -69,8 +76,8 @@ export function TaskCard({
   const [showFireworks, setShowFireworks] = useState(false);
   const prevCompleted = useRef(task.completed);
 
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
+  const [isMainDatePickerOpen, setIsMainDatePickerOpen] = useState(false);
+  const [selectedMainDate, setSelectedMainDate] = useState<Date | undefined>(
     task.dueDate ? new Date(task.dueDate) : undefined
   );
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
@@ -79,6 +86,12 @@ export function TaskCard({
   const [editingChecklistItemId, setEditingChecklistItemId] = useState<string | null>(null);
   const [editingChecklistItemNewTitle, setEditingChecklistItemNewTitle] = useState("");
   const checklistItemInputRef = useRef<HTMLInputElement>(null);
+
+  const [editingItemDueDateId, setEditingItemDueDateId] = useState<string | null>(null);
+  const [selectedItemDate, setSelectedItemDate] = useState<Date | undefined>(undefined);
+  const [isItemDatePickerOpen, setIsItemDatePickerOpen] = useState<Record<string, boolean>>({});
+
+  const [assigningUserItemId, setAssigningUserItemId] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -143,10 +156,10 @@ export function TaskCard({
     }
   };
 
-  const handleSetTaskDueDate = (date: Date | undefined) => {
-    setSelectedDate(date);
+  const handleSetMainTaskDueDate = (date: Date | undefined) => {
+    setSelectedMainDate(date);
     onSetDueDate(task.id, date || null);
-    setIsDatePickerOpen(false);
+    setIsMainDatePickerOpen(false);
   };
 
   const handleSetTaskBackgroundImage = () => {
@@ -171,7 +184,34 @@ export function TaskCard({
     setEditingChecklistItemId(null);
     setEditingChecklistItemNewTitle("");
   };
+
+  const handleSetItemDueDate = (itemId: string, date: Date | undefined) => {
+    onSetChecklistItemDueDate(task.id, itemId, date || null);
+    setIsItemDatePickerOpen(prev => ({ ...prev, [itemId]: false }));
+    setEditingItemDueDateId(null);
+  };
+
+  const handleToggleItemDatePicker = (itemId: string, currentDueDate?: string | null) => {
+    setEditingItemDueDateId(itemId);
+    setSelectedItemDate(currentDueDate ? new Date(currentDueDate) : undefined);
+    setIsItemDatePickerOpen(prev => ({ ...prev, [itemId]: !prev[itemId] }));
+  };
   
+  const handleAssignToMe = (itemId: string) => {
+    if (currentUser && isOwner) {
+      onAssignUserToChecklistItem(task.id, itemId, currentUser.id, currentUser.displayName, currentUser.avatarUrl);
+    }
+    setAssigningUserItemId(null);
+  };
+
+  const handleUnassignItem = (itemId: string) => {
+     if (isOwner || (currentUser && task.checklistItems?.find(item => item.id === itemId)?.assignedUserId === currentUser.id)) {
+        onAssignUserToChecklistItem(task.id, itemId, null, null, null);
+     }
+     setAssigningUserItemId(null);
+  };
+
+
   const cardStyle: React.CSSProperties = {};
   let contentOverlayStyle: React.CSSProperties = {};
 
@@ -179,8 +219,8 @@ export function TaskCard({
     cardStyle.backgroundImage = `url(${task.backgroundImageUrl})`;
     cardStyle.backgroundSize = 'cover';
     cardStyle.backgroundPosition = 'center';
-    contentOverlayStyle.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Dark overlay
-    contentOverlayStyle.color = 'white'; // Ensure text is white
+    contentOverlayStyle.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    contentOverlayStyle.color = 'white';
   }
 
 
@@ -283,28 +323,18 @@ export function TaskCard({
           </div>
         )}
 
-        {task.assignedRoles && task.assignedRoles.length > 0 && (
-          <div className={cn("mt-1.5 pt-1.5 border-t border-dashed", task.backgroundImageUrl ? "border-gray-400/50" : "border-border/50")}>
-            <h4 className={cn("text-xs font-semibold uppercase flex items-center mb-0.5", task.backgroundImageUrl ? "text-gray-300" : "text-muted-foreground")}>
-              <UsersIcon className="mr-1 h-3 w-3" />
-              Needed Roles:
-            </h4>
-            {/* Role rendering logic (omitted for brevity, assumed unchanged) */}
-          </div>
-        )}
-
         {(task.checklistItems && task.checklistItems.length > 0) && (
-          <div className={cn("mt-2 pt-2 border-t border-dashed", task.backgroundImageUrl ? "border-gray-400/50" : "border-border/50")}>
-            <div className="space-y-1 pr-1">
-              {task.checklistItems.map(item => (
-                <div 
-                  key={item.id} 
-                  className={cn(
-                    "flex items-center justify-between group/checklist text-sm rounded-md p-1.5", 
-                    task.backgroundImageUrl ? "border border-white/30 bg-white/10 text-gray-100" : "border border-border/60 text-card-foreground",
-                    editingChecklistItemId === item.id && (task.backgroundImageUrl ? "bg-white/20" : "bg-muted/50")
-                  )}
-                >
+          <div className="space-y-1 pr-1">
+            {task.checklistItems.map(item => (
+              <div
+                key={item.id}
+                className={cn(
+                  "flex flex-col group/checklist text-sm rounded-md p-1.5 border",
+                  task.backgroundImageUrl ? "border-white/30 bg-white/10 text-gray-100" : "border-border/60 bg-card text-card-foreground",
+                  editingChecklistItemId === item.id && (task.backgroundImageUrl ? "bg-white/20" : "bg-muted/50")
+                )}
+              >
+                <div className="flex items-center justify-between">
                   <div className="flex items-center flex-grow min-w-0 relative">
                     <Checkbox
                       id={`checklist-${task.id}-${item.id}`}
@@ -337,11 +367,11 @@ export function TaskCard({
                         className={cn(
                           "h-auto py-0 px-0 text-sm flex-grow bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none",
                            task.backgroundImageUrl ? "text-white placeholder-gray-300" : "text-card-foreground",
-                           isOwner 
-                            ? "pl-0 group-hover/checklist:pl-[calc(0.875rem+0.5rem)] group-focus-within/checklist:pl-[calc(0.875rem+0.5rem)]" 
+                           isOwner
+                            ? "pl-0 group-hover/checklist:pl-[calc(0.875rem+0.5rem)] group-focus-within/checklist:pl-[calc(0.875rem+0.5rem)]"
                             : "pl-[calc(0.875rem+0.5rem)]"
                         )}
-                        style={{ paddingLeft: 'calc(0.875rem + 0.5rem)' }} // Ensure space for checkbox
+                        style={{ paddingLeft: 'calc(0.875rem + 0.5rem)' }}
                         onClick={(e) => e.stopPropagation()}
                       />
                     ) : (
@@ -388,6 +418,67 @@ export function TaskCard({
                           <Edit3Icon className="mr-2 h-3.5 w-3.5" />
                           Edit Item
                         </DropdownMenuItem>
+
+                        <Popover open={isItemDatePickerOpen[item.id] || false} onOpenChange={(isOpen) => setIsItemDatePickerOpen(prev => ({ ...prev, [item.id]: isOpen }))}>
+                          <PopoverTrigger asChild>
+                            <Button variant="ghost" className="w-full justify-start px-2 py-1.5 text-sm font-normal h-auto" onClick={() => handleToggleItemDatePicker(item.id, item.dueDate)}>
+                              <CalendarDaysIcon className="mr-2 h-3.5 w-3.5" /> Set Due Date
+                            </Button>
+                          </PopoverTrigger>
+                          {editingItemDueDateId === item.id && (
+                            <PopoverContent className="w-auto p-0" align="start" side="right" sideOffset={5}>
+                              <Calendar
+                                mode="single"
+                                selected={selectedItemDate}
+                                onSelect={(date) => handleSetItemDueDate(item.id, date)}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          )}
+                        </Popover>
+
+                        <Dialog open={assigningUserItemId === item.id} onOpenChange={(isOpen) => { if (!isOpen) setAssigningUserItemId(null); else setAssigningUserItemId(item.id); }}>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" className="w-full justify-start px-2 py-1.5 text-sm font-normal h-auto">
+                              <UserPlusIcon className="mr-2 h-3.5 w-3.5" /> Assign User
+                            </Button>
+                          </DialogTrigger>
+                          {assigningUserItemId === item.id && (
+                            <DialogContent className="sm:max-w-[425px] bg-card text-card-foreground" onClick={(e) => e.stopPropagation()}>
+                              <DialogHeader>
+                                <DialogTitle>Assign User to: {item.title}</DialogTitle>
+                              </DialogHeader>
+                              <div className="py-4 space-y-3">
+                                {item.assignedUserId && item.assignedUserName && (
+                                   <div className="flex items-center space-x-2 text-sm">
+                                      <Avatar className="h-6 w-6">
+                                          <AvatarImage src={item.assignedUserAvatarUrl} alt={item.assignedUserName} data-ai-hint="user portrait"/>
+                                          <AvatarFallback className="text-xs">{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
+                                      </Avatar>
+                                      <span>Currently assigned to: <strong>{item.assignedUserName}</strong></span>
+                                  </div>
+                                )}
+                                {!item.assignedUserId && <p className="text-sm text-muted-foreground">Not assigned to anyone.</p>}
+
+                                {isOwner && currentUser && item.assignedUserId !== currentUser.id && (
+                                  <Button onClick={() => handleAssignToMe(item.id)} className="w-full">
+                                    <UserCircleIcon className="mr-2 h-4 w-4" /> Assign to Me ({currentUser.displayName})
+                                  </Button>
+                                )}
+                                {(isOwner || (currentUser && item.assignedUserId === currentUser.id)) && item.assignedUserId && (
+                                  <Button variant="outline" onClick={() => handleUnassignItem(item.id)} className="w-full">
+                                    Unassign
+                                  </Button>
+                                )}
+                              </div>
+                               <DialogFooter>
+                                <DialogClose asChild><Button variant="ghost">Close</Button></DialogClose>
+                              </DialogFooter>
+                            </DialogContent>
+                          )}
+                        </Dialog>
+
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => onDeleteChecklistItem(task.id, item.id)}
                           className="text-destructive focus:text-destructive focus:bg-destructive/10"
@@ -395,26 +486,36 @@ export function TaskCard({
                           <Trash2Icon className="mr-2 h-3.5 w-3.5" />
                           Delete Item
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem disabled>
-                           <CalendarDaysIcon className="mr-2 h-3.5 w-3.5 text-muted-foreground/70" />
-                           <span className="text-muted-foreground/70">Set Due Date (soon)</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem disabled>
-                           <UserPlusIcon className="mr-2 h-3.5 w-3.5 text-muted-foreground/70" />
-                           <span className="text-muted-foreground/70">Assign User (soon)</span>
-                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
                 </div>
-              ))}
-            </div>
+                {(item.dueDate || item.assignedUserId) && (
+                  <div className={cn("mt-1 pt-1 border-t text-xs flex items-center gap-x-3", task.backgroundImageUrl ? "border-white/20 text-gray-200" : "border-border/30 text-muted-foreground")}>
+                    {item.dueDate && (
+                      <div className="flex items-center">
+                        <CalendarDaysIcon className="mr-1 h-3 w-3" />
+                        {format(new Date(item.dueDate), "MMM d")}
+                      </div>
+                    )}
+                    {item.assignedUserId && item.assignedUserName && (
+                      <div className="flex items-center">
+                        <Avatar className="h-4 w-4 mr-1">
+                           <AvatarImage src={item.assignedUserAvatarUrl} alt={item.assignedUserName} data-ai-hint="user"/>
+                           <AvatarFallback className="text-xs bg-primary/20 text-primary">{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        {item.assignedUserName}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
         {isOwner && (
-          <div className={cn("mt-2 pt-2 border-t border-dashed", task.backgroundImageUrl ? "border-gray-400/50" : "border-border/50")}>
+          <div className={cn("mt-2 pt-2 border-t", task.backgroundImageUrl ? "border-gray-400/50" : "border-border/50")}>
             <div className="flex items-center gap-2">
               <Input
                 type="text"
@@ -423,8 +524,8 @@ export function TaskCard({
                 onChange={(e) => setNewChecklistItemTitle(e.target.value)}
                 onKeyPress={(e) => { if (e.key === 'Enter') handleAddChecklistItemSubmit(); }}
                 className={cn(
-                    "h-8 text-sm flex-grow border-input",
-                    task.backgroundImageUrl ? "bg-white/10 border-white/30 text-white placeholder-gray-300" : "bg-background/50"
+                    "h-8 text-sm flex-grow",
+                    task.backgroundImageUrl ? "bg-white/10 border-white/30 text-white placeholder-gray-300" : "bg-background/50 border-input"
                 )}
                 disabled={!isOwner}
                 onClick={(e) => e.stopPropagation()}
@@ -446,15 +547,23 @@ export function TaskCard({
         )}
       </CardContent>
       <CardFooter className={cn("flex justify-end space-x-0.5 pt-1", !task.backgroundImageUrl && "p-3")}>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={(e) => { e.stopPropagation(); onPrint(task);}}
-          className={cn("h-7 w-7 hover:bg-black/10 dark:hover:bg-white/10", task.backgroundImageUrl ? "text-gray-300 hover:text-white" : "text-muted-foreground hover:text-foreground")}
-          aria-label="Print task"
-        >
-          <PrinterIcon className="h-4 w-4" />
-        </Button>
+        <TooltipProvider>
+           <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => { e.stopPropagation(); onPrint(task);}}
+                  className={cn("h-7 w-7 hover:bg-black/10 dark:hover:bg-white/10", task.backgroundImageUrl ? "text-gray-300 hover:text-white" : "text-muted-foreground hover:text-foreground")}
+                  aria-label="Print task"
+                >
+                  <PrinterIcon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom"><p>Print Card</p></TooltipContent>
+           </Tooltip>
+        </TooltipProvider>
+
         {isOwner && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -468,9 +577,9 @@ export function TaskCard({
                 <MoreHorizontalIcon className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent 
-                side="bottom" 
-                align="end" 
+            <DropdownMenuContent
+                side="bottom"
+                align="end"
                 onClick={(e) => e.stopPropagation()}
                 className="bg-popover text-popover-foreground"
             >
@@ -479,17 +588,17 @@ export function TaskCard({
                 Edit Title
               </DropdownMenuItem>
 
-              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+              <Popover open={isMainDatePickerOpen} onOpenChange={setIsMainDatePickerOpen}>
                 <PopoverTrigger asChild>
                     <Button variant="ghost" className="w-full justify-start px-2 py-1.5 text-sm font-normal h-auto">
-                        <CalendarDaysIcon className="mr-2 h-4 w-4" /> Set Due Date
+                        <CalendarDaysIcon className="mr-2 h-4 w-4" /> Set Card Due Date
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start" side="right" sideOffset={5}>
                     <Calendar
                         mode="single"
-                        selected={selectedDate}
-                        onSelect={handleSetTaskDueDate}
+                        selected={selectedMainDate}
+                        onSelect={handleSetMainTaskDueDate}
                         initialFocus
                     />
                 </PopoverContent>
@@ -498,12 +607,12 @@ export function TaskCard({
               <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
                 <DialogTrigger asChild>
                     <Button variant="ghost" className="w-full justify-start px-2 py-1.5 text-sm font-normal h-auto">
-                        <UsersIcon className="mr-2 h-4 w-4" /> Set Background Image
+                        <ImagePlusIcon className="mr-2 h-4 w-4" /> Set Background Image
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px] bg-card text-card-foreground" onClick={(e) => e.stopPropagation()}>
                   <DialogHeader>
-                    <DialogTitle>Set Background Image</DialogTitle>
+                    <DialogTitle>Set Card Background Image</DialogTitle>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
@@ -513,9 +622,10 @@ export function TaskCard({
                         value={newImageUrl}
                         onChange={(e) => setNewImageUrl(e.target.value)}
                         className="col-span-3 bg-input text-foreground"
-                        placeholder="https://example.com/image.png"
+                        placeholder="https://placehold.co/600x400.png"
                       />
                     </div>
+                     <p className="text-xs text-muted-foreground text-center col-span-4">Leave empty to remove background image.</p>
                   </div>
                   <DialogFooter>
                     <Button onClick={handleSetTaskBackgroundImage}>Save Background</Button>
@@ -531,7 +641,7 @@ export function TaskCard({
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onDelete(task)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                 <Trash2Icon className="mr-2 h-4 w-4" />
-                Delete Task
+                Delete Card
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -541,4 +651,3 @@ export function TaskCard({
     </Card>
   );
 }
-    
