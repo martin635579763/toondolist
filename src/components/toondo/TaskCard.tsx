@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon } from "lucide-react";
+import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, Image as ImageIcon, TrashIcon, MessageSquareIcon, Circle, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -26,6 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { EditableTitle } from "./EditableTitle";
+import { Badge } from "@/components/ui/badge";
 
 
 interface TaskCardProps {
@@ -127,12 +128,13 @@ export function TaskCard({
     if (!editingItemAllDetails) return;
 
     const trimmedTitle = dialogTempTitle.trim();
-    if (trimmedTitle && trimmedTitle !== editingItemAllDetails.title) {
-      onUpdateChecklistItemTitle(task.id, editingItemAllDetails.id, trimmedTitle);
-    } else if (!trimmedTitle && editingItemAllDetails.title) {
+    if (!trimmedTitle) {
         toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
         setDialogTempTitle(editingItemAllDetails.title); // Revert to original if user tried to blank it
-        return; // Prevent saving if title is emptied
+        return; 
+    }
+    if (trimmedTitle !== editingItemAllDetails.title) {
+      onUpdateChecklistItemTitle(task.id, editingItemAllDetails.id, trimmedTitle);
     }
 
 
@@ -154,8 +156,10 @@ export function TaskCard({
     let finalImageAiHint: string | null = null;
 
     if (finalImageUrl) {
-        finalImageAiHint = trimmedTitle.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
+      // Automatically derive AI hint from the first one or two words of the title
+      finalImageAiHint = trimmedTitle.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
     }
+
 
     if (finalImageUrl !== editingItemAllDetails.imageUrl || finalImageAiHint !== editingItemAllDetails.imageAiHint) {
         onSetChecklistItemImage(task.id, editingItemAllDetails.id, finalImageUrl, finalImageAiHint);
@@ -248,11 +252,11 @@ export function TaskCard({
                 initialValue={task.title}
                 onSave={(newTitle) => onUpdateTaskTitle(task.id, newTitle)}
                 isEditable={isOwner}
-                textElement="div" // CardTitle is a div
-                containerClassName={cn("text-xl font-bold")} // Matches CardTitle styling
+                textElement="div" 
+                containerClassName={cn("text-xl font-bold")} 
                 textClassName={cn(task.backgroundImageUrl ? "text-white" : "text-card-foreground")}
                 inputClassName={cn(
-                    "text-xl font-bold", // Basic styling for input
+                    "text-xl font-bold", 
                     task.backgroundImageUrl ? "bg-transparent text-white placeholder-gray-300" : "bg-transparent"
                 )}
                 editIconClassName={cn(task.backgroundImageUrl ? "text-gray-300" : "text-muted-foreground")}
@@ -295,9 +299,9 @@ export function TaskCard({
                    !isOwner && "cursor-default"
                 )}
                 onClick={(e) => {
-                    // Stop propagation to prevent card-level click if any
+                    
                     e.stopPropagation();
-                    // Check if the click was on the checkbox; if so, don't open dialog
+                    
                     const target = e.target as HTMLElement;
                     if (target.closest('button[role="checkbox"]')) {
                         return;
@@ -323,11 +327,11 @@ export function TaskCard({
                           ? "opacity-100" 
                           : "opacity-50 cursor-not-allowed"
                       )}
-                      onClick={(e) => e.stopPropagation()} // Prevent dialog open on checkbox click
+                      onClick={(e) => e.stopPropagation()} 
                       aria-label={`Toggle completion for ${item.title}`}
                     />
                       <label
-                        htmlFor={`checklist-${task.id}-${item.id}`} // Should not be needed if Checkbox has id
+                        htmlFor={`checklist-${task.id}-${item.id}`} 
                         className={cn(
                           "flex-grow break-all truncate",
                           "transition-all duration-200 ease-in-out",
@@ -492,17 +496,19 @@ export function TaskCard({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 items-start">
                 {/* Left Column */}
                 <div className="md:col-span-2 space-y-3 pr-1">
-                  <div>
-                    <Label htmlFor="dialogItemTitle" className={cn(task.backgroundImageUrl && "text-gray-200")}>Title</Label>
+                  <div className="flex items-center space-x-2">
+                     <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                      <EditableTitle
                         initialValue={dialogTempTitle}
                         onSave={(newTitle) => setDialogTempTitle(newTitle)}
-                        isEditable={true} // Always editable within this dialog
+                        isEditable={true} 
                         textElement='div'
-                        inputClassName={cn("text-lg", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                        textClassName={cn("text-lg py-1",task.backgroundImageUrl && "text-gray-200")} // Style to look like an input placeholder if empty
+                        textClassName={cn("text-lg font-medium py-1",task.backgroundImageUrl && "text-gray-100")} 
+                        inputClassName={cn("text-lg font-medium h-auto p-0", task.backgroundImageUrl && "bg-transparent text-white placeholder-gray-300")}
                         placeholder="Item title..."
-                        showEditIcon={false} // No need for edit icon inside dialog input
+                        ariaLabel="Item title"
+                        showEditIcon={true} 
+                        containerClassName="flex-grow" 
                      />
                   </div>
 
@@ -556,30 +562,37 @@ export function TaskCard({
                   <div className="space-y-3 pt-2 border-t border-border/50">
                      <div>
                         <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Due Date</Label>
-                        <Popover open={dialogTempIsDatePickerOpen} onOpenChange={setDialogTempIsDatePickerOpen}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "w-full justify-start text-left font-normal h-auto py-2",
-                                    !dialogTempDueDate && "text-muted-foreground",
-                                    task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
-                                )}
-                                >
-                                <CalendarDaysIcon className="mr-2 h-4 w-4" />
-                                {dialogTempDueDate ? format(dialogTempDueDate, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start" side="right">
-                                <Calendar
-                                mode="single"
-                                selected={dialogTempDueDate}
-                                onSelect={(date) => { setDialogTempDueDate(date || undefined); setDialogTempIsDatePickerOpen(false); }}
-                                initialFocus
-                                className={cn(task.backgroundImageUrl && "bg-card text-card-foreground border-white/30")}
-                                />
-                            </PopoverContent>
-                        </Popover>
+                        <div className="flex items-center">
+                          <Popover open={dialogTempIsDatePickerOpen} onOpenChange={setDialogTempIsDatePickerOpen}>
+                              <PopoverTrigger asChild>
+                                  <Button
+                                  variant={"outline"}
+                                  className={cn(
+                                      "w-full justify-start text-left font-normal h-auto py-2",
+                                      !dialogTempDueDate && "text-muted-foreground",
+                                      task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
+                                  )}
+                                  >
+                                  <CalendarDaysIcon className="mr-2 h-4 w-4" />
+                                  {dialogTempDueDate ? format(dialogTempDueDate, "PPP") : <span>Pick a date</span>}
+                                  </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start" side="right">
+                                  <Calendar
+                                  mode="single"
+                                  selected={dialogTempDueDate}
+                                  onSelect={(date) => { setDialogTempDueDate(date || undefined); setDialogTempIsDatePickerOpen(false); }}
+                                  initialFocus
+                                  className={cn(task.backgroundImageUrl && "bg-card text-card-foreground border-white/30")}
+                                  />
+                              </PopoverContent>
+                          </Popover>
+                          {editingItemAllDetails?.completed && (
+                            <Badge variant="outline" className="ml-2 border-green-600 bg-green-100 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400 text-xs px-1.5 py-0.5 h-auto flex items-center whitespace-nowrap">
+                              <CheckCircle2 className="mr-1 h-3 w-3 flex-shrink-0" /> Done
+                            </Badge>
+                          )}
+                        </div>
                     </div>
                     <div>
                         <Label className={cn("block mb-1",task.backgroundImageUrl && "text-gray-200")}>Assigned User</Label>
