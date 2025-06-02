@@ -7,9 +7,10 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, Edit3Icon, CalendarDaysIcon, PartyPopperIcon, PlusCircleIcon, Trash2Icon, UserPlusIcon, MoreHorizontalIcon, UserCircleIcon, ImagePlusIcon } from "lucide-react";
+import { PrinterIcon, Edit3Icon, CalendarDaysIcon, PartyPopperIcon, PlusCircleIcon, Trash2Icon, UserPlusIcon, MoreHorizontalIcon, UserCircleIcon, ImagePlusIcon, Image as ImageIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import {
   Tooltip,
   TooltipContent,
@@ -43,10 +44,11 @@ interface TaskCardProps {
   onUpdateChecklistItemTitle: (taskId: string, itemId: string, newTitle: string) => void;
   onSetChecklistItemDueDate: (taskId: string, itemId: string, date: Date | null) => void;
   onAssignUserToChecklistItem: (taskId: string, itemId: string, userId: string | null, userName: string | null, userAvatarUrl: string | null) => void;
+  onSetChecklistItemImage: (taskId: string, itemId: string, imageUrl: string | null, imageAiHint: string | null) => void;
   onApplyForRole: (taskId: string, roleName: string) => void;
   onUpdateTaskTitle: (taskId: string, newTitle: string) => void;
-  onSetDueDate: (taskId: string, date: Date | null) => void; // Remains for potential future use via other UI
-  onSetBackgroundImage: (taskId: string, imageUrl: string | null) => void; // Remains for potential future use
+  onSetDueDate: (taskId: string, date: Date | null) => void;
+  onSetBackgroundImage: (taskId: string, imageUrl: string | null) => void;
 }
 
 export function TaskCard({
@@ -60,6 +62,7 @@ export function TaskCard({
   onUpdateChecklistItemTitle,
   onSetChecklistItemDueDate,
   onAssignUserToChecklistItem,
+  onSetChecklistItemImage,
   onApplyForRole,
   onUpdateTaskTitle,
   onSetDueDate,
@@ -85,6 +88,11 @@ export function TaskCard({
   const [isItemDatePickerOpen, setIsItemDatePickerOpen] = useState<Record<string, boolean>>({});
 
   const [assigningUserItemId, setAssigningUserItemId] = useState<string | null>(null);
+
+  const [editingImageItemId, setEditingImageItemId] = useState<string | null>(null);
+  const [currentImageUrlInput, setCurrentImageUrlInput] = useState("");
+  const [currentImageAiHintInput, setCurrentImageAiHintInput] = useState("");
+  const [itemForImageDialog, setItemForImageDialog] = useState<ChecklistItem | null>(null);
 
 
   useEffect(() => {
@@ -193,6 +201,40 @@ export function TaskCard({
      setAssigningUserItemId(null);
   };
 
+  const handleOpenImageDialog = (item: ChecklistItem) => {
+    setItemForImageDialog(item);
+    setCurrentImageUrlInput(item.imageUrl || "");
+    setCurrentImageAiHintInput(item.imageAiHint || "");
+    setEditingImageItemId(item.id);
+  };
+
+  const handleSaveImage = () => {
+    if (editingImageItemId) {
+      let finalImageUrl: string | null = currentImageUrlInput.trim() || null;
+      let finalImageAiHint: string | null = currentImageAiHintInput.trim() || null;
+
+      if (!finalImageUrl && finalImageAiHint) {
+        finalImageUrl = `https://placehold.co/80x45.png`;
+      } else if (finalImageUrl && !finalImageAiHint && itemForImageDialog) {
+        finalImageAiHint = itemForImageDialog.title.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
+      }
+      
+      onSetChecklistItemImage(task.id, editingImageItemId, finalImageUrl, finalImageAiHint);
+      toast({ title: "Image Updated", description: "Checklist item image details saved." });
+    }
+    setEditingImageItemId(null);
+    setItemForImageDialog(null);
+  };
+
+  const handleRemoveImage = () => {
+    if (editingImageItemId) {
+      onSetChecklistItemImage(task.id, editingImageItemId, null, null);
+      toast({ title: "Image Removed", description: "Checklist item image removed." });
+    }
+    setEditingImageItemId(null);
+    setItemForImageDialog(null);
+  };
+
 
   const cardStyle: React.CSSProperties = {};
   let contentOverlayStyle: React.CSSProperties = {};
@@ -201,8 +243,8 @@ export function TaskCard({
     cardStyle.backgroundImage = `url(${task.backgroundImageUrl})`;
     cardStyle.backgroundSize = 'cover';
     cardStyle.backgroundPosition = 'center';
-    contentOverlayStyle.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Dark overlay for text contrast
-    contentOverlayStyle.color = 'white'; // Ensure text on overlay is white
+    contentOverlayStyle.backgroundColor = 'rgba(0, 0, 0, 0.5)'; 
+    contentOverlayStyle.color = 'white'; 
   }
 
 
@@ -211,7 +253,7 @@ export function TaskCard({
       className={cn(
         "flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 relative border-border",
         task.completed && "opacity-60 ring-2 ring-green-500",
-        !task.backgroundImageUrl && "bg-card text-card-foreground" // Apply only if no background image
+        !task.backgroundImageUrl && "bg-card text-card-foreground" 
       )}
       style={cardStyle}
     >
@@ -223,13 +265,13 @@ export function TaskCard({
         <div className="fireworks-container">
           {Array.from({ length: 20 }).map((_, i) => {
             const angle = Math.random() * 360;
-            const radius = 30 + Math.random() * 70; // Increased radius for wider spread
+            const radius = 30 + Math.random() * 70; 
             const txVal = Math.cos(angle * Math.PI / 180) * radius;
             const tyVal = Math.sin(angle * Math.PI / 180) * radius;
 
             const tx = txVal + 'px';
             const ty = tyVal + 'px';
-            const delay = Math.random() * 0.4; // Shorten delay slightly for quicker burst
+            const delay = Math.random() * 0.4; 
             const particleColors = ['#FFD700', '#FF6347', '#ADFF2F', '#87CEEB', '#DA70D6', '#FFFFFF'];
             const color = particleColors[Math.floor(Math.random() * particleColors.length)];
             return (
@@ -237,9 +279,9 @@ export function TaskCard({
                 key={i}
                 className="firework-particle"
                 style={{
-                  top: '50%', // Explode from center
+                  top: '50%', 
                   left: '50%',
-                  transform: 'translate(-50%, -50%)', // Adjust origin for transform
+                  transform: 'translate(-50%, -50%)', 
                   backgroundColor: color,
                   animationDelay: `${delay}s`,
                   // @ts-ignore
@@ -293,11 +335,11 @@ export function TaskCard({
             )}
           </div>
           <div className="flex items-center space-x-1 shrink-0">
-            {task.completed && <PartyPopperIcon className="ml-1 shrink-0 h-5 w-5 text-yellow-400" />}
+             {task.completed && <PartyPopperIcon className={cn("ml-1 shrink-0 h-5 w-5", task.backgroundImageUrl ? "text-yellow-300" : "text-yellow-400")} />}
           </div>
         </div>
       </CardHeader>
-      <CardContent className={cn("flex-grow space-y-2 pt-1 min-h-7", !task.backgroundImageUrl && "p-4")}>
+      <CardContent className={cn("flex-grow space-y-2 pt-1", !task.backgroundImageUrl && "p-4")}>
         {task.dueDate && (
           <div className={cn("text-sm flex items-center", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")}>
             <CalendarDaysIcon className="mr-1 h-3.5 w-3.5" />
@@ -394,16 +436,16 @@ export function TaskCard({
                         side="bottom"
                         align="end"
                         onClick={(e) => e.stopPropagation()}
-                        className="bg-popover text-popover-foreground"
+                        className={cn("bg-popover text-popover-foreground", task.backgroundImageUrl && "bg-background/80 backdrop-blur-sm border-white/30 text-white")}
                       >
-                        <DropdownMenuItem onClick={() => handleStartEditChecklistItem(item)}>
+                        <DropdownMenuItem onClick={() => handleStartEditChecklistItem(item)} className={cn(task.backgroundImageUrl && "focus:bg-white/20")}>
                           <Edit3Icon className="mr-2 h-3.5 w-3.5" />
                           Edit Item
                         </DropdownMenuItem>
 
                         <Popover open={isItemDatePickerOpen[item.id] || false} onOpenChange={(isOpen) => setIsItemDatePickerOpen(prev => ({ ...prev, [item.id]: isOpen }))}>
                           <PopoverTrigger asChild>
-                            <Button variant="ghost" className="w-full justify-start px-2 py-1.5 text-sm font-normal h-auto" onClick={() => handleToggleItemDatePicker(item.id, item.dueDate)}>
+                            <Button variant="ghost" className={cn("w-full justify-start px-2 py-1.5 text-sm font-normal h-auto", task.backgroundImageUrl && "hover:bg-white/20 text-white")} onClick={() => handleToggleItemDatePicker(item.id, item.dueDate)}>
                               <CalendarDaysIcon className="mr-2 h-3.5 w-3.5" /> Set Due Date
                             </Button>
                           </PopoverTrigger>
@@ -414,6 +456,7 @@ export function TaskCard({
                                 selected={selectedItemDate}
                                 onSelect={(date) => handleSetItemDueDate(item.id, date)}
                                 initialFocus
+                                className={cn(task.backgroundImageUrl && "bg-card text-card-foreground border-white/30")}
                               />
                             </PopoverContent>
                           )}
@@ -421,49 +464,109 @@ export function TaskCard({
 
                         <Dialog open={assigningUserItemId === item.id} onOpenChange={(isOpen) => { if (!isOpen) setAssigningUserItemId(null); else setAssigningUserItemId(item.id); }}>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" className="w-full justify-start px-2 py-1.5 text-sm font-normal h-auto">
+                            <Button variant="ghost" className={cn("w-full justify-start px-2 py-1.5 text-sm font-normal h-auto", task.backgroundImageUrl && "hover:bg-white/20 text-white")}>
                               <UserPlusIcon className="mr-2 h-3.5 w-3.5" /> Assign User
                             </Button>
                           </DialogTrigger>
                           {assigningUserItemId === item.id && (
-                            <DialogContent className="sm:max-w-[425px] bg-card text-card-foreground" onClick={(e) => e.stopPropagation()}>
+                            <DialogContent className={cn("sm:max-w-[425px] bg-card text-card-foreground", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white placeholder-gray-300")} onClick={(e) => e.stopPropagation()}>
                               <DialogHeader>
-                                <DialogTitle>Assign User to: {item.title}</DialogTitle>
+                                <DialogTitle className={cn(task.backgroundImageUrl && "text-white")}>Assign User to: {item.title}</DialogTitle>
                               </DialogHeader>
                               <div className="py-4 space-y-3">
                                 {item.assignedUserId && item.assignedUserName && (
                                    <div className="flex items-center space-x-2 text-sm">
                                       <Avatar className="h-6 w-6">
                                           <AvatarImage src={item.assignedUserAvatarUrl} alt={item.assignedUserName} data-ai-hint="user portrait"/>
-                                          <AvatarFallback className="text-xs">{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
+                                          <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary")}>{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
                                       </Avatar>
                                       <span>Currently assigned to: <strong>{item.assignedUserName}</strong></span>
                                   </div>
                                 )}
-                                {!item.assignedUserId && <p className="text-sm text-muted-foreground">Not assigned to anyone.</p>}
+                                {!item.assignedUserId && <p className={cn("text-sm", task.backgroundImageUrl ? "text-gray-300" : "text-muted-foreground")}>Not assigned to anyone.</p>}
 
                                 {isOwner && currentUser && item.assignedUserId !== currentUser.id && (
-                                  <Button onClick={() => handleAssignToMe(item.id)} className="w-full">
+                                  <Button onClick={() => handleAssignToMe(item.id)} className={cn("w-full", task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}>
                                     <UserCircleIcon className="mr-2 h-4 w-4" /> Assign to Me ({currentUser.displayName})
                                   </Button>
                                 )}
                                 {(isOwner || (currentUser && item.assignedUserId === currentUser.id)) && item.assignedUserId && (
-                                  <Button variant="outline" onClick={() => handleUnassignItem(item.id)} className="w-full">
+                                  <Button variant="outline" onClick={() => handleUnassignItem(item.id)} className={cn("w-full", task.backgroundImageUrl && "bg-transparent border-white/40 hover:bg-white/10 text-white")}>
                                     Unassign
                                   </Button>
                                 )}
                               </div>
                                <DialogFooter>
-                                <DialogClose asChild><Button variant="ghost">Close</Button></DialogClose>
+                                <DialogClose asChild><Button variant="ghost" className={cn(task.backgroundImageUrl && "text-gray-300 hover:bg-white/10")}>Close</Button></DialogClose>
+                              </DialogFooter>
+                            </DialogContent>
+                          )}
+                        </Dialog>
+                        
+                        <Dialog open={editingImageItemId === item.id} onOpenChange={(isOpen) => { if (!isOpen) setEditingImageItemId(null); }}>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" className={cn("w-full justify-start px-2 py-1.5 text-sm font-normal h-auto", task.backgroundImageUrl && "hover:bg-white/20 text-white")} onClick={() => handleOpenImageDialog(item)}>
+                              <ImageIcon className="mr-2 h-3.5 w-3.5" /> Add/Change Image
+                            </Button>
+                          </DialogTrigger>
+                          {editingImageItemId === item.id && itemForImageDialog && (
+                            <DialogContent className={cn("sm:max-w-[425px] bg-card text-card-foreground", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")} onClick={(e) => e.stopPropagation()}>
+                              <DialogHeader>
+                                <DialogTitle className={cn(task.backgroundImageUrl && "text-white")}>Image for: {itemForImageDialog.title}</DialogTitle>
+                              </DialogHeader>
+                              <div className="py-4 space-y-4">
+                                { (currentImageUrlInput || itemForImageDialog.imageUrl) && (
+                                  <div className="mb-2 w-full h-32 relative overflow-hidden rounded-md">
+                                    <Image 
+                                      src={currentImageUrlInput || itemForImageDialog.imageUrl!} 
+                                      alt="Checklist item image" 
+                                      layout="fill" 
+                                      objectFit="cover" 
+                                      className="rounded-md"
+                                      data-ai-hint={currentImageAiHintInput || itemForImageDialog.imageAiHint || itemForImageDialog.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
+                                    />
+                                  </div>
+                                )}
+                                <div>
+                                  <Label htmlFor="itemImageUrl" className={cn(task.backgroundImageUrl && "text-gray-200")}>Image URL</Label>
+                                  <Input 
+                                    id="itemImageUrl" 
+                                    value={currentImageUrlInput} 
+                                    onChange={(e) => setCurrentImageUrlInput(e.target.value)} 
+                                    placeholder="https://example.com/image.png" 
+                                    className={cn(task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="itemImageAiHint" className={cn(task.backgroundImageUrl && "text-gray-200")}>AI Hint (1-2 words)</Label>
+                                  <Input 
+                                    id="itemImageAiHint" 
+                                    value={currentImageAiHintInput} 
+                                    onChange={(e) => setCurrentImageAiHintInput(e.target.value)} 
+                                    placeholder="e.g., 'nature forest'" 
+                                    className={cn(task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                                  />
+                                  <p className={cn("text-xs mt-1", task.backgroundImageUrl ? "text-gray-400" : "text-muted-foreground")}>
+                                    If no URL, placeholder image will be used with this hint. If no hint, first 2 words of title used.
+                                  </p>
+                                </div>
+                              </div>
+                              <DialogFooter className="gap-2 sm:gap-0">
+                                {(itemForImageDialog.imageUrl || currentImageUrlInput) && 
+                                  <Button variant="destructive" onClick={handleRemoveImage} className={cn(task.backgroundImageUrl && "bg-red-500/80 hover:bg-red-500/90 text-white")}>Remove Image</Button>
+                                }
+                                <Button onClick={handleSaveImage} className={cn(task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}>Save Image</Button>
+                                <DialogClose asChild><Button variant="ghost" className={cn(task.backgroundImageUrl && "text-gray-300 hover:bg-white/10")}>Cancel</Button></DialogClose>
                               </DialogFooter>
                             </DialogContent>
                           )}
                         </Dialog>
 
-                        <DropdownMenuSeparator />
+
+                        <DropdownMenuSeparator className={cn(task.backgroundImageUrl && "bg-white/20")} />
                         <DropdownMenuItem
                           onClick={() => onDeleteChecklistItem(task.id, item.id)}
-                          className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                          className={cn("focus:bg-destructive/10", task.backgroundImageUrl ? "text-red-400 hover:!bg-red-500/30 focus:text-red-300" : "text-destructive focus:text-destructive")}
                         >
                           <Trash2Icon className="mr-2 h-3.5 w-3.5" />
                           Delete Item
@@ -472,23 +575,37 @@ export function TaskCard({
                     </DropdownMenu>
                   )}
                 </div>
-                {(item.dueDate || item.assignedUserId) && (
-                  <div className={cn("mt-1 pt-1 border-t text-xs flex items-center gap-x-3", task.backgroundImageUrl ? "border-white/20 text-gray-200" : "border-border/30 text-muted-foreground")}>
-                    {item.dueDate && (
-                      <div className="flex items-center">
-                        <CalendarDaysIcon className="mr-1 h-3 w-3" />
-                        {format(new Date(item.dueDate), "MMM d")}
+                {(item.dueDate || item.assignedUserId || item.imageUrl) && (
+                  <div className={cn("mt-1 pt-1 border-t text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "border-white/20 text-gray-200" : "border-border/30 text-muted-foreground")}>
+                    {item.imageUrl && (
+                      <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
+                         <Image 
+                            src={item.imageUrl} 
+                            alt={item.title || "Checklist item image"}
+                            layout="fill"
+                            objectFit="cover"
+                            className="rounded"
+                            data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
+                          />
                       </div>
                     )}
-                    {item.assignedUserId && item.assignedUserName && (
-                      <div className="flex items-center">
-                        <Avatar className="h-4 w-4 mr-1">
-                           <AvatarImage src={item.assignedUserAvatarUrl} alt={item.assignedUserName} data-ai-hint="user"/>
-                           <AvatarFallback className="text-xs bg-primary/20 text-primary">{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        {item.assignedUserName}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-x-3 w-full">
+                      {item.dueDate && (
+                        <div className="flex items-center">
+                          <CalendarDaysIcon className="mr-1 h-3 w-3" />
+                          {format(new Date(item.dueDate), "MMM d")}
+                        </div>
+                      )}
+                      {item.assignedUserId && item.assignedUserName && (
+                        <div className="flex items-center">
+                          <Avatar className="h-4 w-4 mr-1">
+                             <AvatarImage src={item.assignedUserAvatarUrl} alt={item.assignedUserName} data-ai-hint="user"/>
+                             <AvatarFallback className={cn("text-xs", task.backgroundImageUrl ? "bg-white/30 text-white" : "bg-primary/20 text-primary" )}>{item.assignedUserName.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          {item.assignedUserName}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -507,7 +624,7 @@ export function TaskCard({
                 onKeyPress={(e) => { if (e.key === 'Enter') handleAddChecklistItemSubmit(); }}
                 className={cn(
                     "h-8 text-sm flex-grow",
-                    task.backgroundImageUrl ? "bg-white/10 border-white/30 text-white placeholder-gray-300" : "bg-background/50 border-input"
+                    task.backgroundImageUrl ? "bg-white/10 border-white/30 text-white placeholder-gray-300 focus:border-white/50" : "bg-background/50 border-input"
                 )}
                 disabled={!isOwner}
                 onClick={(e) => e.stopPropagation()}
@@ -542,7 +659,7 @@ export function TaskCard({
                   <PrinterIcon className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom"><p>Print Card</p></TooltipContent>
+              <TooltipContent side="bottom" className={cn(task.backgroundImageUrl && "bg-black/70 text-white border-white/20") }><p>Print Card</p></TooltipContent>
            </Tooltip>
         </TooltipProvider>
 
@@ -560,7 +677,7 @@ export function TaskCard({
                         <Trash2Icon className="h-4 w-4" />
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" className="bg-destructive text-destructive-foreground"><p>Delete Card</p></TooltipContent>
+                    <TooltipContent side="bottom" className={cn("bg-destructive text-destructive-foreground", task.backgroundImageUrl && "bg-red-500/80 text-white border-red-500/50")}><p>Delete Card</p></TooltipContent>
                 </Tooltip>
             </TooltipProvider>
         )}

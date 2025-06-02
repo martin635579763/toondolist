@@ -21,6 +21,8 @@ export interface ChecklistItem {
   assignedUserId?: string | null;
   assignedUserName?: string | null;
   assignedUserAvatarUrl?: string | null;
+  imageUrl?: string | null;
+  imageAiHint?: string | null;
 }
 
 export interface Task {

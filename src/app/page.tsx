@@ -85,10 +85,15 @@ function HomePageContent() {
       assignedRoles: task.assignedRoles || [],
       checklistItems: (task.checklistItems || []).map(item => ({
         ...item,
+        id: item.id || generateId(),
+        title: item.title || "Untitled Item",
+        completed: item.completed || false,
         dueDate: item.dueDate || null,
         assignedUserId: item.assignedUserId || null,
         assignedUserName: item.assignedUserName || null,
         assignedUserAvatarUrl: item.assignedUserAvatarUrl || null,
+        imageUrl: item.imageUrl || null,
+        imageAiHint: item.imageAiHint || null,
       })),
       order: task.order ?? index,
       userId: task.userId || 'unknown_user',
@@ -180,12 +185,14 @@ function HomePageContent() {
             assignedUserId: null,
             assignedUserName: null,
             assignedUserAvatarUrl: null,
+            imageUrl: null,
+            imageAiHint: null,
           };
           const updatedChecklistItems = [...(task.checklistItems || []), newItem];
           return {
             ...task,
             checklistItems: updatedChecklistItems,
-            completed: false, // Adding an item makes the task incomplete
+            completed: false, 
           };
         }
         return task;
@@ -235,7 +242,7 @@ function HomePageContent() {
           if (updatedChecklistItems.length > 0 && updatedChecklistItems.every(item => item.completed)) {
             newCompletedStatus = true;
           } else if (updatedChecklistItems.length === 0) {
-            newCompletedStatus = task.completed; // If task was complete and no items, it stays complete (or could be false based on preference)
+            newCompletedStatus = task.completed; 
           }
 
 
@@ -296,7 +303,7 @@ function HomePageContent() {
     if (!currentUser) return;
      setTasks(prevTasks =>
       prevTasks.map(task => {
-        if (task.id === taskId && task.userId === currentUser.id) { // Ensure current user owns the task
+        if (task.id === taskId && task.userId === currentUser.id) { 
           const updatedChecklistItems = (task.checklistItems || []).map(item =>
             item.id === itemId ? { ...item, assignedUserId: userId, assignedUserName: userName, assignedUserAvatarUrl: userAvatarUrl } : item
           );
@@ -308,15 +315,27 @@ function HomePageContent() {
     toast({ title: "Item Assignment Updated!", description: userName ? `Item assigned to ${userName}.` : "Item unassigned." });
   };
 
+  const handleSetChecklistItemImage = (taskId: string, itemId: string, imageUrl: string | null, imageAiHint: string | null) => {
+    if (!currentUser) return;
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        if (task.id === taskId && task.userId === currentUser.id) {
+          const updatedChecklistItems = (task.checklistItems || []).map(item =>
+            item.id === itemId ? { ...item, imageUrl, imageAiHint } : item
+          );
+          return { ...task, checklistItems: updatedChecklistItems };
+        }
+        return task;
+      })
+    );
+  };
+
 
   const handleApplyForRole = (taskId: string, roleName: string) => {
-    // This function might be less relevant now if assignedRoles on main task is de-emphasized
-    // But keeping it for now in case it's used elsewhere or for future.
     if (!currentUser) {
       toast({ title: "Login Required", description: "You must be logged in to apply for roles.", variant: "destructive" });
       return;
     }
-    // ... (rest of the existing logic for applying to main task roles)
   };
 
   const handleUpdateTaskTitle = (taskId: string, newTitle: string) => {
@@ -660,6 +679,7 @@ function HomePageContent() {
                         onUpdateChecklistItemTitle={handleUpdateChecklistItemTitle}
                         onSetChecklistItemDueDate={handleSetChecklistItemDueDate}
                         onAssignUserToChecklistItem={handleAssignUserToChecklistItem}
+                        onSetChecklistItemImage={handleSetChecklistItemImage}
                         onApplyForRole={handleApplyForRole}
                         onUpdateTaskTitle={handleUpdateTaskTitle}
                         onSetDueDate={handleSetTaskDueDate}
@@ -696,7 +716,7 @@ function defaultTasksAddedForUser(userId: string, allTasks?: Task[]): boolean {
     const defaultTitles = ["Later", "This Week", "Today"].sort();
     return JSON.stringify(titles) === JSON.stringify(defaultTitles);
   }
-  return userTasks.length > 0 && userTasks.length < 3; // if some defaults were deleted, still true
+  return userTasks.length > 0 && userTasks.length < 3; 
 }
 
 
