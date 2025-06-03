@@ -81,10 +81,26 @@ export function ChecklistItemEditDialog({
 
   useEffect(() => {
     if (isOpen) {
+        // When dialog opens, sync description and image URL from the item prop
         setDialogTempDescription(item.description || "");
         setDialogTempImageUrl(item.imageUrl || "");
     }
-  }, [item, isOpen]);
+  }, [item.description, item.imageUrl, isOpen]);
+
+  // This effect ensures that if the item prop itself changes (e.g. title, completed status from parent)
+  // while the dialog is open, the dialog's view of description and image url is also kept in sync if not actively editing.
+  // Only update if the prop changed AND it's different from what's currently in the dialog's temp state.
+  useEffect(() => {
+    if (isOpen) {
+        if (item.description !== dialogTempDescription && !document.activeElement?.closest('#dialogItemDescription')) {
+            setDialogTempDescription(item.description || "");
+        }
+        if (item.imageUrl !== dialogTempImageUrl && !isAttachmentDialogOpen) {
+            setDialogTempImageUrl(item.imageUrl || "");
+        }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.description, item.imageUrl, isOpen]);
 
 
   const handleSaveDescriptionOnClose = () => {
@@ -205,9 +221,15 @@ export function ChecklistItemEditDialog({
     const trimmedTitle = newTitle.trim();
      if (!trimmedTitle) {
         toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
-        return;
+        // Revert to original title if save is attempted with empty
+         if (item.title !== newTitle) { // Only toast if it was a real attempt to blank, not just blur on initial empty
+            // This part might need adjustment based on EditableTitle behavior for empty save
+         }
+        return; 
     }
-    onUpdateChecklistItemTitle(taskId, item.id, trimmedTitle);
+    if (item.title !== trimmedTitle) {
+      onUpdateChecklistItemTitle(taskId, item.id, trimmedTitle);
+    }
   };
 
   const handleCheckboxChange = () => {
@@ -266,7 +288,10 @@ export function ChecklistItemEditDialog({
                 </div>
           </DialogHeader>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 flex-grow overflow-hidden">
+          <div className={cn(
+              "grid grid-cols-1 md:grid-cols-2 gap-x-6 flex-grow overflow-hidden min-h-0"
+            )}
+          >
             {/* Left Column: Image, Actions, Description */}
             <div className="md:col-span-1 space-y-4 pr-4 md:border-r md:border-border/50 overflow-y-auto h-full">
               {item.imageUrl && ( 
@@ -420,8 +445,8 @@ export function ChecklistItemEditDialog({
                 </h4>
                 <ScrollArea 
                   className={cn(
-                    "flex-grow",
-                    taskBackgroundImageUrl && "pr-2"
+                    "flex-grow", // Removed explicit height, flex-grow should handle it
+                    taskBackgroundImageUrl && "pr-2" // Padding for scrollbar visibility on transparent bg
                   )}
                 >
                   {(item.activityLog && item.activityLog.length > 0) ? (
