@@ -64,29 +64,7 @@ function HomePageContent() {
 
     let tasksToProcess = [...parsedTasks];
 
-    if (currentUser && !authIsLoading) {
-      const currentUserTasks = tasksToProcess.filter(task => task.userId === currentUser.id);
-      if (currentUserTasks.length === 0) {
-        const defaultTitles = ["Today", "This Week", "Later"];
-        const defaultTasksForUser: Task[] = defaultTitles.map((title, index) => ({
-          id: generateId(),
-          title: title,
-          description: `Tasks to do ${title.toLowerCase()}.`,
-          completed: false,
-          dueDate: null,
-          backgroundImageUrl: undefined,
-          createdAt: Date.now() + index,
-          applicants: [],
-          checklistItems: [],
-          assignedRoles: [],
-          order: index,
-          userId: currentUser.id,
-          userDisplayName: currentUser.displayName,
-          userAvatarUrl: currentUser.avatarUrl,
-        }));
-        tasksToProcess = [...tasksToProcess, ...defaultTasksForUser];
-      }
-    }
+    // Removed automatic creation of default tasks
 
     const tasksWithDefaults = tasksToProcess.map((task, index) => ({
       ...task,
@@ -108,7 +86,7 @@ function HomePageContent() {
         imageUrl: item.imageUrl || null,
         imageAiHint: item.imageAiHint || null,
         comments: item.comments || [],
-        label: Array.isArray(item.label) ? item.label : (item.label ? [item.label] : []), 
+        label: Array.isArray(item.label) ? item.label : (item.label ? [item.label] : []),
       })),
       order: task.order ?? index,
       userId: task.userId || 'unknown_user',
@@ -204,7 +182,7 @@ function HomePageContent() {
             imageUrl: null,
             imageAiHint: null,
             comments: [],
-            label: [], 
+            label: [],
           };
           const updatedChecklistItems = [...(task.checklistItems || []), newItem];
           return {
@@ -807,3 +785,6 @@ export default function HomePage() {
       <HomePageContent />
   );
 }
+
+
+    
