@@ -5,7 +5,7 @@ import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Task, ChecklistItem } from '@/types/task';
 import { TaskCard } from '@/components/toondo/TaskCard';
-import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, UserCircleIcon, PlusSquareIcon, ImagePlusIcon } from 'lucide-react';
+import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, UserCircleIcon, PlusSquareIcon, ImagePlusIcon, TrashIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { cn, generateId } from '@/lib/utils';
 import { format } from "date-fns";
@@ -21,6 +21,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PrintableTaskCard } from '@/components/toondo/PrintableTaskCard';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
 
 function HomePageContent() {
   const { currentUser, logout, isLoading: authIsLoading } = useAuth();
@@ -96,7 +108,7 @@ function HomePageContent() {
         imageUrl: item.imageUrl || null,
         imageAiHint: item.imageAiHint || null,
         comments: item.comments || [],
-        label: Array.isArray(item.label) ? item.label : (item.label ? [item.label] : []), // Ensure label is an array
+        label: Array.isArray(item.label) ? item.label : (item.label ? [item.label] : []), 
       })),
       order: task.order ?? index,
       userId: task.userId || 'unknown_user',
@@ -192,7 +204,7 @@ function HomePageContent() {
             imageUrl: null,
             imageAiHint: null,
             comments: [],
-            label: [], // Initialize as empty array
+            label: [], 
           };
           const updatedChecklistItems = [...(task.checklistItems || []), newItem];
           return {
@@ -584,6 +596,16 @@ function HomePageContent() {
       return orderA - orderB;
   });
 
+  const handleClearLocalStorage = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('toondo-users');
+      localStorage.removeItem('toondo-current-user');
+      localStorage.removeItem('toondo-tasks');
+      toast({ title: "Local Storage Cleared", description: "All app data has been removed from your browser." });
+      window.location.reload();
+    }
+  };
+
 
   if (authIsLoading || isLoadingTasks) {
     return (
@@ -692,7 +714,7 @@ function HomePageContent() {
                   </div>
                 </div>
 
-                {displayTasks.filter(task => task.userId === currentUser.id).length === 0 && !isLoadingTasks && !defaultTasksAddedForUser(currentUser.id, tasks) ? (
+                {displayTasks.filter(task => task.userId === currentUser.id).length === 0 && !isLoadingTasks ? (
                   <div className="text-center py-16 pl-6">
                     <FileTextIcon className="mx-auto h-24 w-24 text-muted-foreground opacity-50 mb-4" />
                     <h2 className="text-3xl font-semibold mb-2">No ToonDos Yet, {currentUser.displayName}!</h2>
@@ -751,28 +773,37 @@ function HomePageContent() {
           <p className="text-muted-foreground">
             &copy; {new Date().getFullYear()} ToonDo List. Make your tasks fun!
           </p>
+          <div className="mt-4">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <TrashIcon className="mr-2 h-4 w-4" /> Clear Local Storage
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action will permanently delete all ToonDo users and tasks from your browser's local storage. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearLocalStorage}>
+                    Yes, clear storage
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </footer>
       </div>
     </TooltipProvider>
   );
 }
 
-function defaultTasksAddedForUser(userId: string, allTasks?: Task[]): boolean {
-  if (!allTasks) return false;
-  const userTasks = allTasks.filter(t => t.userId === userId);
-
-  if (userTasks.length === 3) {
-    const titles = userTasks.map(t => t.title).sort();
-    const defaultTitles = ["Later", "This Week", "Today"].sort();
-    return JSON.stringify(titles) === JSON.stringify(defaultTitles);
-  }
-  return userTasks.length > 0 && userTasks.length < 3;
-}
-
-
 export default function HomePage() {
   return (
       <HomePageContent />
   );
 }
-
