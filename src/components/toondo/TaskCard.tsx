@@ -446,7 +446,13 @@ export function TaskCard({
                             />
                         )}
                         {item.dueDate && (
-                        <div className="flex items-center">
+                        <div className={cn(
+                            "flex items-center",
+                            item.completed ? 
+                                (task.backgroundImageUrl ? "text-green-300" : "text-green-600 dark:text-green-400") :
+                                (task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")
+                            )}
+                        >
                             <CalendarDaysIcon className="mr-1 h-3 w-3" />
                             {format(new Date(item.dueDate), "MMM d")}
                         </div>
@@ -611,15 +617,9 @@ export function TaskCard({
                             size="sm" 
                             className={cn(
                                 "justify-start text-xs h-auto py-1.5 px-2",
-                                task.backgroundImageUrl 
-                                ? [ 
-                                    "bg-white/10 border-white/30 hover:bg-white/20",
-                                    dialogTempCompleted && dialogTempDueDate ? "text-green-300" : "text-white"
-                                  ]
-                                : (dialogTempCompleted && dialogTempDueDate 
-                                    ? "text-green-600 dark:text-green-400 hover:bg-accent/80 hover:text-green-700 dark:hover:text-green-300" 
-                                    : "" 
-                                  )
+                                dialogTempCompleted && dialogTempDueDate 
+                                ? (task.backgroundImageUrl ? "text-green-300 bg-white/10 border-white/30 hover:bg-white/20" : "text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300")
+                                : (task.backgroundImageUrl ? "bg-white/10 border-white/30 text-white hover:bg-white/20" : "")
                             )}
                         >
                             <CalendarDaysIcon className={cn("mr-1.5 h-3.5 w-3.5")} />
@@ -799,3 +799,4 @@ export function TaskCard({
 
 
     
+
