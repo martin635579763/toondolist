@@ -70,11 +70,9 @@ export function ChecklistItemEditDialog({
 }: ChecklistItemEditDialogProps) {
   const { toast } = useToast();
 
-  // State for values that are edited in sub-dialogs or have delayed save (like description)
   const [dialogTempDescription, setDialogTempDescription] = useState(item.description || "");
   const [dialogTempImageUrl, setDialogTempImageUrl] = useState<string>(item.imageUrl || "");
   
-  // State for popover/sub-dialog visibility
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
   const attachmentDialogFileInpuRef = useRef<HTMLInputElement>(null);
   const [isUserPopoverOpen, setIsUserPopoverOpen] = useState(false);
@@ -82,12 +80,9 @@ export function ChecklistItemEditDialog({
   const [isLabelPopoverOpen, setIsLabelPopoverOpen] = useState(false);
 
   useEffect(() => {
-    // Sync local state if the item prop changes (e.g., due to external updates or real-time log additions)
-    // Only sync if the dialog is open to avoid unnecessary updates.
     if (isOpen) {
         setDialogTempDescription(item.description || "");
         setDialogTempImageUrl(item.imageUrl || "");
-        // Title is handled by EditableTitle's internal state + onSave prop
     }
   }, [item, isOpen]);
 
@@ -103,7 +98,6 @@ export function ChecklistItemEditDialog({
   const handleDialogClose = (openState: boolean) => {
     if (!openState) { 
       if(isOwner) handleSaveDescriptionOnClose();
-      // Reset popover states
       setIsUserPopoverOpen(false);
       setIsDueDatePopoverOpen(false);
       setIsLabelPopoverOpen(false);
@@ -211,7 +205,6 @@ export function ChecklistItemEditDialog({
     const trimmedTitle = newTitle.trim();
      if (!trimmedTitle) {
         toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
-        // EditableTitle should handle reverting to initial value if save is not successful
         return;
     }
     onUpdateChecklistItemTitle(taskId, item.id, trimmedTitle);
@@ -273,7 +266,7 @@ export function ChecklistItemEditDialog({
                 </div>
           </DialogHeader>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 flex-grow overflow-hidden min-h-[300px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 flex-grow overflow-hidden">
             {/* Left Column: Image, Actions, Description */}
             <div className="md:col-span-1 space-y-4 pr-4 md:border-r md:border-border/50 overflow-y-auto h-full">
               {item.imageUrl && ( 
@@ -428,7 +421,7 @@ export function ChecklistItemEditDialog({
                 <ScrollArea 
                   className={cn(
                     "flex-grow",
-                    taskBackgroundImageUrl && "pr-2" // Add padding for scrollbar visibility only if no parent padding from bg-muted
+                    taskBackgroundImageUrl && "pr-2"
                   )}
                 >
                   {(item.activityLog && item.activityLog.length > 0) ? (
@@ -544,3 +537,4 @@ export function ChecklistItemEditDialog({
     </>
   );
 }
+
