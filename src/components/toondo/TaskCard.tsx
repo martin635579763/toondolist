@@ -360,21 +360,23 @@ export function TaskCard({
                   onClick={(e) => {
                     if (!isOwner) return;
                     const target = e.target as HTMLElement;
-                    if (target.closest('button[role="checkbox"]') || target.closest('[data-role="action-buttons-container"]')) {
+                    if (target.closest('input[type="checkbox"]') || target.closest('[data-role="action-buttons-container"]')) { // Updated to target input type checkbox
                         return;
                     }
                     handleOpenItemEditDialog(item);
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center flex-grow min-w-0 relative">
+                    <div className={cn("flex items-center flex-grow min-w-0 relative group/checkbox-reveal-area")}>
                         <Checkbox
                         id={`checklist-${task.id}-${item.id}`}
                         checked={item.completed}
                         onCheckedChange={(checked) => onToggleChecklistItem(task.id, item.id)}
                         disabled={!isOwner}
                         className={cn(
+                            "absolute left-0 top-1/2 -translate-y-1/2",
                             "h-3.5 w-3.5 border-2 rounded-sm data-[state=checked]:bg-green-400 shrink-0",
+                            "opacity-0 group-hover/checkbox-reveal-area:opacity-100 transition-opacity duration-300 ease-in-out",
                             task.backgroundImageUrl ? "border-gray-300 data-[state=checked]:text-gray-800" : "border-muted-foreground data-[state=checked]:text-primary-foreground",
                             !isOwner && "opacity-50 cursor-not-allowed"
                         )}
@@ -384,7 +386,8 @@ export function TaskCard({
                         <label
                         htmlFor={`checklist-${task.id}-${item.id}`}
                         className={cn(
-                            "flex-grow break-all truncate ml-2",
+                            "flex-grow break-all truncate cursor-pointer",
+                            "pl-1 group-hover/checkbox-reveal-area:pl-5 transition-all duration-300 ease-in-out",
                             item.completed && "line-through opacity-70",
                             task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
                             !isOwner && "pointer-events-none"
@@ -763,5 +766,6 @@ export function TaskCard({
     </Card>
   );
 }
+
 
 
