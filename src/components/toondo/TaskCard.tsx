@@ -17,10 +17,10 @@ import {
   TooltipTrigger,
   TooltipProvider
 } from "@/components/ui/tooltip";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Added useEffect
 import { EditableTitle } from "./EditableTitle";
 import { marked } from 'marked';
-import { ChecklistItemEditDialog } from "./ChecklistItemEditDialog"; // New Import
+import { ChecklistItemEditDialog } from "./ChecklistItemEditDialog";
 
 
 interface TaskCardProps {
@@ -63,6 +63,31 @@ export function TaskCard({
   const [newChecklistItemTitle, setNewChecklistItemTitle] = useState("");
   const [editingItemAllDetails, setEditingItemAllDetails] = useState<ChecklistItem | null>(null);
 
+  useEffect(() => {
+    // This effect ensures that if the dialog is open and the underlying task data changes
+    // (e.g., due to an update from within the dialog itself that modified page.tsx state),
+    // the dialog receives the freshest version of the item.
+    if (editingItemAllDetails && task.checklistItems) {
+      const freshItemFromProps = task.checklistItems.find(
+        (ci) => ci.id === editingItemAllDetails.id
+      );
+
+      if (freshItemFromProps) {
+        // Compare by reference or a more robust method if needed (e.g., deep compare or lastUpdated timestamp)
+        // For now, if the object reference from props is different, update our state.
+        // This assumes that page.tsx always creates new item objects on update.
+        if (freshItemFromProps !== editingItemAllDetails) {
+          setEditingItemAllDetails(freshItemFromProps);
+        }
+      } else {
+        // The item being edited was likely deleted from the main list, so close the dialog.
+        setEditingItemAllDetails(null);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.checklistItems, editingItemAllDetails?.id]); // Rerun if checklistItems array changes or the ID of the item being edited changes (less likely for ID)
+                                                 // Adding editingItemAllDetails itself can cause loops if not careful, so using its ID or the whole task.checklistItems.
+
   const handleAddChecklistItemSubmit = () => {
     if (newChecklistItemTitle.trim()) {
       onAddChecklistItem(task.id, newChecklistItemTitle.trim());
@@ -87,7 +112,7 @@ export function TaskCard({
     cardStyle.backgroundImage = `url(${task.backgroundImageUrl})`;
     cardStyle.backgroundSize = 'cover';
     cardStyle.backgroundPosition = 'center';
-    contentOverlayStyle.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // TODO: This needs to be dynamic based on light/dark theme
+    contentOverlayStyle.backgroundColor = 'rgba(0, 0, 0, 0.5)'; 
     contentOverlayStyle.color = 'white';
   }
 
