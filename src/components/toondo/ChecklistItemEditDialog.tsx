@@ -5,7 +5,7 @@ import type React from 'react';
 import { useState, useEffect, useRef, type ChangeEvent } from 'react';
 import type { ChecklistItem } from "@/types/task";
 import type { User } from "@/types/user";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
