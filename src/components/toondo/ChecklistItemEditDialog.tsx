@@ -301,26 +301,8 @@ export function ChecklistItemEditDialog({
                       />
                   </div>
               )}
-              <div>
-                <div className="flex items-center space-x-2 mb-1.5">
-                    <AlignLeftIcon className={cn("h-4 w-4", taskBackgroundImageUrl ? "text-gray-200" : "text-muted-foreground")} />
-                    <Label htmlFor="dialogItemDescription" className={cn("text-sm font-medium", taskBackgroundImageUrl && "text-gray-200")}>Description</Label>
-                </div>
-                <Textarea
-                  id="dialogItemDescription"
-                  value={dialogTempDescription}
-                  onChange={(e) => isOwner && setDialogTempDescription(e.target.value)}
-                  placeholder="Add more details about this item... Markdown is supported for formatting (e.g. **bold**, *italic*, - lists)."
-                  className={cn(
-                      "min-h-[150px] text-sm",
-                      taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50"
-                  )}
-                  rows={dialogTempImageUrl ? 4 : 8}
-                  disabled={!isOwner}
-                />
-              </div>
 
-              {/* Action Buttons Moved Here */}
+              {/* Action Buttons */}
               <div className="space-y-2 flex flex-col items-start pt-4">
                   <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                       <PopoverTrigger asChild>
@@ -418,6 +400,26 @@ export function ChecklistItemEditDialog({
                           </Button>
                       </PopoverContent>
                   </Popover>
+              </div>
+
+              {/* Description Area */}
+              <div className="pt-2">
+                <div className="flex items-center space-x-2 mb-1.5">
+                    <AlignLeftIcon className={cn("h-4 w-4", taskBackgroundImageUrl ? "text-gray-200" : "text-muted-foreground")} />
+                    <Label htmlFor="dialogItemDescription" className={cn("text-sm font-medium", taskBackgroundImageUrl && "text-gray-200")}>Description</Label>
+                </div>
+                <Textarea
+                  id="dialogItemDescription"
+                  value={dialogTempDescription}
+                  onChange={(e) => isOwner && setDialogTempDescription(e.target.value)}
+                  placeholder="Add more details about this item... Markdown is supported for formatting (e.g. **bold**, *italic*, - lists)."
+                  className={cn(
+                      "min-h-[150px] text-sm",
+                      taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50"
+                  )}
+                  rows={dialogTempImageUrl ? 4 : 8}
+                  disabled={!isOwner}
+                />
               </div>
             </div>
 
