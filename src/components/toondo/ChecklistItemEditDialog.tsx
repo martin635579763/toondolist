@@ -83,9 +83,9 @@ export function ChecklistItemEditDialog({
 
   useEffect(() => {
     if (isOpen) { 
-        setDialogTempTitle(item.title);
-        setDialogTempDescription(item.description || "");
-        setDialogTempImageUrl(item.imageUrl || "");
+        setDialogTempTitle(item.title); // Keep for EditableTitle internal state management
+        setDialogTempDescription(item.description || ""); // Keep for Textarea local editing
+        setDialogTempImageUrl(item.imageUrl || ""); // Keep for attachment sub-dialog
     }
   }, [item, isOpen]);
 
@@ -111,6 +111,7 @@ export function ChecklistItemEditDialog({
 
   const handleOpenAttachmentDialog = () => {
     if (!isOwner) return;
+    setDialogTempImageUrl(item.imageUrl || ""); // Ensure sub-dialog starts with current image
     if (attachmentDialogFileInpuRef.current) {
       attachmentDialogFileInpuRef.current.value = "";
     }
@@ -175,7 +176,12 @@ export function ChecklistItemEditDialog({
   const handleSaveDueDateFromPopover = (date: Date | undefined) => {
     if (!isOwner) return;
     const newDueDate = date || null;
-    onSetChecklistItemDueDate(taskId, item.id, newDueDate);
+    // Only call if date actually changed
+    const currentDueDate = item.dueDate ? new Date(item.dueDate).toISOString().split('T')[0] : null;
+    const selectedDueDate = date ? date.toISOString().split('T')[0] : null;
+    if(currentDueDate !== selectedDueDate) {
+        onSetChecklistItemDueDate(taskId, item.id, newDueDate);
+    }
     setIsDueDatePopoverOpen(false);
   };
 
@@ -273,9 +279,9 @@ export function ChecklistItemEditDialog({
                 </div>
           </DialogHeader>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 flex-grow overflow-y-auto min-h-[300px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 flex-grow overflow-hidden min-h-[300px]">
             {/* Left Column: Image, Actions, Description */}
-            <div className="md:col-span-1 space-y-4 pr-4 md:border-r md:border-border/50">
+            <div className="md:col-span-1 space-y-4 pr-4 md:border-r md:border-border/50 overflow-y-auto h-full">
               {item.imageUrl && ( 
                   <div className="w-full h-48 relative overflow-hidden rounded-md border border-border">
                       <Image
@@ -411,12 +417,11 @@ export function ChecklistItemEditDialog({
             </div>
 
             {/* Right Column: Activity Log */}
-            <div className="md:col-span-1 space-y-4 pl-4 mt-4 md:mt-0">
-              <div>
+            <div className="md:col-span-1 pl-4 mt-4 md:mt-0 flex flex-col h-full">
                 <h4 className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center", taskBackgroundImageUrl && "text-gray-300")}>
                     <HistoryIcon className="h-3.5 w-3.5 mr-1.5" /> Activity
                 </h4>
-                <ScrollArea className="h-[calc(100%-2rem)] pr-2"> {/* Adjusted height for scroll area */}
+                <ScrollArea className="flex-grow pr-2">
                   {(item.activityLog && item.activityLog.length > 0) ? (
                     <div className="space-y-2.5 text-xs">
                       {item.activityLog.map((log: ActivityLogEntry) => (
@@ -450,7 +455,6 @@ export function ChecklistItemEditDialog({
                     </div>
                   )}
                 </ScrollArea>
-              </div>
             </div>
           </div>
         </DialogContent>
@@ -531,5 +535,3 @@ export function ChecklistItemEditDialog({
     </>
   );
 }
-
-    
