@@ -350,7 +350,11 @@ export function TaskCard({
                   onClick={(e) => {
                     if (!isOwner) return;
                     const target = e.target as HTMLElement;
-                     if (target.closest('[role="checkbox"]') || target.closest('[data-role="action-buttons-container"]')) {
+                     if (
+                        target.closest('[role="checkbox"]') ||
+                        target.closest('[data-role="checkbox-label"]') ||
+                        target.closest('[data-role="action-buttons-container"]')
+                     ) {
                         return;
                     }
                     handleOpenItemEditDialog(item);
@@ -376,6 +380,7 @@ export function TaskCard({
                         />
                         <label
                         htmlFor={`checklist-${task.id}-${item.id}`}
+                        data-role="checkbox-label"
                         className={cn(
                             "flex-grow break-all truncate",
                             isOwner && "cursor-pointer", 
@@ -384,7 +389,7 @@ export function TaskCard({
                                : "pl-1 group-hover/checkbox-reveal-area:pl-5 transition-all duration-300 ease-in-out",
                             task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
                             !isOwner && "pointer-events-none" ,
-                            item.completed ? "" : "" // Explicitly handle non-completed case for cn
+                            item.completed ? "line-through opacity-70" : ""
                         )}
                         >
                         {item.title}
@@ -776,3 +781,6 @@ export function TaskCard({
     </Card>
   );
 }
+
+
+    
