@@ -82,7 +82,7 @@ export function ChecklistItemEditDialog({
   const [isLabelPopoverOpen, setIsLabelPopoverOpen] = useState(false);
 
   useEffect(() => {
-    if (isOpen) { // Only update local state if dialog is open to avoid stale data issues
+    if (isOpen) { 
         setDialogTempTitle(item.title);
         setDialogTempDescription(item.description || "");
         setDialogTempImageUrl(item.imageUrl || "");
@@ -168,21 +168,14 @@ export function ChecklistItemEditDialog({
       newAssignedUserAvatarUrl = currentUser.avatarUrl || null;
     }
     
-    if (newAssignedUserId !== item.assignedUserId) {
-      onAssignUserToChecklistItem(taskId, item.id, newAssignedUserId, newAssignedUserName, newAssignedUserAvatarUrl);
-    }
+    onAssignUserToChecklistItem(taskId, item.id, newAssignedUserId, newAssignedUserName, newAssignedUserAvatarUrl);
     setIsUserPopoverOpen(false);
   };
 
   const handleSaveDueDateFromPopover = (date: Date | undefined) => {
     if (!isOwner) return;
     const newDueDate = date || null;
-    const newDueDateStr = newDueDate ? newDueDate.toISOString() : null;
-    const currentDueDateStr = item.dueDate ? new Date(item.dueDate).toISOString() : null;
-    
-    if (newDueDateStr !== currentDueDateStr) {
-        onSetChecklistItemDueDate(taskId, item.id, newDueDate);
-    }
+    onSetChecklistItemDueDate(taskId, item.id, newDueDate);
     setIsDueDatePopoverOpen(false);
   };
 
@@ -202,11 +195,7 @@ export function ChecklistItemEditDialog({
             return; 
         }
     }
-    
-    const labelsChanged = currentLabels.length !== newLabels.length || !currentLabels.every(label => newLabels.includes(label));
-    if (labelsChanged) {
-        onSetChecklistItemLabel(taskId, item.id, newLabels);
-    }
+    onSetChecklistItemLabel(taskId, item.id, newLabels);
   };
   
   const handleClearAllLabelsInDialog = () => {
@@ -223,7 +212,7 @@ export function ChecklistItemEditDialog({
     const trimmedTitle = newTitle.trim();
      if (!trimmedTitle) {
         toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
-        setDialogTempTitle(item.title); // Revert temp title to original if save fails
+        setDialogTempTitle(item.title); 
         return;
     }
     if (trimmedTitle !== item.title) {
@@ -262,7 +251,7 @@ export function ChecklistItemEditDialog({
                       className={cn("h-5 w-5 rounded-sm", taskBackgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
                     />
                    <EditableTitle
-                      initialValue={dialogTempTitle} // EditableTitle manages its own internal value based on initialValue
+                      initialValue={item.title} 
                       onSave={handleTitleSave}
                       isEditable={isOwner}
                       textElement='div'
@@ -287,10 +276,10 @@ export function ChecklistItemEditDialog({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 flex-grow overflow-y-auto min-h-[300px]">
             {/* Left Column: Image, Actions, Description */}
             <div className="md:col-span-1 space-y-4 pr-4 md:border-r md:border-border/50">
-              {dialogTempImageUrl && ( // Use dialogTempImageUrl for optimistic UI for image
+              {item.imageUrl && ( 
                   <div className="w-full h-48 relative overflow-hidden rounded-md border border-border">
                       <Image
-                          src={dialogTempImageUrl}
+                          src={item.imageUrl}
                           alt={item.title || "Item image"}
                           fill
                           style={{objectFit: "cover"}}
@@ -299,7 +288,6 @@ export function ChecklistItemEditDialog({
                       />
                   </div>
               )}
-
               {/* Action Buttons */}
                <div className="space-y-2 flex flex-col items-start pt-4">
                   <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
@@ -400,6 +388,7 @@ export function ChecklistItemEditDialog({
                   </Popover>
               </div>
 
+
               {/* Description Area */}
               <div className="pt-2">
                 <div className="flex items-center space-x-2 mb-1.5">
@@ -415,7 +404,7 @@ export function ChecklistItemEditDialog({
                       "min-h-[150px] text-sm",
                       taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50"
                   )}
-                  rows={dialogTempImageUrl ? 4 : 8} // Use dialogTempImageUrl here
+                  rows={item.imageUrl ? 4 : 8} 
                   disabled={!isOwner}
                 />
               </div>
@@ -427,7 +416,7 @@ export function ChecklistItemEditDialog({
                 <h4 className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center", taskBackgroundImageUrl && "text-gray-300")}>
                     <HistoryIcon className="h-3.5 w-3.5 mr-1.5" /> Activity
                 </h4>
-                <ScrollArea className="h-[calc(100%-2rem)] pr-2">
+                <ScrollArea className="h-[calc(100%-2rem)] pr-2"> {/* Adjusted height for scroll area */}
                   {(item.activityLog && item.activityLog.length > 0) ? (
                     <div className="space-y-2.5 text-xs">
                       {item.activityLog.map((log: ActivityLogEntry) => (
@@ -477,7 +466,7 @@ export function ChecklistItemEditDialog({
                     <DialogTitle className={cn(taskBackgroundImageUrl && "text-white")}>Manage Item Image</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
-                    {dialogTempImageUrl ? ( // Use dialogTempImageUrl for optimistic UI
+                    {dialogTempImageUrl ? ( 
                         <div className="w-full h-40 relative overflow-hidden rounded-md border border-border">
                             <Image
                                 src={dialogTempImageUrl}
@@ -497,7 +486,7 @@ export function ChecklistItemEditDialog({
                         <Label htmlFor="dialogAttachmentImageUrl" className={cn("text-xs", taskBackgroundImageUrl && "text-gray-200")}>Image URL</Label>
                         <Input
                             id="dialogAttachmentImageUrl"
-                            value={dialogTempImageUrl} // Controlled by dialogTempImageUrl
+                            value={dialogTempImageUrl} 
                             onChange={(e) => setDialogTempImageUrl(e.target.value)}
                             placeholder="https://example.com/image.png"
                             className={cn("text-sm h-9", taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
@@ -514,7 +503,7 @@ export function ChecklistItemEditDialog({
                             className={cn("text-xs p-1 h-auto file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-input file:bg-transparent file:text-xs file:font-medium file:text-foreground", taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 file:text-gray-200 file:border-white/30 hover:file:bg-white/5")}
                         />
                     </div>
-                    {(dialogTempImageUrl) && // Use dialogTempImageUrl
+                    {(dialogTempImageUrl) && 
                         <Button
                             size="sm"
                             variant="outline"
@@ -542,3 +531,5 @@ export function ChecklistItemEditDialog({
     </>
   );
 }
+
+    
