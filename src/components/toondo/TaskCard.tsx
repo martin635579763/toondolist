@@ -334,7 +334,7 @@ export function TaskCard({
               <div
                 key={item.id}
                 className={cn(
-                  "flex flex-col group/checklist text-sm rounded-md border overflow-hidden",
+                  "flex flex-col group/item-area text-sm rounded-md border overflow-hidden",
                   task.backgroundImageUrl ? "border-white/30 bg-white/10 text-gray-100" : "border-border/60 bg-card text-card-foreground",
                 )}
               >
@@ -361,7 +361,7 @@ export function TaskCard({
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <div className={cn("flex items-center flex-grow min-w-0 relative group/checkbox-reveal-area")}>
+                    <div className={cn("flex items-center flex-grow min-w-0 relative")}>
                         <Checkbox
                         id={`checklist-${task.id}-${item.id}`}
                         checked={item.completed}
@@ -372,7 +372,7 @@ export function TaskCard({
                             "h-3.5 w-3.5 border-2 rounded-sm data-[state=checked]:bg-green-400 shrink-0",
                             item.completed
                                ? "opacity-100"
-                               : "opacity-0 group-hover/checkbox-reveal-area:opacity-100 transition-opacity duration-300 ease-in-out",
+                               : "opacity-0 group-hover/item-area:opacity-100 transition-opacity duration-300 ease-in-out",
                             task.backgroundImageUrl ? "border-gray-300 data-[state=checked]:text-gray-800" : "border-muted-foreground data-[state=checked]:text-primary-foreground"
                         )}
                         onClick={(e) => e.stopPropagation()}
@@ -386,7 +386,7 @@ export function TaskCard({
                             isOwner && "cursor-pointer", 
                             item.completed
                                ? "pl-5 line-through opacity-70" 
-                               : "pl-1 group-hover/checkbox-reveal-area:pl-5 transition-all duration-300 ease-in-out",
+                               : "pl-1 group-hover/item-area:pl-5 transition-all duration-300 ease-in-out",
                             task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
                             !isOwner && "pointer-events-none" ,
                             item.completed ? "line-through opacity-70" : ""
@@ -399,7 +399,7 @@ export function TaskCard({
                         {isOwner && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); handleOpenItemEditDialog(item); }}
-                                className={cn("p-0.5 rounded opacity-0 group-hover/checklist:opacity-100 focus:opacity-100 transition-opacity", task.backgroundImageUrl ? "text-gray-300 hover:text-white" : "text-muted-foreground hover:text-foreground")}
+                                className={cn("p-0.5 rounded opacity-0 group-hover/item-area:opacity-100 focus:opacity-100 transition-opacity", task.backgroundImageUrl ? "text-gray-300 hover:text-white" : "text-muted-foreground hover:text-foreground")}
                                 aria-label="Edit item details"
                             >
                                 <Edit3Icon className="h-3.5 w-3.5" />
@@ -412,7 +412,7 @@ export function TaskCard({
                                     onDeleteChecklistItem(task.id, item.id);
                                 }}
                                 className={cn(
-                                    "p-0.5 rounded opacity-0 group-hover/checklist:opacity-100 focus:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 ml-1",
+                                    "p-0.5 rounded opacity-0 group-hover/item-area:opacity-100 focus:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 ml-1",
                                     task.backgroundImageUrl ? "hover:text-red-400" : "hover:text-destructive"
                                 )}
                                 aria-label="Delete item"
