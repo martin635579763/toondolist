@@ -83,9 +83,9 @@ export function ChecklistItemEditDialog({
 
   useEffect(() => {
     if (isOpen) { 
-        setDialogTempTitle(item.title); // Keep for EditableTitle internal state management
-        setDialogTempDescription(item.description || ""); // Keep for Textarea local editing
-        setDialogTempImageUrl(item.imageUrl || ""); // Keep for attachment sub-dialog
+        setDialogTempTitle(item.title); 
+        setDialogTempDescription(item.description || ""); 
+        setDialogTempImageUrl(item.imageUrl || "");
     }
   }, [item, isOpen]);
 
@@ -111,7 +111,7 @@ export function ChecklistItemEditDialog({
 
   const handleOpenAttachmentDialog = () => {
     if (!isOwner) return;
-    setDialogTempImageUrl(item.imageUrl || ""); // Ensure sub-dialog starts with current image
+    setDialogTempImageUrl(item.imageUrl || ""); 
     if (attachmentDialogFileInpuRef.current) {
       attachmentDialogFileInpuRef.current.value = "";
     }
@@ -128,9 +128,7 @@ export function ChecklistItemEditDialog({
     if (finalImageUrl && item.title) { 
         finalImageAiHint = item.title.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
     }
-    if (finalImageUrl !== item.imageUrl) { 
-        onSetChecklistItemImage(taskId, item.id, finalImageUrl, finalImageAiHint);
-    }
+    onSetChecklistItemImage(taskId, item.id, finalImageUrl, finalImageAiHint);
     setIsAttachmentDialogOpen(false); 
   };
 
@@ -176,12 +174,7 @@ export function ChecklistItemEditDialog({
   const handleSaveDueDateFromPopover = (date: Date | undefined) => {
     if (!isOwner) return;
     const newDueDate = date || null;
-    // Only call if date actually changed
-    const currentDueDate = item.dueDate ? new Date(item.dueDate).toISOString().split('T')[0] : null;
-    const selectedDueDate = date ? date.toISOString().split('T')[0] : null;
-    if(currentDueDate !== selectedDueDate) {
-        onSetChecklistItemDueDate(taskId, item.id, newDueDate);
-    }
+    onSetChecklistItemDueDate(taskId, item.id, newDueDate);
     setIsDueDatePopoverOpen(false);
   };
 
@@ -206,10 +199,7 @@ export function ChecklistItemEditDialog({
   
   const handleClearAllLabelsInDialog = () => {
     if (!isOwner) return;
-    const currentLabels = item.label || [];
-    if (currentLabels.length > 0) {
-      onSetChecklistItemLabel(taskId, item.id, []);
-    }
+    onSetChecklistItemLabel(taskId, item.id, []);
     setIsLabelPopoverOpen(false);
   }
 
@@ -221,9 +211,7 @@ export function ChecklistItemEditDialog({
         setDialogTempTitle(item.title); 
         return;
     }
-    if (trimmedTitle !== item.title) {
-      onUpdateChecklistItemTitle(taskId, item.id, trimmedTitle);
-    }
+    onUpdateChecklistItemTitle(taskId, item.id, trimmedTitle);
   };
 
   const handleCheckboxChange = () => {
@@ -438,7 +426,7 @@ export function ChecklistItemEditDialog({
                           </Avatar>
                           <div className="flex-grow">
                             <p className={cn(taskBackgroundImageUrl ? "text-gray-200" : "text-foreground/90")}>
-                              <span className="font-medium">{log.actorName || "Unknown User"}</span> {log.action}
+                              <span className="font-semibold">{log.actorName || "Unknown User"}</span> {log.action}
                             </p>
                             {log.details && <p className={cn("text-xs italic", taskBackgroundImageUrl ? "text-gray-400" : "text-muted-foreground/80")}>{log.details}</p>}
                             <p className={cn("text-[10px]", taskBackgroundImageUrl ? "text-gray-400" : "text-muted-foreground/70")}>
@@ -535,3 +523,6 @@ export function ChecklistItemEditDialog({
     </>
   );
 }
+
+
+    
