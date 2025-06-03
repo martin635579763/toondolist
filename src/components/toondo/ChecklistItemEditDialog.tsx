@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { useState, useEffect, useRef, type ChangeEvent } from 'react';
-import type { ChecklistItem } from "@/types/task";
+import type { ChecklistItem, ActivityLogEntry } from "@/types/task";
 import type { User } from "@/types/user";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -17,11 +17,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { EditableTitle } from "./EditableTitle";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import Image from "next/image";
-import { AlignLeftIcon, CalendarDaysIcon, CheckCircle2, HistoryIcon, ImageIcon, PaperclipIcon, TagIcon, TrashIcon, UserCircleIcon } from 'lucide-react';
+import { AlignLeftIcon, CalendarDaysIcon, CheckCircle2, HistoryIcon, ImageIcon, PaperclipIcon, TagIcon, TrashIcon, UserCircleIcon, UserIcon } from 'lucide-react';
 
 const LABEL_COLORS = [
   "bg-red-500",
@@ -41,9 +42,8 @@ interface ChecklistItemEditDialogProps {
   taskId: string;
   currentUser: User | null;
   isOwner: boolean;
-  taskBackgroundImageUrl?: string; // For styling context
+  taskBackgroundImageUrl?: string; 
 
-  // Callbacks for item updates
   onToggleChecklistItem: (taskId: string, itemId: string) => void;
   onUpdateChecklistItemTitle: (taskId: string, itemId: string, newTitle: string) => void;
   onUpdateChecklistItemDescription: (taskId: string, itemId: string, newDescription: string) => void;
@@ -87,7 +87,6 @@ export function ChecklistItemEditDialog({
   const [isDueDatePopoverOpen, setIsDueDatePopoverOpen] = useState(false);
   const [isLabelPopoverOpen, setIsLabelPopoverOpen] = useState(false);
 
-  // Effect to reset temp states when the item prop changes (e.g., opening dialog for a different item)
   useEffect(() => {
     setDialogTempTitle(item.title);
     setDialogTempDescription(item.description || "");
@@ -102,16 +101,12 @@ export function ChecklistItemEditDialog({
 
 
   const handleSaveItemEdits = () => {
-    if (!isOwner) return;
-
-    if (dialogTempCompleted !== item.completed) {
-      onToggleChecklistItem(taskId, item.id);
-    }
+    if (!isOwner || !currentUser) return;
 
     const trimmedTitle = dialogTempTitle.trim();
     if (!trimmedTitle) {
         toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
-        setDialogTempTitle(item.title); // Revert to original if empty
+        setDialogTempTitle(item.title); 
         return; 
     }
     if (trimmedTitle !== item.title) {
@@ -120,6 +115,12 @@ export function ChecklistItemEditDialog({
 
     if (dialogTempDescription.trim() !== (item.description || "").trim()) {
       onUpdateChecklistItemDescription(taskId, item.id, dialogTempDescription.trim());
+    }
+    
+    // Compare completed status after title/desc, as onToggleChecklistItem might be called by checkbox directly
+    // However, the dialog's internal 'dialogTempCompleted' is the source of truth for this save operation.
+    if (dialogTempCompleted !== item.completed) {
+        onToggleChecklistItem(taskId, item.id); // This will toggle based on item.completed, so if it's already been externally toggled, this makes it right
     }
     
     const newDueDateStr = dialogTempDueDate ? dialogTempDueDate.toISOString().split('T')[0] : null;
@@ -151,9 +152,8 @@ export function ChecklistItemEditDialog({
   };
 
   const handleDialogClose = (openState: boolean) => {
-    if (!openState) { // Dialog is closing
+    if (!openState) { 
       if(isOwner) handleSaveItemEdits();
-      // Reset popover states
       setIsUserPopoverOpen(false);
       setIsDueDatePopoverOpen(false);
       setIsLabelPopoverOpen(false);
@@ -171,13 +171,14 @@ export function ChecklistItemEditDialog({
   };
 
   const handleSaveAttachmentFromSubDialog = () => {
-    setIsAttachmentDialogOpen(false);
+    setIsAttachmentDialogOpen(false); 
+    // The actual image URL update will happen on main dialog close via handleSaveItemEdits
   };
 
   const handleAttachmentFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+      if (file.size > 2 * 1024 * 1024) { 
         toast({ title: "File Too Large", description: "Please select an image smaller than 2MB.", variant: "destructive" });
         if (attachmentDialogFileInpuRef.current) attachmentDialogFileInpuRef.current.value = "";
         return;
@@ -237,7 +238,7 @@ export function ChecklistItemEditDialog({
     setIsLabelPopoverOpen(false);
   }
 
-  if (!isOwner && !isOpen) return null; // Don't render if not owner and closed (mainly for initial setup)
+  if (!isOwner && !isOpen) return null; 
 
   return (
     <>
@@ -247,7 +248,7 @@ export function ChecklistItemEditDialog({
       >
         <DialogContent
           className={cn("sm:max-w-3xl bg-card text-card-foreground max-h-[90vh] flex flex-col", taskBackgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
-          onClick={(e) => e.stopPropagation()} // Prevent clicks inside dialog from closing it if not intended
+          onClick={(e) => e.stopPropagation()}
         >
            <DialogHeader className="pb-2 pr-10">
                  <DialogTitle className="sr-only">
@@ -257,13 +258,18 @@ export function ChecklistItemEditDialog({
                    <Checkbox
                       id={`dialog-item-completed-${item.id}`}
                       checked={dialogTempCompleted}
-                      onCheckedChange={(checked) => isOwner && setDialogTempCompleted(Boolean(checked))}
+                      onCheckedChange={(checked) => {
+                        if (isOwner) {
+                          setDialogTempCompleted(Boolean(checked));
+                          // No direct call to onToggleChecklistItem here, it's handled in handleSaveItemEdits
+                        }
+                      }}
                       disabled={!isOwner}
                       className={cn("h-5 w-5 rounded-sm", taskBackgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
                     />
                    <EditableTitle
                       initialValue={dialogTempTitle}
-                      onSave={(newTitle) => isOwner && setDialogTempTitle(newTitle)}
+                      onSave={(newTitle) => isOwner && setDialogTempTitle(newTitle)} // This just updates local dialog state
                       isEditable={isOwner}
                       textElement='div'
                       textClassName={cn(
@@ -285,7 +291,7 @@ export function ChecklistItemEditDialog({
           </DialogHeader>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 flex-grow overflow-y-auto min-h-[300px]">
-            <div className="md:col-span-2 space-y-4 pr-4 border-r border-border/50">
+            <div className="md:col-span-2 space-y-4 pr-4 md:border-r md:border-border/50">
               {dialogTempImageUrl && (
                   <div className="w-full h-48 relative overflow-hidden rounded-md border border-border">
                       <Image
@@ -318,7 +324,7 @@ export function ChecklistItemEditDialog({
               </div>
             </div>
 
-            <div className="md:col-span-1 space-y-4 pl-4 md:pl-6 mt-4 md:mt-0">
+            <div className="md:col-span-1 space-y-4 pl-0 md:pl-4 mt-4 md:mt-0">
               <h4 className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground", taskBackgroundImageUrl && "text-gray-300")}>Actions</h4>
               <div className="space-y-2 flex flex-col items-start">
                   <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
@@ -422,12 +428,44 @@ export function ChecklistItemEditDialog({
               <Separator className={cn("my-3", taskBackgroundImageUrl && "bg-white/20")} />
 
               <div>
-                <h4 className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2", taskBackgroundImageUrl && "text-gray-300")}>Activity</h4>
-                <div className={cn("p-3 rounded-md text-xs min-h-[100px] flex items-center justify-center border border-dashed", taskBackgroundImageUrl ? "bg-white/5 text-gray-400 border-white/20" : "bg-muted text-muted-foreground")}>
-                   <HistoryIcon className="h-5 w-5 mr-2 opacity-50" /> Activity log coming soon.
-                </div>
+                <h4 className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center", taskBackgroundImageUrl && "text-gray-300")}>
+                    <HistoryIcon className="h-3.5 w-3.5 mr-1.5" /> Activity
+                </h4>
+                <ScrollArea className="h-[150px] pr-2">
+                  {(item.activityLog && item.activityLog.length > 0) ? (
+                    <div className="space-y-2.5 text-xs">
+                      {item.activityLog.map((log: ActivityLogEntry) => (
+                        <div key={log.id} className={cn("flex items-start space-x-2", taskBackgroundImageUrl ? "text-gray-300" : "text-muted-foreground")}>
+                          <Avatar className="h-5 w-5 mt-0.5 shrink-0">
+                            <AvatarImage 
+                                src={currentUser?.id === item.actorName.split(" ")[0] ? currentUser.avatarUrl : undefined} // Simplistic check, assumes actorName starts with current user's ID
+                                alt={log.actorName} 
+                                data-ai-hint="user avatar"
+                            />
+                            <AvatarFallback className={cn("text-[10px]", taskBackgroundImageUrl ? "bg-white/20 text-gray-200" : "bg-muted")}>
+                                {log.actorName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-grow">
+                            <p className={cn(taskBackgroundImageUrl ? "text-gray-200" : "text-foreground/90")}>
+                              <span className="font-medium">{log.actorName}</span> {log.action}
+                            </p>
+                            {log.details && <p className={cn("text-xs italic", taskBackgroundImageUrl ? "text-gray-400" : "text-muted-foreground/80")}>{log.details}</p>}
+                            <p className={cn("text-[10px]", taskBackgroundImageUrl ? "text-gray-400" : "text-muted-foreground/70")}>
+                              {formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={cn("p-3 rounded-md text-xs min-h-[100px] flex flex-col items-center justify-center border border-dashed", taskBackgroundImageUrl ? "bg-white/5 text-gray-400 border-white/20" : "bg-muted text-muted-foreground")}>
+                      <HistoryIcon className="h-6 w-6 mb-2 opacity-50" />
+                      No activity yet for this item.
+                    </div>
+                  )}
+                </ScrollArea>
               </div>
-
             </div>
           </div>
         </DialogContent>

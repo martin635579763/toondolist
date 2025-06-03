@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Task, ChecklistItem } from '@/types/task';
+import type { Task, ChecklistItem, ActivityLogEntry } from '@/types/task';
 import { TaskCard } from '@/components/toondo/TaskCard';
 import { FileTextIcon, Loader2, LogInIcon, UserPlusIcon, LogOutIcon, UserCircleIcon, PlusSquareIcon, ImagePlusIcon, TrashIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -64,8 +64,6 @@ function HomePageContent() {
 
     let tasksToProcess = [...parsedTasks];
 
-    // Removed automatic creation of default tasks
-
     const tasksWithDefaults = tasksToProcess.map((task, index) => ({
       ...task,
       description: task.description || "",
@@ -87,6 +85,7 @@ function HomePageContent() {
         imageAiHint: item.imageAiHint || null,
         comments: item.comments || [],
         label: Array.isArray(item.label) ? item.label : (item.label ? [item.label] : []),
+        activityLog: item.activityLog || [],
       })),
       order: task.order ?? index,
       userId: task.userId || 'unknown_user',
@@ -162,11 +161,11 @@ function HomePageContent() {
   };
 
   const handleAddChecklistItem = (taskId: string, itemTitle: string) => {
-    if (!itemTitle.trim()) return;
+    if (!itemTitle.trim() || !currentUser) return;
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId) {
-          if (!currentUser || currentUser.id !== task.userId) {
+          if (currentUser.id !== task.userId) {
             toast({ title: "Permission Denied", description: "You can only add checklist items to your own tasks.", variant: "destructive" });
             return task;
           }
@@ -183,12 +182,19 @@ function HomePageContent() {
             imageAiHint: null,
             comments: [],
             label: [],
+            activityLog: [{
+              id: generateId(),
+              timestamp: Date.now(),
+              actorName: currentUser.displayName,
+              action: 'created item',
+              details: `with title "${itemTitle.trim()}"`
+            }],
           };
           const updatedChecklistItems = [...(task.checklistItems || []), newItem];
           return {
             ...task,
             checklistItems: updatedChecklistItems,
-            completed: false,
+            completed: false, // Adding an item makes the parent task incomplete
           };
         }
         return task;
@@ -197,16 +203,33 @@ function HomePageContent() {
   };
 
   const handleToggleChecklistItem = (taskId: string, itemId: string) => {
+    if (!currentUser) return;
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId) {
-           if (!currentUser || currentUser.id !== task.userId) {
+           if (currentUser.id !== task.userId) {
             toast({ title: "Permission Denied", description: "You can only modify checklist items on your own tasks.", variant: "destructive" });
             return task;
           }
-          const updatedChecklistItems = (task.checklistItems || []).map(item =>
-            item.id === itemId ? { ...item, completed: !item.completed } : item
-          );
+          let toggledItem: ChecklistItem | undefined;
+          const updatedChecklistItems = (task.checklistItems || []).map(item => {
+            if (item.id === itemId) {
+              toggledItem = item;
+              const activityLogEntry: ActivityLogEntry = {
+                id: generateId(),
+                timestamp: Date.now(),
+                actorName: currentUser.displayName,
+                action: item.completed ? 'marked as incomplete' : 'marked as complete',
+                details: `Item: "${item.title}"`
+              };
+              return { 
+                ...item, 
+                completed: !item.completed,
+                activityLog: [activityLogEntry, ...(item.activityLog || [])]
+              };
+            }
+            return item;
+          });
 
           let newCompletedStatus = false;
           if (updatedChecklistItems.length > 0 && updatedChecklistItems.every(item => item.completed)) {
@@ -225,23 +248,34 @@ function HomePageContent() {
   };
 
   const handleDeleteChecklistItem = (taskId: string, itemId: string) => {
+     if (!currentUser) return;
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId) {
-          if (!currentUser || currentUser.id !== task.userId) {
+          if (currentUser.id !== task.userId) {
             toast({ title: "Permission Denied", description: "You can only delete checklist items from your own tasks.", variant: "destructive" });
             return task;
           }
+          const itemToDelete = (task.checklistItems || []).find(it => it.id === itemId);
+          if (!itemToDelete) return task;
+
+          // Log deletion on the parent task if needed, or consider if item logs are sufficient
+          // For now, deletion just removes the item. If a "deleted item X" log is needed on the task itself, add here.
+
           const updatedChecklistItems = (task.checklistItems || []).filter(item => item.id !== itemId);
 
           let newCompletedStatus = false;
           if (updatedChecklistItems.length > 0 && updatedChecklistItems.every(item => item.completed)) {
             newCompletedStatus = true;
           } else if (updatedChecklistItems.length === 0) {
-            newCompletedStatus = task.completed;
+            // If all items deleted, parent task completion status depends on its own state or could be set to false
+            // For now, retain previous parent completion if no items remain, or set to false. Let's set to false.
+            newCompletedStatus = false; 
+          } else {
+             newCompletedStatus = task.completed; // Keep parent status if some items remain
           }
 
-
+          toast({ title: "Checklist Item Deleted", description: `"${itemToDelete.title}" was removed.` });
           return {
             ...task,
             checklistItems: updatedChecklistItems,
@@ -265,9 +299,24 @@ function HomePageContent() {
             toast({ title: "Permission Denied", description: "You can only update items in your own tasks.", variant: "destructive" });
             return task;
           }
-          const updatedChecklistItems = (task.checklistItems || []).map(item =>
-            item.id === itemId ? { ...item, title: newTitle } : item
-          );
+          const updatedChecklistItems = (task.checklistItems || []).map(item => {
+            if (item.id === itemId) {
+              if (item.title === newTitle) return item; // No change
+              const activityLogEntry: ActivityLogEntry = {
+                id: generateId(),
+                timestamp: Date.now(),
+                actorName: currentUser.displayName,
+                action: 'updated title',
+                details: `from "${item.title}" to "${newTitle}"`,
+              };
+              return { 
+                ...item, 
+                title: newTitle,
+                activityLog: [activityLogEntry, ...(item.activityLog || [])]
+              };
+            }
+            return item;
+          });
           return { ...task, checklistItems: updatedChecklistItems };
         }
         return task;
@@ -291,9 +340,24 @@ function HomePageContent() {
             toast({ title: "Permission Denied", description: "You can only update item descriptions in your own tasks.", variant: "destructive" });
             return task;
           }
-          const updatedChecklistItems = (task.checklistItems || []).map(item =>
-            item.id === itemId ? { ...item, description: newDescription } : item
-          );
+          const updatedChecklistItems = (task.checklistItems || []).map(item => {
+            if (item.id === itemId) {
+              if ((item.description || "") === newDescription) return item; // No change
+              const activityLogEntry: ActivityLogEntry = {
+                id: generateId(),
+                timestamp: Date.now(),
+                actorName: currentUser.displayName,
+                action: 'updated description',
+                details: newDescription ? `to "${newDescription.substring(0,30)}..."` : "cleared description",
+              };
+              return { 
+                ...item, 
+                description: newDescription,
+                activityLog: [activityLogEntry, ...(item.activityLog || [])] 
+              };
+            }
+            return item;
+          });
           return { ...task, checklistItems: updatedChecklistItems };
         }
         return task;
@@ -310,9 +374,27 @@ function HomePageContent() {
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId && task.userId === currentUser.id) {
-          const updatedChecklistItems = (task.checklistItems || []).map(item =>
-            item.id === itemId ? { ...item, dueDate: date ? date.toISOString() : null } : item
-          );
+          const updatedChecklistItems = (task.checklistItems || []).map(item => {
+            if (item.id === itemId) {
+              const oldDueDate = item.dueDate ? format(new Date(item.dueDate), "PPP") : "none";
+              const newDueDateString = date ? format(date, "PPP") : "none";
+              if (item.dueDate === (date ? date.toISOString() : null)) return item; // No change
+
+              const activityLogEntry: ActivityLogEntry = {
+                id: generateId(),
+                timestamp: Date.now(),
+                actorName: currentUser.displayName,
+                action: date ? 'set due date' : 'cleared due date',
+                details: date ? `to ${newDueDateString}` : `from ${oldDueDate}`,
+              };
+              return { 
+                ...item, 
+                dueDate: date ? date.toISOString() : null,
+                activityLog: [activityLogEntry, ...(item.activityLog || [])] 
+              };
+            }
+            return item;
+          });
           return { ...task, checklistItems: updatedChecklistItems };
         }
         return task;
@@ -326,9 +408,29 @@ function HomePageContent() {
      setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId && task.userId === currentUser.id) {
-          const updatedChecklistItems = (task.checklistItems || []).map(item =>
-            item.id === itemId ? { ...item, assignedUserId: userId, assignedUserName: userName, assignedUserAvatarUrl: userAvatarUrl } : item
-          );
+          const updatedChecklistItems = (task.checklistItems || []).map(item => {
+            if (item.id === itemId) {
+              if (item.assignedUserId === userId) return item; // No change
+              const oldAssignee = item.assignedUserName || "no one";
+              const newAssignee = userName || "no one";
+
+              const activityLogEntry: ActivityLogEntry = {
+                id: generateId(),
+                timestamp: Date.now(),
+                actorName: currentUser.displayName,
+                action: userName ? 'assigned user' : 'unassigned user',
+                details: userName ? `to ${newAssignee}` : `from ${oldAssignee}`,
+              };
+              return { 
+                ...item, 
+                assignedUserId: userId, 
+                assignedUserName: userName, 
+                assignedUserAvatarUrl: userAvatarUrl,
+                activityLog: [activityLogEntry, ...(item.activityLog || [])] 
+              };
+            }
+            return item;
+          });
           return { ...task, checklistItems: updatedChecklistItems };
         }
         return task;
@@ -342,9 +444,25 @@ function HomePageContent() {
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId && task.userId === currentUser.id) {
-          const updatedChecklistItems = (task.checklistItems || []).map(item =>
-            item.id === itemId ? { ...item, imageUrl, imageAiHint } : item
-          );
+          const updatedChecklistItems = (task.checklistItems || []).map(item => {
+            if (item.id === itemId) {
+              if (item.imageUrl === imageUrl) return item; // No change
+              const activityLogEntry: ActivityLogEntry = {
+                id: generateId(),
+                timestamp: Date.now(),
+                actorName: currentUser.displayName,
+                action: imageUrl ? 'set image' : 'cleared image',
+                details: imageUrl ? `added an image for "${item.title}"` : `removed image for "${item.title}"`,
+              };
+              return { 
+                ...item, 
+                imageUrl, 
+                imageAiHint,
+                activityLog: [activityLogEntry, ...(item.activityLog || [])] 
+              };
+            }
+            return item;
+          });
           return { ...task, checklistItems: updatedChecklistItems };
         }
         return task;
@@ -357,9 +475,28 @@ function HomePageContent() {
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId && task.userId === currentUser.id) {
-          const updatedChecklistItems = (task.checklistItems || []).map(item =>
-            item.id === itemId ? { ...item, label: newLabels || [] } : item
-          );
+          const updatedChecklistItems = (task.checklistItems || []).map(item => {
+            if (item.id === itemId) {
+              const currentLabels = item.label || [];
+              const finalNewLabels = newLabels || [];
+              const labelsChanged = currentLabels.length !== finalNewLabels.length || !currentLabels.every(label => finalNewLabels.includes(label));
+              if (!labelsChanged) return item; // No change
+
+              const activityLogEntry: ActivityLogEntry = {
+                id: generateId(),
+                timestamp: Date.now(),
+                actorName: currentUser.displayName,
+                action: 'updated labels',
+                details: finalNewLabels.length > 0 ? `set labels for "${item.title}"` : `cleared labels for "${item.title}"`,
+              };
+              return { 
+                ...item, 
+                label: finalNewLabels,
+                activityLog: [activityLogEntry, ...(item.activityLog || [])] 
+              };
+            }
+            return item;
+          });
           return { ...task, checklistItems: updatedChecklistItems };
         }
         return task;
@@ -785,6 +922,3 @@ export default function HomePage() {
       <HomePageContent />
   );
 }
-
-
-    
