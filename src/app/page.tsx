@@ -482,17 +482,18 @@ function HomePageContent() {
               const labelsChanged = currentLabels.length !== finalNewLabels.length || !currentLabels.every(label => finalNewLabels.includes(label));
               if (!labelsChanged) return item; // No change
 
-              const activityLogEntry: ActivityLogEntry = {
-                id: generateId(),
-                timestamp: Date.now(),
-                actorName: currentUser.displayName,
-                action: 'updated labels',
-                details: finalNewLabels.length > 0 ? `set labels for "${item.title}"` : `cleared labels for "${item.title}"`,
-              };
+              // Activity logging for labels removed as per request
+              // const activityLogEntry: ActivityLogEntry = {
+              //   id: generateId(),
+              //   timestamp: Date.now(),
+              //   actorName: currentUser.displayName,
+              //   action: 'updated labels',
+              //   details: finalNewLabels.length > 0 ? `set labels for "${item.title}"` : `cleared labels for "${item.title}"`,
+              // };
               return { 
                 ...item, 
                 label: finalNewLabels,
-                activityLog: [activityLogEntry, ...(item.activityLog || [])] 
+                // activityLog: [activityLogEntry, ...(item.activityLog || [])] 
               };
             }
             return item;
@@ -922,3 +923,5 @@ export default function HomePage() {
       <HomePageContent />
   );
 }
+
+    
