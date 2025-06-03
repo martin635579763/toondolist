@@ -151,7 +151,7 @@ export function TaskCard({
     if (!trimmedTitle) {
         toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
         setDialogTempTitle(editingItemAllDetails.title); // Revert to original if empty
-        return; // Prevent saving an empty title that clears out a previously valid one implicitly
+        return; 
     }
     if (trimmedTitle !== editingItemAllDetails.title) {
       onUpdateChecklistItemTitle(task.id, editingItemAllDetails.id, trimmedTitle);
@@ -185,7 +185,6 @@ export function TaskCard({
     if (labelsChanged) {
         onSetChecklistItemLabel(task.id, editingItemAllDetails.id, newLabels.length > 0 ? newLabels : []);
     }
-    // No explicit toast here, individual actions (or the calling context) might toast.
   };
 
 
@@ -199,7 +198,6 @@ export function TaskCard({
 
   const handleSaveAttachmentFromSubDialog = () => {
     setIsAttachmentDialogOpen(false);
-    // The actual image URL is set in dialogTempImageUrl and saved when main dialog closes/saves
   };
 
   const handleAttachmentFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -352,7 +350,7 @@ export function TaskCard({
                   onClick={(e) => {
                     if (!isOwner) return;
                     const target = e.target as HTMLElement;
-                     if (target.closest('input[type="checkbox"]') || target.closest('[data-role="action-buttons-container"]')) {
+                     if (target.closest('[role="checkbox"]') || target.closest('[data-role="action-buttons-container"]')) {
                         return;
                     }
                     handleOpenItemEditDialog(item);
@@ -380,12 +378,13 @@ export function TaskCard({
                         htmlFor={`checklist-${task.id}-${item.id}`}
                         className={cn(
                             "flex-grow break-all truncate",
-                            isOwner && "cursor-pointer", // Keep label clickable if owner to toggle checkbox
+                            isOwner && "cursor-pointer", 
                             item.completed
-                               ? "pl-5 line-through opacity-70"
+                               ? "pl-5 line-through opacity-70" 
                                : "pl-1 group-hover/checkbox-reveal-area:pl-5 transition-all duration-300 ease-in-out",
                             task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
-                            !isOwner && "pointer-events-none" 
+                            !isOwner && "pointer-events-none" ,
+                            item.completed ? "" : "" // Explicitly handle non-completed case for cn
                         )}
                         >
                         {item.title}
@@ -697,7 +696,6 @@ export function TaskCard({
                 </div>
               </div>
             </div>
-            {/* DialogFooter removed */}
           </DialogContent>
         </Dialog>
       )}
@@ -778,6 +776,3 @@ export function TaskCard({
     </Card>
   );
 }
-
-
-    
