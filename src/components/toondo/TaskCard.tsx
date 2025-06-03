@@ -150,8 +150,8 @@ export function TaskCard({
     const trimmedTitle = dialogTempTitle.trim();
     if (!trimmedTitle) {
         toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
-        setDialogTempTitle(editingItemAllDetails.title);
-        return;
+        setDialogTempTitle(editingItemAllDetails.title); // Revert to original if empty
+        return; // Prevent saving an empty title that clears out a previously valid one implicitly
     }
     if (trimmedTitle !== editingItemAllDetails.title) {
       onUpdateChecklistItemTitle(task.id, editingItemAllDetails.id, trimmedTitle);
@@ -185,18 +185,9 @@ export function TaskCard({
     if (labelsChanged) {
         onSetChecklistItemLabel(task.id, editingItemAllDetails.id, newLabels.length > 0 ? newLabels : []);
     }
-
-    handleCloseItemEditDialog();
-    toast({ title: "Item Updated", description: "Checklist item details saved." });
+    // No explicit toast here, individual actions (or the calling context) might toast.
   };
 
-  const handleDeleteItemFromDialog = () => {
-    if (editingItemAllDetails) {
-        onDeleteChecklistItem(task.id, editingItemAllDetails.id);
-        toast({ title: "Item Deleted", description: `"${editingItemAllDetails.title}" was removed from the checklist.` });
-        handleCloseItemEditDialog();
-    }
-  };
 
   const handleOpenAttachmentDialog = () => {
     if (!isOwner) return;
@@ -208,6 +199,7 @@ export function TaskCard({
 
   const handleSaveAttachmentFromSubDialog = () => {
     setIsAttachmentDialogOpen(false);
+    // The actual image URL is set in dialogTempImageUrl and saved when main dialog closes/saves
   };
 
   const handleAttachmentFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -349,18 +341,18 @@ export function TaskCard({
                 )}
               >
                 {item.label && item.label.length > 0 && (
-                    <div className={cn("flex h-1.5 rounded-sm overflow-hidden", "w-36")}>
+                    <div className={cn("flex h-1.5 rounded-sm overflow-hidden w-36")}>
                         {item.label.map((colorClass, index) => (
-                            <div key={index} className={cn("h-full", "w-6", colorClass)} />
+                            <div key={index} className={cn("h-full w-6", colorClass)} />
                         ))}
                     </div>
                 )}
                 <div
-                  className={cn("p-1.5",isOwner && "cursor-pointer hover:bg-opacity-20", (!item.label || item.label.length === 0) && "pt-1.5" )}
+                  className={cn("p-1.5",isOwner && "cursor-pointer", (!item.label || item.label.length === 0) && "pt-1.5" )}
                   onClick={(e) => {
                     if (!isOwner) return;
                     const target = e.target as HTMLElement;
-                    if (target.closest('input[type="checkbox"]') || target.closest('[data-role="action-buttons-container"]')) { // Updated to target input type checkbox
+                     if (target.closest('input[type="checkbox"]') || target.closest('[data-role="action-buttons-container"]')) {
                         return;
                     }
                     handleOpenItemEditDialog(item);
@@ -387,27 +379,44 @@ export function TaskCard({
                         <label
                         htmlFor={`checklist-${task.id}-${item.id}`}
                         className={cn(
-                            "flex-grow break-all truncate cursor-pointer",
+                            "flex-grow break-all truncate",
+                            isOwner && "cursor-pointer", // Keep label clickable if owner to toggle checkbox
                             item.completed
-                               ? "pl-5"
+                               ? "pl-5 line-through opacity-70"
                                : "pl-1 group-hover/checkbox-reveal-area:pl-5 transition-all duration-300 ease-in-out",
-                            item.completed ? "line-through opacity-70" : "",
                             task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
-                            !isOwner && "pointer-events-none"
+                            !isOwner && "pointer-events-none" 
                         )}
                         >
                         {item.title}
                         </label>
                     </div>
-                    {isOwner && (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); handleOpenItemEditDialog(item); }}
-                            className={cn("ml-2 p-0.5 rounded opacity-50 group-hover/checklist:opacity-100 focus:opacity-100 transition-opacity", task.backgroundImageUrl ? "text-gray-300 hover:text-white" : "text-muted-foreground hover:text-foreground")}
-                            aria-label="Edit item details"
-                        >
-                            <Edit3Icon className="h-3.5 w-3.5" />
-                        </button>
-                    )}
+                     <div className="flex items-center shrink-0 ml-2" data-role="action-buttons-container">
+                        {isOwner && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleOpenItemEditDialog(item); }}
+                                className={cn("p-0.5 rounded opacity-0 group-hover/checklist:opacity-100 focus:opacity-100 transition-opacity", task.backgroundImageUrl ? "text-gray-300 hover:text-white" : "text-muted-foreground hover:text-foreground")}
+                                aria-label="Edit item details"
+                            >
+                                <Edit3Icon className="h-3.5 w-3.5" />
+                            </button>
+                        )}
+                        {isOwner && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteChecklistItem(task.id, item.id);
+                                }}
+                                className={cn(
+                                    "p-0.5 rounded opacity-0 group-hover/checklist:opacity-100 focus:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 ml-1",
+                                    task.backgroundImageUrl ? "hover:text-red-400" : "hover:text-destructive"
+                                )}
+                                aria-label="Delete item"
+                            >
+                                <Trash2Icon className="h-3.5 w-3.5" />
+                            </button>
+                        )}
+                    </div>
                   </div>
 
                   {(item.imageUrl || item.description || item.dueDate || item.assignedUserId) && (
@@ -527,14 +536,24 @@ export function TaskCard({
       </div>
 
       {editingItemAllDetails && isOwner && (
-        <Dialog open={!!editingItemAllDetails} onOpenChange={(isOpen) => { if (!isOpen) handleCloseItemEditDialog(); }}>
+        <Dialog 
+            open={!!editingItemAllDetails} 
+            onOpenChange={(isOpen) => { 
+                if (!isOpen) {
+                    if (editingItemAllDetails) { 
+                        handleSaveItemEditsFromMainDialog(); 
+                    }
+                    handleCloseItemEditDialog(); 
+                } 
+            }}
+        >
           <DialogContent
             className={cn("sm:max-w-3xl bg-card text-card-foreground max-h-[90vh] flex flex-col", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
             onClick={(e) => e.stopPropagation()}
           >
              <DialogHeader className="pb-2">
                    <DialogTitle className="sr-only">
-                    {`Edit item: ${dialogTempTitle || editingItemAllDetails.title || "Untitled Item"}`}
+                    {`Edit item: ${dialogTempTitle || (editingItemAllDetails ? editingItemAllDetails.title : "") || "Untitled Item"}`}
                   </DialogTitle>
                  <div className="flex items-center space-x-2">
                      <Checkbox
@@ -678,17 +697,7 @@ export function TaskCard({
                 </div>
               </div>
             </div>
-
-            <DialogFooter className="gap-2 sm:gap-1 pt-3 border-t border-border">
-              <Button variant="destructive" onClick={handleDeleteItemFromDialog} className={cn(task.backgroundImageUrl && "bg-red-500/80 hover:bg-red-500/90 text-white")}>
-                Delete Item
-              </Button>
-              <div className="flex-grow sm:flex-grow-0"></div> {/* Spacer */}
-              <DialogClose asChild>
-                <Button variant="ghost" onClick={handleCloseItemEditDialog} className={cn(task.backgroundImageUrl && "text-gray-300 hover:bg-white/10")}>Cancel</Button>
-              </DialogClose>
-              <Button onClick={handleSaveItemEditsFromMainDialog} className={cn(task.backgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")}>Save Changes</Button>
-            </DialogFooter>
+            {/* DialogFooter removed */}
           </DialogContent>
         </Dialog>
       )}
@@ -769,3 +778,6 @@ export function TaskCard({
     </Card>
   );
 }
+
+
+    
