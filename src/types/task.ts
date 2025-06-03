@@ -13,6 +13,14 @@ export interface Applicant {
   applicantUserId: string; // ID of the user who applied
 }
 
+export interface ActivityLogEntry {
+  id: string;
+  timestamp: number;
+  actorName: string; // e.g., "You" or a specific user name if shared
+  action: string; // e.g., "marked as complete", "changed due date", "updated description"
+  details?: string; // e.g., "from 'Oct 25' to 'Oct 28'" or "updated title to 'New Shiny Title'"
+}
+
 export interface ChecklistItem {
   id: string;
   title: string;
@@ -24,8 +32,9 @@ export interface ChecklistItem {
   assignedUserAvatarUrl?: string | null;
   imageUrl?: string | null;
   imageAiHint?: string | null;
-  comments?: string[];
-  label?: string[]; // Changed from string | null
+  comments?: string[]; // Retained for now, might be merged into activity log later
+  label?: string[];
+  activityLog?: ActivityLogEntry[]; // New field for activity logging
 }
 
 export interface Task {
@@ -46,4 +55,3 @@ export interface Task {
   userDisplayName: string;
   userAvatarUrl?: string;
 }
-

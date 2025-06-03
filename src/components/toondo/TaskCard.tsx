@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, ImageIcon, TrashIcon, MessageSquareIcon, CheckCircle2, PaperclipIcon, TagIcon, Edit3Icon, AlignLeftIcon } from "lucide-react";
+import { PrinterIcon, CalendarDaysIcon, PlusCircleIcon, Trash2Icon, UserCircleIcon, ImageIcon, TrashIcon, MessageSquareIcon, CheckCircle2, PaperclipIcon, TagIcon, Edit3Icon, AlignLeftIcon, InfoIcon, HistoryIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -28,6 +28,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { EditableTitle } from "./EditableTitle";
 import { Badge } from "@/components/ui/badge";
 import { marked } from 'marked';
+import { Separator } from "@/components/ui/separator";
+
 
 const LABEL_COLORS = [
   "bg-red-500",
@@ -388,7 +390,7 @@ export function TaskCard({
                                ? "pl-5 line-through opacity-70" 
                                : "pl-1 group-hover/item-area:pl-5 transition-all duration-300 ease-in-out",
                             task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
-                            !isOwner && "pointer-events-none" ,
+                            !isOwner && "pointer-events-none",
                             item.completed ? "line-through opacity-70" : ""
                         )}
                         >
@@ -561,7 +563,7 @@ export function TaskCard({
             className={cn("sm:max-w-3xl bg-card text-card-foreground max-h-[90vh] flex flex-col", task.backgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
             onClick={(e) => e.stopPropagation()}
           >
-             <DialogHeader className="pb-2">
+             <DialogHeader className="pb-2 pr-10"> {/* Added pr-10 to avoid overlap with close button */}
                    <DialogTitle className="sr-only">
                     {`Edit item: ${dialogTempTitle || (editingItemAllDetails ? editingItemAllDetails.title : "") || "Untitled Item"}`}
                   </DialogTitle>
@@ -570,7 +572,7 @@ export function TaskCard({
                         id={`dialog-item-completed-${editingItemAllDetails.id}`}
                         checked={dialogTempCompleted}
                         onCheckedChange={(checked) => setDialogTempCompleted(Boolean(checked))}
-                        className={cn("h-5 w-5 rounded-full", task.backgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
+                        className={cn("h-5 w-5 rounded-sm", task.backgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
                       />
                      <EditableTitle
                         initialValue={dialogTempTitle}
@@ -595,125 +597,147 @@ export function TaskCard({
                   </div>
             </DialogHeader>
             
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-                <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className={cn("justify-start text-xs h-auto py-1.5 px-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
-                            <UserCircleIcon className="mr-1.5 h-3.5 w-3.5" />
-                            {dialogTempAssignedUserName ? dialogTempAssignedUserName.split(' ')[0] : "Assign"}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleToggleDialogAssignCurrentUser}>
-                        {dialogTempAssignedUserId === currentUser?.id ? "Unassign Myself" : "Assign to Me"}
-                        </Button>
-                    </PopoverContent>
-                </Popover>
-
-                <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className={cn(
-                                "justify-start text-xs h-auto py-1.5 px-2",
-                                dialogTempCompleted && dialogTempDueDate 
-                                ? (task.backgroundImageUrl ? "text-green-300 bg-white/10 border-white/30 hover:bg-white/20" : "text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300")
-                                : (task.backgroundImageUrl ? "bg-white/10 border-white/30 text-white hover:bg-white/20" : "")
-                            )}
-                        >
-                            <CalendarDaysIcon className={cn("mr-1.5 h-3.5 w-3.5")} />
-                            {dialogTempDueDate ? format(dialogTempDueDate, "MMM d") : "Due Date"}
-                            {dialogTempCompleted && dialogTempDueDate && (
-                                <Badge variant="secondary" className={cn("ml-1.5 text-xs px-1 py-0", task.backgroundImageUrl ? "bg-green-300/30 text-green-100 border-green-300/50" : "bg-green-100 text-green-700")}>
-                                   <CheckCircle2 className="mr-1 h-3 w-3"/> Done
-                                </Badge>
-                            )}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
-                        <Calendar
-                        mode="single"
-                        selected={dialogTempDueDate}
-                        onSelect={handleSaveDueDateFromPopover}
-                        initialFocus
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 flex-grow overflow-y-auto min-h-[300px]"> {/* min-h for scroll */}
+              {/* Left Column: Description & Image */}
+              <div className="md:col-span-2 space-y-4 pr-4 border-r border-border/50">
+                {dialogTempImageUrl && (
+                    <div className="w-full h-48 relative overflow-hidden rounded-md border border-border">
+                        <Image
+                            src={dialogTempImageUrl}
+                            alt={dialogTempTitle || "Item image"}
+                            fill
+                            style={{objectFit: "cover"}}
+                            className="rounded-md"
+                            data-ai-hint={editingItemAllDetails.imageAiHint || dialogTempTitle.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
                         />
-                        {dialogTempDueDate && <Button size="sm" variant="link" className="w-full text-xs text-destructive" onClick={() => {handleSaveDueDateFromPopover(undefined);}}>Clear Date</Button>}
-                    </PopoverContent>
-                </Popover>
-
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleOpenAttachmentDialog}
-                    className={cn("justify-start text-xs h-auto py-1.5 px-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
-                >
-                    <PaperclipIcon className="mr-1.5 h-3.5 w-3.5" /> Image
-                </Button>
-
-                <Popover open={isLabelPopoverOpen} onOpenChange={setIsLabelPopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className={cn("justify-start text-xs items-center h-auto py-1.5 px-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
-                            <TagIcon className="mr-1.5 h-3.5 w-3.5" />
-                            Label
-                            {dialogTempLabel.length > 0 && (
-                                <div className="flex items-center gap-0.5 ml-1.5">
-                                    {dialogTempLabel.slice(0, MAX_LABELS).map(color => ( 
-                                        <span key={color} className={cn("w-2.5 h-2.5 rounded-sm", color)} />
-                                    ))}
-                                </div>
-                            )}
-                        </Button>
-                    </PopoverTrigger>
-                     <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
-                        <div className="grid grid-cols-4 gap-1 mb-2">
-                            {LABEL_COLORS.map(colorClass => (
-                                <button
-                                    key={colorClass}
-                                    type="button"
-                                    className={cn("w-5 h-5 rounded-md cursor-pointer hover:ring-2 hover:ring-offset-1 ring-ring", colorClass, dialogTempLabel.includes(colorClass) && "ring-2 ring-offset-1 ring-ring")}
-                                    onClick={() => handleToggleLabelColorInDialog(colorClass)}
-                                    aria-label={`Toggle label ${colorClass.split('-')[1]}`}
-                                />
-                            ))}
-                        </div>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full text-xs"
-                            onClick={handleClearAllLabelsInDialog}
-                            disabled={dialogTempLabel.length === 0}
-                        >
-                            Clear All Labels
-                        </Button>
-                    </PopoverContent>
-                </Popover>
-            </div>
-
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 flex-grow overflow-y-auto pb-3">
-              <div className="md:col-span-2 space-y-3">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-1">
-                        <AlignLeftIcon className={cn("h-4 w-4", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")} />
-                        <Label htmlFor="dialogItemDescription" className={cn("text-sm", task.backgroundImageUrl && "text-gray-200")}>Description</Label>
                     </div>
-                    <Textarea
-                      id="dialogItemDescription"
-                      value={dialogTempDescription}
-                      onChange={(e) => setDialogTempDescription(e.target.value)}
-                      placeholder="Add more details about this item... Markdown is supported for formatting (e.g. **bold**, *italic*, - lists)."
-                      className={cn("min-h-[100px]",task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
-                      rows={3}
-                    />
+                )}
+                <div>
+                  <div className="flex items-center space-x-2 mb-1.5">
+                      <AlignLeftIcon className={cn("h-4 w-4", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")} />
+                      <Label htmlFor="dialogItemDescription" className={cn("text-sm font-medium", task.backgroundImageUrl && "text-gray-200")}>Description</Label>
                   </div>
+                  <Textarea
+                    id="dialogItemDescription"
+                    value={dialogTempDescription}
+                    onChange={(e) => setDialogTempDescription(e.target.value)}
+                    placeholder="Add more details about this item... Markdown is supported for formatting (e.g. **bold**, *italic*, - lists)."
+                    className={cn(
+                        "min-h-[150px] text-sm",
+                        task.backgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50"
+                    )}
+                    rows={dialogTempImageUrl ? 4 : 8}
+                  />
+                </div>
               </div>
 
-              <div className="md:col-span-1 space-y-3 border-l border-border md:pl-6 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0">
-                <h4 className={cn("font-medium", task.backgroundImageUrl && "text-gray-200")}>Comments</h4>
-                <div className={cn("p-3 rounded-md text-sm min-h-[150px] flex items-center justify-center", task.backgroundImageUrl ? "bg-white/5 text-gray-400 border border-white/20" : "bg-muted text-muted-foreground border border-dashed")}>
-                   <MessageSquareIcon className="h-6 w-6 mr-2 opacity-50" /> Comments are coming soon!
+              {/* Right Column: Actions & Activity Log */}
+              <div className="md:col-span-1 space-y-4 pl-4 md:pl-6 mt-4 md:mt-0">
+                <h4 className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground", task.backgroundImageUrl && "text-gray-300")}>Actions</h4>
+                <div className="space-y-2 flex flex-col items-start">
+                    <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className={cn("w-full justify-start text-xs h-auto py-1.5 px-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                                <UserCircleIcon className="mr-1.5 h-3.5 w-3.5" />
+                                {dialogTempAssignedUserName ? dialogTempAssignedUserName.split(' ')[0] : "Assign User"}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
+                            <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleToggleDialogAssignCurrentUser}>
+                            {dialogTempAssignedUserId === currentUser?.id ? "Unassign Myself" : "Assign to Me"}
+                            </Button>
+                        </PopoverContent>
+                    </Popover>
+
+                    <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
+                        <PopoverTrigger asChild>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className={cn(
+                                    "w-full justify-start text-xs h-auto py-1.5 px-2",
+                                    dialogTempCompleted && dialogTempDueDate 
+                                    ? (task.backgroundImageUrl ? "text-green-300 bg-white/10 border-white/30 hover:bg-white/20" : "text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300")
+                                    : (task.backgroundImageUrl ? "bg-white/10 border-white/30 text-white hover:bg-white/20" : "")
+                                )}
+                            >
+                                <CalendarDaysIcon className={cn("mr-1.5 h-3.5 w-3.5")} />
+                                {dialogTempDueDate ? format(dialogTempDueDate, "MMM d, yyyy") : "Set Due Date"}
+                                {dialogTempCompleted && dialogTempDueDate && (
+                                    <Badge variant="secondary" className={cn("ml-1.5 text-xs px-1 py-0", task.backgroundImageUrl ? "bg-green-300/30 text-green-100 border-green-300/50" : "bg-green-100 text-green-700")}>
+                                      <CheckCircle2 className="mr-1 h-3 w-3"/> Done
+                                    </Badge>
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
+                            <Calendar
+                            mode="single"
+                            selected={dialogTempDueDate}
+                            onSelect={handleSaveDueDateFromPopover}
+                            initialFocus
+                            />
+                            {dialogTempDueDate && <Button size="sm" variant="link" className="w-full text-xs text-destructive" onClick={() => {handleSaveDueDateFromPopover(undefined);}}>Clear Date</Button>}
+                        </PopoverContent>
+                    </Popover>
+
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenAttachmentDialog}
+                        className={cn("w-full justify-start text-xs h-auto py-1.5 px-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
+                    >
+                        <PaperclipIcon className="mr-1.5 h-3.5 w-3.5" /> {dialogTempImageUrl ? "Change Image" : "Add Image"}
+                    </Button>
+
+                    <Popover open={isLabelPopoverOpen} onOpenChange={setIsLabelPopoverOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className={cn("w-full justify-start text-xs items-center h-auto py-1.5 px-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
+                                <TagIcon className="mr-1.5 h-3.5 w-3.5" />
+                                Labels
+                                {dialogTempLabel.length > 0 && (
+                                    <div className="flex items-center gap-0.5 ml-auto pl-1">
+                                        {dialogTempLabel.slice(0, MAX_LABELS).map(color => ( 
+                                            <span key={color} className={cn("w-2.5 h-2.5 rounded-sm block", color)} />
+                                        ))}
+                                    </div>
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
+                            <div className="grid grid-cols-4 gap-1 mb-2">
+                                {LABEL_COLORS.map(colorClass => (
+                                    <button
+                                        key={colorClass}
+                                        type="button"
+                                        className={cn("w-5 h-5 rounded-md cursor-pointer hover:ring-2 hover:ring-offset-1 ring-ring", colorClass, dialogTempLabel.includes(colorClass) && "ring-2 ring-offset-1 ring-ring")}
+                                        onClick={() => handleToggleLabelColorInDialog(colorClass)}
+                                        aria-label={`Toggle label ${colorClass.split('-')[1]}`}
+                                    />
+                                ))}
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full text-xs"
+                                onClick={handleClearAllLabelsInDialog}
+                                disabled={dialogTempLabel.length === 0}
+                            >
+                                Clear All Labels
+                            </Button>
+                        </PopoverContent>
+                    </Popover>
                 </div>
+                
+                <Separator className={cn("my-3", task.backgroundImageUrl && "bg-white/20")} />
+
+                <div>
+                  <h4 className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2", task.backgroundImageUrl && "text-gray-300")}>Activity</h4>
+                  <div className={cn("p-3 rounded-md text-xs min-h-[100px] flex items-center justify-center border border-dashed", task.backgroundImageUrl ? "bg-white/5 text-gray-400 border-white/20" : "bg-muted text-muted-foreground")}>
+                     <HistoryIcon className="h-5 w-5 mr-2 opacity-50" /> Activity log coming soon.
+                  </div>
+                </div>
+
               </div>
             </div>
           </DialogContent>
@@ -796,7 +820,3 @@ export function TaskCard({
     </Card>
   );
 }
-
-
-    
-
