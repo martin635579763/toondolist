@@ -73,13 +73,7 @@ export function ChecklistItemEditDialog({
 
   const [dialogTempTitle, setDialogTempTitle] = useState(item.title);
   const [dialogTempDescription, setDialogTempDescription] = useState(item.description || "");
-  const [dialogTempCompleted, setDialogTempCompleted] = useState(item.completed);
-  const [dialogTempDueDate, setDialogTempDueDate] = useState<Date | undefined>(item.dueDate ? new Date(item.dueDate) : undefined);
-  const [dialogTempAssignedUserId, setDialogTempAssignedUserId] = useState<string | null>(item.assignedUserId || null);
-  const [dialogTempAssignedUserName, setDialogTempAssignedUserName] = useState<string | null>(item.assignedUserName || null);
-  const [dialogTempAssignedUserAvatarUrl, setDialogTempAssignedUserAvatarUrl] = useState<string | null>(item.assignedUserAvatarUrl || null);
   const [dialogTempImageUrl, setDialogTempImageUrl] = useState<string>(item.imageUrl || "");
-  const [dialogTempLabel, setDialogTempLabel] = useState<string[]>(Array.isArray(item.label) ? item.label : []);
 
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
   const attachmentDialogFileInpuRef = useRef<HTMLInputElement>(null);
@@ -88,70 +82,25 @@ export function ChecklistItemEditDialog({
   const [isLabelPopoverOpen, setIsLabelPopoverOpen] = useState(false);
 
   useEffect(() => {
-    setDialogTempTitle(item.title);
-    setDialogTempDescription(item.description || "");
-    setDialogTempCompleted(item.completed);
-    setDialogTempDueDate(item.dueDate ? new Date(item.dueDate) : undefined);
-    setDialogTempAssignedUserId(item.assignedUserId || null);
-    setDialogTempAssignedUserName(item.assignedUserName || null);
-    setDialogTempAssignedUserAvatarUrl(item.assignedUserAvatarUrl || null);
-    setDialogTempImageUrl(item.imageUrl || "");
-    setDialogTempLabel(Array.isArray(item.label) ? item.label : []);
-  }, [item]);
+    if (isOpen) { // Only update local state if dialog is open to avoid stale data issues
+        setDialogTempTitle(item.title);
+        setDialogTempDescription(item.description || "");
+        setDialogTempImageUrl(item.imageUrl || "");
+    }
+  }, [item, isOpen]);
 
 
-  const handleSaveItemEdits = () => {
+  const handleSaveDescriptionOnClose = () => {
     if (!isOwner || !currentUser) return;
-
-    const trimmedTitle = dialogTempTitle.trim();
-    if (!trimmedTitle) {
-        toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
-        setDialogTempTitle(item.title); 
-        return; 
-    }
-    if (trimmedTitle !== item.title) {
-      onUpdateChecklistItemTitle(taskId, item.id, trimmedTitle);
-    }
-
-    if (dialogTempDescription.trim() !== (item.description || "").trim()) {
-      onUpdateChecklistItemDescription(taskId, item.id, dialogTempDescription.trim());
-    }
-    
-    if (dialogTempCompleted !== item.completed) {
-        onToggleChecklistItem(taskId, item.id); 
-    }
-    
-    const newDueDateStr = dialogTempDueDate ? dialogTempDueDate.toISOString().split('T')[0] : null;
-    const currentDueDateStr = item.dueDate ? new Date(item.dueDate).toISOString().split('T')[0] : null;
-    if (newDueDateStr !== currentDueDateStr) {
-        onSetChecklistItemDueDate(taskId, item.id, dialogTempDueDate || null);
-    }
-
-    if (dialogTempAssignedUserId !== item.assignedUserId) {
-      onAssignUserToChecklistItem(taskId, item.id, dialogTempAssignedUserId, dialogTempAssignedUserName, dialogTempAssignedUserAvatarUrl);
-    }
-
-    const finalImageUrl = dialogTempImageUrl.trim() || null;
-    let finalImageAiHint: string | null = null;
-    if (finalImageUrl && trimmedTitle) {
-        finalImageAiHint = trimmedTitle.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
-    }
-    if (finalImageUrl !== item.imageUrl) {
-        onSetChecklistItemImage(taskId, item.id, finalImageUrl, finalImageAiHint);
-    }
-
-    const currentLabels = item.label || [];
-    const newLabels = dialogTempLabel;
-    const labelsChanged = currentLabels.length !== newLabels.length || !currentLabels.every(label => newLabels.includes(label));
-
-    if (labelsChanged) {
-        onSetChecklistItemLabel(taskId, item.id, newLabels.length > 0 ? newLabels : []);
+    const trimmedDescription = dialogTempDescription.trim();
+    if (trimmedDescription !== (item.description || "").trim()) {
+      onUpdateChecklistItemDescription(taskId, item.id, trimmedDescription);
     }
   };
 
   const handleDialogClose = (openState: boolean) => {
     if (!openState) { 
-      if(isOwner) handleSaveItemEdits();
+      if(isOwner) handleSaveDescriptionOnClose();
       setIsUserPopoverOpen(false);
       setIsDueDatePopoverOpen(false);
       setIsLabelPopoverOpen(false);
@@ -169,6 +118,18 @@ export function ChecklistItemEditDialog({
   };
 
   const handleSaveAttachmentFromSubDialog = () => {
+    if (!isOwner) {
+      setIsAttachmentDialogOpen(false);
+      return;
+    }
+    const finalImageUrl = dialogTempImageUrl.trim() || null;
+    let finalImageAiHint: string | null = null;
+    if (finalImageUrl && item.title) { 
+        finalImageAiHint = item.title.split(/\s+/).slice(0, 2).join(' ').toLowerCase() || "image";
+    }
+    if (finalImageUrl !== item.imageUrl) { 
+        onSetChecklistItemImage(taskId, item.id, finalImageUrl, finalImageAiHint);
+    }
     setIsAttachmentDialogOpen(false); 
   };
 
@@ -194,46 +155,87 @@ export function ChecklistItemEditDialog({
 
   const handleToggleDialogAssignCurrentUser = () => {
     if (!currentUser || !isOwner) return;
-    if (dialogTempAssignedUserId === currentUser.id) {
-      setDialogTempAssignedUserId(null);
-      setDialogTempAssignedUserName(null);
-      setDialogTempAssignedUserAvatarUrl(null);
+    let newAssignedUserId: string | null = null;
+    let newAssignedUserName: string | null = null;
+    let newAssignedUserAvatarUrl: string | null = null;
+
+    if (item.assignedUserId === currentUser.id) {
+      // Unassign
     } else {
-      setDialogTempAssignedUserId(currentUser.id);
-      setDialogTempAssignedUserName(currentUser.displayName);
-      setDialogTempAssignedUserAvatarUrl(currentUser.avatarUrl || null);
+      // Assign current user
+      newAssignedUserId = currentUser.id;
+      newAssignedUserName = currentUser.displayName;
+      newAssignedUserAvatarUrl = currentUser.avatarUrl || null;
+    }
+    
+    if (newAssignedUserId !== item.assignedUserId) {
+      onAssignUserToChecklistItem(taskId, item.id, newAssignedUserId, newAssignedUserName, newAssignedUserAvatarUrl);
     }
     setIsUserPopoverOpen(false);
   };
 
   const handleSaveDueDateFromPopover = (date: Date | undefined) => {
     if (!isOwner) return;
-    setDialogTempDueDate(date);
+    const newDueDate = date || null;
+    const newDueDateStr = newDueDate ? newDueDate.toISOString() : null;
+    const currentDueDateStr = item.dueDate ? new Date(item.dueDate).toISOString() : null;
+    
+    if (newDueDateStr !== currentDueDateStr) {
+        onSetChecklistItemDueDate(taskId, item.id, newDueDate);
+    }
     setIsDueDatePopoverOpen(false);
   };
 
   const handleToggleLabelColorInDialog = (colorClass: string) => {
     if (!isOwner) return;
-    setDialogTempLabel(prev => {
-        const isSelected = prev.includes(colorClass);
-        if (isSelected) {
-            return prev.filter(c => c !== colorClass);
+    const currentLabels = item.label || [];
+    let newLabels: string[];
+    const isSelected = currentLabels.includes(colorClass);
+
+    if (isSelected) {
+        newLabels = currentLabels.filter(c => c !== colorClass);
+    } else {
+        if (currentLabels.length < MAX_LABELS) {
+            newLabels = [...currentLabels, colorClass];
         } else {
-            if (prev.length < MAX_LABELS) {
-                return [...prev, colorClass];
-            } else {
-                toast({title: "Label Limit Reached", description: `You can select up to ${MAX_LABELS} labels.`, variant: "default"});
-                return prev;
-            }
+            toast({title: "Label Limit Reached", description: `You can select up to ${MAX_LABELS} labels.`, variant: "default"});
+            return; 
         }
-    });
+    }
+    
+    const labelsChanged = currentLabels.length !== newLabels.length || !currentLabels.every(label => newLabels.includes(label));
+    if (labelsChanged) {
+        onSetChecklistItemLabel(taskId, item.id, newLabels);
+    }
   };
   
   const handleClearAllLabelsInDialog = () => {
     if (!isOwner) return;
-    setDialogTempLabel([]);
+    const currentLabels = item.label || [];
+    if (currentLabels.length > 0) {
+      onSetChecklistItemLabel(taskId, item.id, []);
+    }
     setIsLabelPopoverOpen(false);
   }
+
+  const handleTitleSave = (newTitle: string) => {
+    if (!isOwner) return;
+    const trimmedTitle = newTitle.trim();
+     if (!trimmedTitle) {
+        toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
+        setDialogTempTitle(item.title); // Revert temp title to original if save fails
+        return;
+    }
+    if (trimmedTitle !== item.title) {
+      onUpdateChecklistItemTitle(taskId, item.id, trimmedTitle);
+    }
+  };
+
+  const handleCheckboxChange = () => {
+      if (isOwner) {
+          onToggleChecklistItem(taskId, item.id);
+      }
+  };
 
   if (!isOwner && !isOpen) return null; 
 
@@ -254,29 +256,25 @@ export function ChecklistItemEditDialog({
                <div className="flex items-center space-x-2">
                    <Checkbox
                       id={`dialog-item-completed-${item.id}`}
-                      checked={dialogTempCompleted}
-                      onCheckedChange={(checked) => {
-                        if (isOwner) {
-                          setDialogTempCompleted(Boolean(checked));
-                        }
-                      }}
+                      checked={item.completed}
+                      onCheckedChange={handleCheckboxChange}
                       disabled={!isOwner}
                       className={cn("h-5 w-5 rounded-sm", taskBackgroundImageUrl && "border-gray-400 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400")}
                     />
                    <EditableTitle
-                      initialValue={dialogTempTitle}
-                      onSave={(newTitle) => isOwner && setDialogTempTitle(newTitle)} 
+                      initialValue={dialogTempTitle} // EditableTitle manages its own internal value based on initialValue
+                      onSave={handleTitleSave}
                       isEditable={isOwner}
                       textElement='div'
                       textClassName={cn(
                         "text-xl font-semibold py-1",
                         taskBackgroundImageUrl && "text-gray-100",
-                        dialogTempCompleted && "line-through text-muted-foreground"
+                        item.completed && "line-through text-muted-foreground"
                       )}
                       inputClassName={cn(
                         "text-xl font-semibold h-auto p-0",
                         taskBackgroundImageUrl && "bg-transparent text-white placeholder-gray-300",
-                        dialogTempCompleted && "line-through text-muted-foreground"
+                        item.completed && "line-through text-muted-foreground"
                       )}
                       placeholder="Item title..."
                       ariaLabel="Item title"
@@ -287,33 +285,33 @@ export function ChecklistItemEditDialog({
           </DialogHeader>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 flex-grow overflow-y-auto min-h-[300px]">
-            {/* Left Column: Image, Description, Action Buttons */}
+            {/* Left Column: Image, Actions, Description */}
             <div className="md:col-span-1 space-y-4 pr-4 md:border-r md:border-border/50">
-              {dialogTempImageUrl && (
+              {dialogTempImageUrl && ( // Use dialogTempImageUrl for optimistic UI for image
                   <div className="w-full h-48 relative overflow-hidden rounded-md border border-border">
                       <Image
                           src={dialogTempImageUrl}
-                          alt={dialogTempTitle || "Item image"}
+                          alt={item.title || "Item image"}
                           fill
                           style={{objectFit: "cover"}}
                           className="rounded-md"
-                          data-ai-hint={item.imageAiHint || dialogTempTitle.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
+                          data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
                       />
                   </div>
               )}
 
               {/* Action Buttons */}
-              <div className="space-y-2 flex flex-col items-start pt-4">
+               <div className="space-y-2 flex flex-col items-start pt-4">
                   <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                       <PopoverTrigger asChild>
                           <Button variant="outline" size="sm" className={cn("w-full justify-start text-xs h-auto py-1.5 px-2", taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")} disabled={!isOwner}>
                               <UserCircleIcon className="mr-1.5 h-3.5 w-3.5" />
-                              {dialogTempAssignedUserName ? dialogTempAssignedUserName.split(' ')[0] : "Assign User"}
+                              {item.assignedUserName ? item.assignedUserName.split(' ')[0] : "Assign User"}
                           </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-2" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
                           <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleToggleDialogAssignCurrentUser} disabled={!isOwner}>
-                          {dialogTempAssignedUserId === currentUser?.id ? "Unassign Myself" : "Assign to Me"}
+                          {item.assignedUserId === currentUser?.id ? "Unassign Myself" : "Assign to Me"}
                           </Button>
                       </PopoverContent>
                   </Popover>
@@ -325,15 +323,15 @@ export function ChecklistItemEditDialog({
                               size="sm" 
                               className={cn(
                                   "w-full justify-start text-xs h-auto py-1.5 px-2",
-                                  dialogTempCompleted && dialogTempDueDate 
-                                  ? (taskBackgroundImageUrl ? "text-green-300 bg-white/10 border-white/30 hover:bg-white/20" : "text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300")
-                                  : (taskBackgroundImageUrl ? "bg-white/10 border-white/30 text-white hover:bg-white/20" : "")
+                                   item.completed && item.dueDate
+                                   ? (taskBackgroundImageUrl ? "text-green-300 bg-white/10 border-white/30 hover:bg-white/20" : "text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300")
+                                   : (taskBackgroundImageUrl ? "bg-white/10 border-white/30 text-white hover:bg-white/20" : "")
                               )}
                               disabled={!isOwner}
                           >
                               <CalendarDaysIcon className={cn("mr-1.5 h-3.5 w-3.5")} />
-                              {dialogTempDueDate ? format(dialogTempDueDate, "MMM d, yyyy") : "Set Due Date"}
-                              {dialogTempCompleted && dialogTempDueDate && (
+                              {item.dueDate ? format(new Date(item.dueDate), "MMM d, yyyy") : "Set Due Date"}
+                              {item.completed && item.dueDate && (
                                   <Badge variant="secondary" className={cn("ml-1.5 text-xs px-1 py-0", taskBackgroundImageUrl ? "bg-green-300/30 text-green-100 border-green-300/50" : "bg-green-100 text-green-700")}>
                                     <CheckCircle2 className="mr-1 h-3 w-3"/> Done
                                   </Badge>
@@ -343,12 +341,12 @@ export function ChecklistItemEditDialog({
                       <PopoverContent className="w-auto p-0" side="bottom" align="start" onClick={(e) => e.stopPropagation()}>
                           <Calendar
                           mode="single"
-                          selected={dialogTempDueDate}
+                          selected={item.dueDate ? new Date(item.dueDate) : undefined}
                           onSelect={handleSaveDueDateFromPopover}
                           disabled={!isOwner}
                           initialFocus
                           />
-                          {dialogTempDueDate && <Button size="sm" variant="link" className="w-full text-xs text-destructive" onClick={() => {handleSaveDueDateFromPopover(undefined);}} disabled={!isOwner}>Clear Date</Button>}
+                          {item.dueDate && <Button size="sm" variant="link" className="w-full text-xs text-destructive" onClick={() => {handleSaveDueDateFromPopover(undefined);}} disabled={!isOwner}>Clear Date</Button>}
                       </PopoverContent>
                   </Popover>
 
@@ -359,7 +357,7 @@ export function ChecklistItemEditDialog({
                       className={cn("w-full justify-start text-xs h-auto py-1.5 px-2", taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}
                       disabled={!isOwner}
                   >
-                      <PaperclipIcon className="mr-1.5 h-3.5 w-3.5" /> {dialogTempImageUrl ? "Change Image" : "Add Image"}
+                      <PaperclipIcon className="mr-1.5 h-3.5 w-3.5" /> {item.imageUrl ? "Change Image" : "Add Image"}
                   </Button>
 
                   <Popover open={isLabelPopoverOpen} onOpenChange={setIsLabelPopoverOpen}>
@@ -367,9 +365,9 @@ export function ChecklistItemEditDialog({
                           <Button variant="outline" size="sm" className={cn("w-full justify-start text-xs items-center h-auto py-1.5 px-2", taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")} disabled={!isOwner}>
                               <TagIcon className="mr-1.5 h-3.5 w-3.5" />
                               Labels
-                              {dialogTempLabel.length > 0 && (
+                              {(item.label && item.label.length > 0) && (
                                   <div className="flex items-center gap-0.5 ml-auto pl-1">
-                                      {dialogTempLabel.slice(0, MAX_LABELS).map(color => ( 
+                                      {item.label.slice(0, MAX_LABELS).map(color => ( 
                                           <span key={color} className={cn("w-2.5 h-2.5 rounded-sm block", color)} />
                                       ))}
                                   </div>
@@ -382,7 +380,7 @@ export function ChecklistItemEditDialog({
                                   <button
                                       key={colorClass}
                                       type="button"
-                                      className={cn("w-5 h-5 rounded-md cursor-pointer hover:ring-2 hover:ring-offset-1 ring-ring", colorClass, dialogTempLabel.includes(colorClass) && "ring-2 ring-offset-1 ring-ring")}
+                                      className={cn("w-5 h-5 rounded-md cursor-pointer hover:ring-2 hover:ring-offset-1 ring-ring", colorClass, (item.label || []).includes(colorClass) && "ring-2 ring-offset-1 ring-ring")}
                                       onClick={() => handleToggleLabelColorInDialog(colorClass)}
                                       aria-label={`Toggle label ${colorClass.split('-')[1]}`}
                                       disabled={!isOwner}
@@ -394,7 +392,7 @@ export function ChecklistItemEditDialog({
                               size="sm"
                               className="w-full text-xs"
                               onClick={handleClearAllLabelsInDialog}
-                              disabled={!isOwner || dialogTempLabel.length === 0}
+                              disabled={!isOwner || (item.label || []).length === 0}
                           >
                               Clear All Labels
                           </Button>
@@ -417,7 +415,7 @@ export function ChecklistItemEditDialog({
                       "min-h-[150px] text-sm",
                       taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50"
                   )}
-                  rows={dialogTempImageUrl ? 4 : 8}
+                  rows={dialogTempImageUrl ? 4 : 8} // Use dialogTempImageUrl here
                   disabled={!isOwner}
                 />
               </div>
@@ -429,7 +427,7 @@ export function ChecklistItemEditDialog({
                 <h4 className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center", taskBackgroundImageUrl && "text-gray-300")}>
                     <HistoryIcon className="h-3.5 w-3.5 mr-1.5" /> Activity
                 </h4>
-                <ScrollArea className="h-[calc(100%-2rem)] pr-2"> {/* Adjust height as needed */}
+                <ScrollArea className="h-[calc(100%-2rem)] pr-2">
                   {(item.activityLog && item.activityLog.length > 0) ? (
                     <div className="space-y-2.5 text-xs">
                       {item.activityLog.map((log: ActivityLogEntry) => (
@@ -479,7 +477,7 @@ export function ChecklistItemEditDialog({
                     <DialogTitle className={cn(taskBackgroundImageUrl && "text-white")}>Manage Item Image</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
-                    {dialogTempImageUrl ? (
+                    {dialogTempImageUrl ? ( // Use dialogTempImageUrl for optimistic UI
                         <div className="w-full h-40 relative overflow-hidden rounded-md border border-border">
                             <Image
                                 src={dialogTempImageUrl}
@@ -499,7 +497,7 @@ export function ChecklistItemEditDialog({
                         <Label htmlFor="dialogAttachmentImageUrl" className={cn("text-xs", taskBackgroundImageUrl && "text-gray-200")}>Image URL</Label>
                         <Input
                             id="dialogAttachmentImageUrl"
-                            value={dialogTempImageUrl}
+                            value={dialogTempImageUrl} // Controlled by dialogTempImageUrl
                             onChange={(e) => setDialogTempImageUrl(e.target.value)}
                             placeholder="https://example.com/image.png"
                             className={cn("text-sm h-9", taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
@@ -516,7 +514,7 @@ export function ChecklistItemEditDialog({
                             className={cn("text-xs p-1 h-auto file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-input file:bg-transparent file:text-xs file:font-medium file:text-foreground", taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 file:text-gray-200 file:border-white/30 hover:file:bg-white/5")}
                         />
                     </div>
-                    {(dialogTempImageUrl) &&
+                    {(dialogTempImageUrl) && // Use dialogTempImageUrl
                         <Button
                             size="sm"
                             variant="outline"
@@ -544,5 +542,3 @@ export function ChecklistItemEditDialog({
     </>
   );
 }
-
-    
