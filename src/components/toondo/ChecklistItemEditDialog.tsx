@@ -81,21 +81,18 @@ export function ChecklistItemEditDialog({
 
   useEffect(() => {
     if (isOpen) {
-        // When dialog opens, sync description and image URL from the item prop
         setDialogTempDescription(item.description || "");
         setDialogTempImageUrl(item.imageUrl || "");
     }
   }, [item.description, item.imageUrl, isOpen]);
 
-  // This effect ensures that if the item prop itself changes (e.g. title, completed status from parent)
-  // while the dialog is open, the dialog's view of description and image url is also kept in sync if not actively editing.
-  // Only update if the prop changed AND it's different from what's currently in the dialog's temp state.
+
   useEffect(() => {
     if (isOpen) {
         if (item.description !== dialogTempDescription && !document.activeElement?.closest('#dialogItemDescription')) {
             setDialogTempDescription(item.description || "");
         }
-        if (item.imageUrl !== dialogTempImageUrl && !isAttachmentDialogOpen) {
+        if (item.imageUrl !== dialogTempImageUrl && !isAttachmentDialogOpen && !document.activeElement?.closest('#dialogAttachmentImageUrl')) {
             setDialogTempImageUrl(item.imageUrl || "");
         }
     }
@@ -113,7 +110,9 @@ export function ChecklistItemEditDialog({
 
   const handleDialogClose = (openState: boolean) => {
     if (!openState) { 
-      if(isOwner) handleSaveDescriptionOnClose();
+      if(isOwner) {
+        handleSaveDescriptionOnClose();
+      }
       setIsUserPopoverOpen(false);
       setIsDueDatePopoverOpen(false);
       setIsLabelPopoverOpen(false);
@@ -221,10 +220,6 @@ export function ChecklistItemEditDialog({
     const trimmedTitle = newTitle.trim();
      if (!trimmedTitle) {
         toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
-        // Revert to original title if save is attempted with empty
-         if (item.title !== newTitle) { // Only toast if it was a real attempt to blank, not just blur on initial empty
-            // This part might need adjustment based on EditableTitle behavior for empty save
-         }
         return; 
     }
     if (item.title !== trimmedTitle) {
@@ -239,6 +234,13 @@ export function ChecklistItemEditDialog({
   };
 
   if (!isOwner && !isOpen) return null; 
+
+  const rightColBgClass = taskBackgroundImageUrl 
+    ? "pl-4" 
+    : "bg-muted/30 rounded-lg p-3";
+  
+  const scrollAreaPadding = taskBackgroundImageUrl ? "pr-2" : "";
+
 
   return (
     <>
@@ -289,7 +291,7 @@ export function ChecklistItemEditDialog({
           </DialogHeader>
           
           <div className={cn(
-              "grid grid-cols-1 md:grid-cols-2 gap-x-6 flex-grow overflow-hidden min-h-0"
+              "grid grid-cols-1 md:grid-cols-2 gap-x-6 flex-grow overflow-hidden min-h-0" // Added min-h-0
             )}
           >
             {/* Left Column: Image, Actions, Description */}
@@ -431,9 +433,8 @@ export function ChecklistItemEditDialog({
             {/* Right Column: Activity Log */}
             <div 
               className={cn(
-                "md:col-span-1 mt-4 md:mt-0 flex flex-col h-full", 
-                !taskBackgroundImageUrl && "bg-muted/30 rounded-lg p-3",
-                taskBackgroundImageUrl && "pl-4"
+                "md:col-span-1 mt-4 md:mt-0 flex flex-col h-full overflow-hidden", // Added overflow-hidden
+                rightColBgClass
               )}
             >
                 <h4 className={cn(
@@ -445,8 +446,8 @@ export function ChecklistItemEditDialog({
                 </h4>
                 <ScrollArea 
                   className={cn(
-                    "flex-grow", // Removed explicit height, flex-grow should handle it
-                    taskBackgroundImageUrl && "pr-2" // Padding for scrollbar visibility on transparent bg
+                    "flex-grow min-h-0", // min-h-0 is crucial for flex-grow in a constrained parent
+                    scrollAreaPadding
                   )}
                 >
                   {(item.activityLog && item.activityLog.length > 0) ? (
