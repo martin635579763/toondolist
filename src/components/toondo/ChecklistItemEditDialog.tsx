@@ -117,10 +117,8 @@ export function ChecklistItemEditDialog({
       onUpdateChecklistItemDescription(taskId, item.id, dialogTempDescription.trim());
     }
     
-    // Compare completed status after title/desc, as onToggleChecklistItem might be called by checkbox directly
-    // However, the dialog's internal 'dialogTempCompleted' is the source of truth for this save operation.
     if (dialogTempCompleted !== item.completed) {
-        onToggleChecklistItem(taskId, item.id); // This will toggle based on item.completed, so if it's already been externally toggled, this makes it right
+        onToggleChecklistItem(taskId, item.id); 
     }
     
     const newDueDateStr = dialogTempDueDate ? dialogTempDueDate.toISOString().split('T')[0] : null;
@@ -172,7 +170,6 @@ export function ChecklistItemEditDialog({
 
   const handleSaveAttachmentFromSubDialog = () => {
     setIsAttachmentDialogOpen(false); 
-    // The actual image URL update will happen on main dialog close via handleSaveItemEdits
   };
 
   const handleAttachmentFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -261,7 +258,6 @@ export function ChecklistItemEditDialog({
                       onCheckedChange={(checked) => {
                         if (isOwner) {
                           setDialogTempCompleted(Boolean(checked));
-                          // No direct call to onToggleChecklistItem here, it's handled in handleSaveItemEdits
                         }
                       }}
                       disabled={!isOwner}
@@ -269,7 +265,7 @@ export function ChecklistItemEditDialog({
                     />
                    <EditableTitle
                       initialValue={dialogTempTitle}
-                      onSave={(newTitle) => isOwner && setDialogTempTitle(newTitle)} // This just updates local dialog state
+                      onSave={(newTitle) => isOwner && setDialogTempTitle(newTitle)} 
                       isEditable={isOwner}
                       textElement='div'
                       textClassName={cn(
@@ -437,18 +433,18 @@ export function ChecklistItemEditDialog({
                       {item.activityLog.map((log: ActivityLogEntry) => (
                         <div key={log.id} className={cn("flex items-start space-x-2", taskBackgroundImageUrl ? "text-gray-300" : "text-muted-foreground")}>
                           <Avatar className="h-5 w-5 mt-0.5 shrink-0">
-                            <AvatarImage 
-                                src={currentUser?.id === item.actorName.split(" ")[0] ? currentUser.avatarUrl : undefined} // Simplistic check, assumes actorName starts with current user's ID
-                                alt={log.actorName} 
+                            <AvatarImage
+                                src={currentUser && log.actorName && currentUser.displayName === log.actorName ? currentUser.avatarUrl : undefined}
+                                alt={log.actorName || "Actor"}
                                 data-ai-hint="user avatar"
                             />
                             <AvatarFallback className={cn("text-[10px]", taskBackgroundImageUrl ? "bg-white/20 text-gray-200" : "bg-muted")}>
-                                {log.actorName.charAt(0)}
+                                {log.actorName ? log.actorName.charAt(0).toUpperCase() : '?'}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-grow">
                             <p className={cn(taskBackgroundImageUrl ? "text-gray-200" : "text-foreground/90")}>
-                              <span className="font-medium">{log.actorName}</span> {log.action}
+                              <span className="font-medium">{log.actorName || "Unknown User"}</span> {log.action}
                             </p>
                             {log.details && <p className={cn("text-xs italic", taskBackgroundImageUrl ? "text-gray-400" : "text-muted-foreground/80")}>{log.details}</p>}
                             <p className={cn("text-[10px]", taskBackgroundImageUrl ? "text-gray-400" : "text-muted-foreground/70")}>
