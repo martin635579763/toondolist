@@ -286,8 +286,9 @@ export function ChecklistItemEditDialog({
                 </div>
           </DialogHeader>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 flex-grow overflow-y-auto min-h-[300px]">
-            <div className="md:col-span-2 space-y-4 pr-4 md:border-r md:border-border/50">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 flex-grow overflow-y-auto min-h-[300px]">
+            {/* Left Column: Image, Description, Action Buttons */}
+            <div className="md:col-span-1 space-y-4 pr-4 md:border-r md:border-border/50">
               {dialogTempImageUrl && (
                   <div className="w-full h-48 relative overflow-hidden rounded-md border border-border">
                       <Image
@@ -318,11 +319,9 @@ export function ChecklistItemEditDialog({
                   disabled={!isOwner}
                 />
               </div>
-            </div>
 
-            <div className="md:col-span-1 space-y-4 pl-0 md:pl-4 mt-4 md:mt-0">
-              <h4 className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground", taskBackgroundImageUrl && "text-gray-300")}>Actions</h4>
-              <div className="space-y-2 flex flex-col items-start">
+              {/* Action Buttons Moved Here */}
+              <div className="space-y-2 flex flex-col items-start pt-4">
                   <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                       <PopoverTrigger asChild>
                           <Button variant="outline" size="sm" className={cn("w-full justify-start text-xs h-auto py-1.5 px-2", taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")} disabled={!isOwner}>
@@ -420,22 +419,23 @@ export function ChecklistItemEditDialog({
                       </PopoverContent>
                   </Popover>
               </div>
-              
-              <Separator className={cn("my-3", taskBackgroundImageUrl && "bg-white/20")} />
+            </div>
 
+            {/* Right Column: Activity Log */}
+            <div className="md:col-span-1 space-y-4 pl-4 mt-4 md:mt-0">
               <div>
                 <h4 className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center", taskBackgroundImageUrl && "text-gray-300")}>
                     <HistoryIcon className="h-3.5 w-3.5 mr-1.5" /> Activity
                 </h4>
-                <ScrollArea className="h-[150px] pr-2">
+                <ScrollArea className="h-[calc(100%-2rem)] pr-2"> {/* Adjust height as needed */}
                   {(item.activityLog && item.activityLog.length > 0) ? (
                     <div className="space-y-2.5 text-xs">
                       {item.activityLog.map((log: ActivityLogEntry) => (
                         <div key={log.id} className={cn("flex items-start space-x-2", taskBackgroundImageUrl ? "text-gray-300" : "text-muted-foreground")}>
                           <Avatar className="h-5 w-5 mt-0.5 shrink-0">
-                            <AvatarImage
+                            <AvatarImage 
                                 src={currentUser && log.actorName && currentUser.displayName === log.actorName ? currentUser.avatarUrl : undefined}
-                                alt={log.actorName || "Actor"}
+                                alt={log.actorName || "Actor"} 
                                 data-ai-hint="user avatar"
                             />
                             <AvatarFallback className={cn("text-[10px]", taskBackgroundImageUrl ? "bg-white/20 text-gray-200" : "bg-muted")}>
@@ -542,3 +542,5 @@ export function ChecklistItemEditDialog({
     </>
   );
 }
+
+    
