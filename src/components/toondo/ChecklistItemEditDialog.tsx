@@ -16,13 +16,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { EditableTitle } from "./EditableTitle";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 import Image from "next/image";
-import { AlignLeftIcon, CalendarDaysIcon, CheckCircle2, HistoryIcon, ImageIcon, PaperclipIcon, TagIcon, TrashIcon, UserCircleIcon, UserIcon } from 'lucide-react';
+import { AlignLeftIcon, CalendarDaysIcon, CheckCircle2, HistoryIcon, ImageIcon, PaperclipIcon, TagIcon, TrashIcon, UserCircleIcon } from 'lucide-react';
 
 const LABEL_COLORS = [
   "bg-red-500",
@@ -71,10 +70,11 @@ export function ChecklistItemEditDialog({
 }: ChecklistItemEditDialogProps) {
   const { toast } = useToast();
 
-  const [dialogTempTitle, setDialogTempTitle] = useState(item.title);
+  // State for values that are edited in sub-dialogs or have delayed save (like description)
   const [dialogTempDescription, setDialogTempDescription] = useState(item.description || "");
   const [dialogTempImageUrl, setDialogTempImageUrl] = useState<string>(item.imageUrl || "");
-
+  
+  // State for popover/sub-dialog visibility
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
   const attachmentDialogFileInpuRef = useRef<HTMLInputElement>(null);
   const [isUserPopoverOpen, setIsUserPopoverOpen] = useState(false);
@@ -82,10 +82,12 @@ export function ChecklistItemEditDialog({
   const [isLabelPopoverOpen, setIsLabelPopoverOpen] = useState(false);
 
   useEffect(() => {
-    if (isOpen) { 
-        setDialogTempTitle(item.title); 
-        setDialogTempDescription(item.description || ""); 
+    // Sync local state if the item prop changes (e.g., due to external updates or real-time log additions)
+    // Only sync if the dialog is open to avoid unnecessary updates.
+    if (isOpen) {
+        setDialogTempDescription(item.description || "");
         setDialogTempImageUrl(item.imageUrl || "");
+        // Title is handled by EditableTitle's internal state + onSave prop
     }
   }, [item, isOpen]);
 
@@ -101,6 +103,7 @@ export function ChecklistItemEditDialog({
   const handleDialogClose = (openState: boolean) => {
     if (!openState) { 
       if(isOwner) handleSaveDescriptionOnClose();
+      // Reset popover states
       setIsUserPopoverOpen(false);
       setIsDueDatePopoverOpen(false);
       setIsLabelPopoverOpen(false);
@@ -208,7 +211,7 @@ export function ChecklistItemEditDialog({
     const trimmedTitle = newTitle.trim();
      if (!trimmedTitle) {
         toast({ title: "Title Required", description: "Checklist item title cannot be empty.", variant: "destructive" });
-        setDialogTempTitle(item.title); 
+        // EditableTitle should handle reverting to initial value if save is not successful
         return;
     }
     onUpdateChecklistItemTitle(taskId, item.id, trimmedTitle);
@@ -229,12 +232,15 @@ export function ChecklistItemEditDialog({
           onOpenChange={handleDialogClose}
       >
         <DialogContent
-          className={cn("sm:max-w-3xl bg-card text-card-foreground max-h-[90vh] flex flex-col", taskBackgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white")}
+          className={cn(
+            "sm:max-w-3xl bg-card text-card-foreground max-h-[90vh] flex flex-col", 
+            taskBackgroundImageUrl && "bg-background/90 backdrop-blur-md border-white/40 text-white"
+          )}
           onClick={(e) => e.stopPropagation()}
         >
            <DialogHeader className="pb-2 pr-10">
                  <DialogTitle className="sr-only">
-                  {`Edit item: ${dialogTempTitle || item.title || "Untitled Item"}`}
+                  {`Edit item: ${item.title || "Untitled Item"}`}
                 </DialogTitle>
                <div className="flex items-center space-x-2">
                    <Checkbox
@@ -283,7 +289,7 @@ export function ChecklistItemEditDialog({
                   </div>
               )}
               {/* Action Buttons */}
-               <div className="space-y-2 flex flex-col items-start pt-4">
+               <div className="space-y-2 flex flex-col items-start pt-1">
                   <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                       <PopoverTrigger asChild>
                           <Button variant="outline" size="sm" className={cn("w-full justify-start text-xs h-auto py-1.5 px-2", taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")} disabled={!isOwner}>
@@ -405,11 +411,26 @@ export function ChecklistItemEditDialog({
             </div>
 
             {/* Right Column: Activity Log */}
-            <div className="md:col-span-1 pl-4 mt-4 md:mt-0 flex flex-col h-full">
-                <h4 className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center", taskBackgroundImageUrl && "text-gray-300")}>
+            <div 
+              className={cn(
+                "md:col-span-1 mt-4 md:mt-0 flex flex-col h-full", 
+                !taskBackgroundImageUrl && "bg-muted/30 rounded-lg p-3",
+                taskBackgroundImageUrl && "pl-4"
+              )}
+            >
+                <h4 className={cn(
+                    "text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center", 
+                    taskBackgroundImageUrl && "text-gray-300"
+                  )}
+                >
                     <HistoryIcon className="h-3.5 w-3.5 mr-1.5" /> Activity
                 </h4>
-                <ScrollArea className="flex-grow pr-2">
+                <ScrollArea 
+                  className={cn(
+                    "flex-grow",
+                    taskBackgroundImageUrl && "pr-2" // Add padding for scrollbar visibility only if no parent padding from bg-muted
+                  )}
+                >
                   {(item.activityLog && item.activityLog.length > 0) ? (
                     <div className="space-y-2.5 text-xs">
                       {item.activityLog.map((log: ActivityLogEntry) => (
@@ -523,6 +544,3 @@ export function ChecklistItemEditDialog({
     </>
   );
 }
-
-
-    
