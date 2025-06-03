@@ -606,8 +606,23 @@ export function TaskCard({
 
                 <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className={cn("justify-start text-xs h-auto py-1.5 px-2", task.backgroundImageUrl && "bg-white/10 border-white/30 text-white hover:bg-white/20")}>
-                            <CalendarDaysIcon className="mr-1.5 h-3.5 w-3.5" />
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className={cn(
+                                "justify-start text-xs h-auto py-1.5 px-2",
+                                task.backgroundImageUrl 
+                                ? [ 
+                                    "bg-white/10 border-white/30 hover:bg-white/20",
+                                    dialogTempCompleted && dialogTempDueDate ? "text-green-300" : "text-white"
+                                  ]
+                                : (dialogTempCompleted && dialogTempDueDate 
+                                    ? "text-green-600 dark:text-green-400 hover:bg-accent/80 hover:text-green-700 dark:hover:text-green-300" 
+                                    : "" 
+                                  )
+                            )}
+                        >
+                            <CalendarDaysIcon className={cn("mr-1.5 h-3.5 w-3.5")} />
                             {dialogTempDueDate ? format(dialogTempDueDate, "MMM d") : "Due Date"}
                             {dialogTempCompleted && dialogTempDueDate && (
                                 <Badge variant="secondary" className={cn("ml-1.5 text-xs px-1 py-0", task.backgroundImageUrl ? "bg-green-300/30 text-green-100 border-green-300/50" : "bg-green-100 text-green-700")}>
