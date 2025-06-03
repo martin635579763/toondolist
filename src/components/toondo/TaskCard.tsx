@@ -377,7 +377,7 @@ export function TaskCard({
                             "absolute left-0 top-1/2 -translate-y-1/2",
                             "h-3.5 w-3.5 border-2 rounded-sm data-[state=checked]:bg-green-400 shrink-0",
                             item.completed
-                               ? "opacity-100" 
+                               ? "opacity-100"
                                : "opacity-0 group-hover/checkbox-reveal-area:opacity-100 transition-opacity duration-300 ease-in-out",
                             task.backgroundImageUrl ? "border-gray-300 data-[state=checked]:text-gray-800" : "border-muted-foreground data-[state=checked]:text-primary-foreground"
                         )}
@@ -389,9 +389,9 @@ export function TaskCard({
                         className={cn(
                             "flex-grow break-all truncate cursor-pointer",
                             item.completed
-                               ? "pl-5" 
+                               ? "pl-5"
                                : "pl-1 group-hover/checkbox-reveal-area:pl-5 transition-all duration-300 ease-in-out",
-                            item.completed && "line-through opacity-70",
+                            item.completed ? "line-through opacity-70" : "",
                             task.backgroundImageUrl ? "text-gray-100" : "text-card-foreground",
                             !isOwner && "pointer-events-none"
                         )}
@@ -769,7 +769,3 @@ export function TaskCard({
     </Card>
   );
 }
-
-
-
-
