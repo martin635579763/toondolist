@@ -73,6 +73,9 @@ export function ChecklistItemEditDialog({
   const [dialogTempDescription, setDialogTempDescription] = useState(item.description || "");
   const [dialogTempImageUrl, setDialogTempImageUrl] = useState<string>(item.imageUrl || "");
   
+  const [unsplashSearchQuery, setUnsplashSearchQuery] = useState("");
+  const [unsplashResults, setUnsplashResults] = useState<any[]>([]);
+  
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
   const attachmentDialogFileInpuRef = useRef<HTMLInputElement>(null);
   const [isUserPopoverOpen, setIsUserPopoverOpen] = useState(false);
@@ -127,6 +130,11 @@ export function ChecklistItemEditDialog({
     if (attachmentDialogFileInpuRef.current) {
       attachmentDialogFileInpuRef.current.value = "";
     }
+    // Reset search
+    setUnsplashSearchQuery("");
+    setUnsplashResults([]);
+
+
     setIsAttachmentDialogOpen(true);
   };
 
@@ -147,7 +155,7 @@ export function ChecklistItemEditDialog({
   const handleAttachmentFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { 
+      if (file.size > 2 * 1024 * 1024) { 
         toast({ title: "File Too Large", description: "Please select an image smaller than 2MB.", variant: "destructive" });
         if (attachmentDialogFileInpuRef.current) attachmentDialogFileInpuRef.current.value = "";
         return;
@@ -164,6 +172,23 @@ export function ChecklistItemEditDialog({
     if (attachmentDialogFileInpuRef.current) attachmentDialogFileInpuRef.current.value = "";
   };
 
+  const handleUnsplashSearch = async (query: string) => {
+    if (!query.trim()) {
+      setUnsplashResults([]);
+      return;
+    }
+    try {
+      const results = await searchPhotos(query);
+      setUnsplashResults(results);
+    } catch (error) {
+      console.error("Error searching Unsplash:", error);
+      toast({ title: "Search Failed", description: "Could not search Unsplash. Please try again.", variant: "destructive" });
+    }
+  };
+
+  const handleSelectUnsplashImage = (imageUrl: string) => {
+    setDialogTempImageUrl(imageUrl);
+  }
   const handleToggleDialogAssignCurrentUser = () => {
     if (!currentUser || !isOwner) return;
     let newAssignedUserId: string | null = null;
@@ -445,7 +470,7 @@ export function ChecklistItemEditDialog({
                     <HistoryIcon className="h-3.5 w-3.5 mr-1.5" /> Activity
                 </h4>
                 <ScrollArea 
-                  className={cn(
+className={cn(
                     "flex-grow min-h-0", // min-h-0 is crucial for flex-grow in a constrained parent
                     scrollAreaPadding
                   )}
@@ -535,6 +560,36 @@ export function ChecklistItemEditDialog({
                             className={cn("text-xs p-1 h-auto file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-input file:bg-transparent file:text-xs file:font-medium file:text-foreground", taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 file:text-gray-200 file:border-white/30 hover:file:bg-white/5")}
                         />
                     </div>
+                    <div>
+                         <Label htmlFor="unsplashSearch" className={cn("text-xs", taskBackgroundImageUrl && "text-gray-200")}>Search Unsplash</Label>
+                         <div className="flex space-x-2">
+                              <Input
+                                  id="unsplashSearch"
+                                  value={unsplashSearchQuery}
+                                  onChange={(e) => setUnsplashSearchQuery(e.target.value)}
+                                  placeholder="e.g., 'beach', 'work'"
+                                  className={cn("text-sm h-9 flex-grow", taskBackgroundImageUrl && "bg-white/10 border-white/30 text-white placeholder-gray-400 focus:border-white/50")}
+                                  onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          handleUnsplashSearch(unsplashSearchQuery);
+                                      }
+                                  }}
+                              />
+                              <Button size="sm" className={cn(taskBackgroundImageUrl && "bg-white/20 hover:bg-white/30 text-white")} onClick={() => handleUnsplashSearch(unsplashSearchQuery)}>Search</Button>
+                         </div>
+                         {unsplashResults.length > 0 && (
+                             <ScrollArea className="mt-2 h-32 overflow-y-auto rounded-md border border-border p-2">
+                                 <div className="grid grid-cols-3 gap-2">
+                                     {unsplashResults.map((photo) => (
+                                         <div key={photo.id} className="relative aspect-[3/2] overflow-hidden rounded cursor-pointer hover:opacity-80" onClick={() => handleSelectUnsplashImage(photo.urls.regular)}>
+                                             <Image src={photo.urls.small} alt={photo.alt_description || 'Unsplash image'} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" style={{objectFit: "cover"}} className="rounded" />
+                                         </div>
+                                     ))}
+                                 </div>
+                             </ScrollArea>
+                         )}
+                     </div>
                     {(dialogTempImageUrl) && 
                         <Button
                             size="sm"
