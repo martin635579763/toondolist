@@ -147,7 +147,7 @@ export function ChecklistItemEditDialog({
   const handleAttachmentFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { 
+      if (file.size > 5 * 1024 * 1024) { 
         toast({ title: "File Too Large", description: "Please select an image smaller than 2MB.", variant: "destructive" });
         if (attachmentDialogFileInpuRef.current) attachmentDialogFileInpuRef.current.value = "";
         return;

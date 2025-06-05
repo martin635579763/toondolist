@@ -269,38 +269,38 @@ export function TaskCard({
                   </div>
 
                   {(item.imageUrl || item.description || item.dueDate || item.assignedUserId) && (
-                    <div className={cn("mt-1 pt-1 text-xs flex flex-wrap gap-x-2 gap-y-1 items-start", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")}>
+ <div className={cn("mt-1 pt-1 text-xs flex flex-col gap-y-1 items-start", task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")}>
                         {item.imageUrl && (
-                        <div className="w-full mt-1 mb-1 h-[45px] relative overflow-hidden rounded">
-                            <Image
-                                src={item.imageUrl}
-                                alt={item.title || "Checklist item image"}
-                                fill
-                                style={{objectFit: "cover"}}
-                                className="rounded"
-                                data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
-                            />
-                        </div>
+ <div className="w-full mt-1 mb-1 relative max-h-48 overflow-hidden rounded">
+ <Image 
+ src={item.imageUrl}
+ alt={item.title || "Checklist item image"}
+ width={500} // Set a reasonable width, or make it dynamic
+ height={300} // Set a reasonable height, or make it dynamic
+ style={{objectFit: "contain", width: "100%", height: "auto"}} // Use "contain" to show full image, auto height to maintain aspect ratio
+ className="rounded"
+ data-ai-hint={item.imageAiHint || item.title.split(/\s+/).slice(0,2).join(' ').toLowerCase()}
+ />
+ </div>
                         )}
                         {item.description && (
-                            <p
-                                className="italic truncate w-full text-ellipsis text-gray-400/90 dark:text-gray-500/90"
-                                dangerouslySetInnerHTML={{
-                                __html: marked.parseInline(item.description.length > 50 ? `${item.description.substring(0, 47)}...` : item.description)
-                                }}
-                            />
+ <p
+ className={cn("italic w-full text-gray-400/90 dark:text-gray-500/90", item.imageUrl ? "mt-2" : "")} // Added margin top if there's an image above
+ dangerouslySetInnerHTML={{
+ __html: marked.parseInline(item.description) // Show full description
+ }}
+ />
                         )}
                         {item.dueDate && (
-                        <div className={cn(
-                            "flex items-center",
-                            item.completed ? 
-                                (task.backgroundImageUrl ? "text-green-300" : "text-green-600 dark:text-green-400") :
-                                (task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")
-                            )}
+ <div className={cn("flex items-center mt-1", // Added margin top
+ item.completed ?
+ (task.backgroundImageUrl ? "text-green-300" : "text-green-600 dark:text-green-400") :
+ (task.backgroundImageUrl ? "text-gray-200" : "text-muted-foreground")
+ )}
                         >
-                            <CalendarDaysIcon className="mr-1 h-3 w-3" />
-                            {format(new Date(item.dueDate), "MMM d")}
-                        </div>
+ <CalendarDaysIcon className="mr-1 h-3 w-3" />
+ {format(new Date(item.dueDate), "MMM d")}
+ </div>
                         )}
                         {item.assignedUserId && item.assignedUserName && (
                         <div className="flex items-center">
