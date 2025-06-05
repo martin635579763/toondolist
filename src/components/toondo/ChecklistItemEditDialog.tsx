@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import { AlignLeftIcon, CalendarDaysIcon, CheckCircle2, HistoryIcon, ImageIcon, PaperclipIcon, TagIcon, TrashIcon, UserCircleIcon } from 'lucide-react';
+import { searchPhotos } from '@/lib/unsplash';
 
 const LABEL_COLORS = [
   "bg-red-500",
@@ -583,7 +584,7 @@ className={cn(
                                  <div className="grid grid-cols-3 gap-2">
                                      {unsplashResults.map((photo) => (
                                          <div key={photo.id} className="relative aspect-[3/2] overflow-hidden rounded cursor-pointer hover:opacity-80" onClick={() => handleSelectUnsplashImage(photo.urls.regular)}>
-                                             <Image src={photo.urls.small} alt={photo.alt_description || 'Unsplash image'} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" style={{objectFit: "cover"}} className="rounded" />
+                                             <Image src={photo.urls.regular} alt={photo.alt_description || 'Unsplash image'} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" style={{objectFit: "cover"}} className="rounded" />
                                          </div>
                                      ))}
                                  </div>

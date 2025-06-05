@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import axios from 'axios';
 
 interface UnsplashPhoto {
   id: string;
@@ -13,13 +13,13 @@ export async function searchPhotos(query: string): Promise<UnsplashPhoto[]> {
   const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&client_id=${apiKey}`;
 
   try {
-    const response = await fetch(url);
+    const response = await axios.get(url);
 
-    if (!response.ok) {
-      throw new Error(`Error fetching photos: ${response.statusText}`);
+    if (response.status !== 200) {
+ throw new Error(`Error fetching photos: ${response.statusText}`);
     }
 
-    const data: any = await response.json(); // Using 'any' for flexibility with the API response structure
+    const data: any = response.data; // Using 'any' for flexibility with the API response structure
 
     if (!data.results || !Array.isArray(data.results)) {
       throw new Error("Invalid data format from Unsplash API");
