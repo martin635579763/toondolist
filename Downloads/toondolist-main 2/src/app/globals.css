@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 92%; /* Light Grey */
+    --foreground: 0 0% 20%; /* Dark Grey/Black */
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 0 0% 20%; /* Dark Grey/Black for Cards */
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 0 0% 20%; /* Dark Grey/Black for Popovers */
+    --primary: 220 85% 60%; /* Lego Blue */
+    --primary-foreground: 0 0% 100%; /* White */
+    --secondary: 50 100% 55%; /* Lego Yellow */
+    --secondary-foreground: 0 0% 20%; /* Dark Grey/Black (for contrast on Yellow) */
+    --muted: 0 0% 90%; /* Lighter Grey */
+    --muted-foreground: 0 0% 45%; /* Medium Grey */
+    --accent: 0 90% 60%; /* Lego Red */
+    --accent-foreground: 0 0% 100%; /* White */
+    --destructive: 0 80% 55%; /* Bright Red */
+    --destructive-foreground: 0 0% 100%; /* White */
+    --border: 0 0% 75%; /* Medium Grey Border */
+    --input: 0 0% 95%; /* Light Grey Input Background */
+    --ring: 220 85% 60%; /* Lego Blue for focus rings */
+    --chart-1: 220 70% 60%; /* Lego Blue variant */
+    --chart-2: 0 80% 55%; /* Lego Red variant */
+    --chart-3: 50 90% 50%; /* Lego Yellow variant */
+    --chart-4: 120 60% 45%; /* Lego Green variant */
+    --chart-5: 25 90% 55%; /* Lego Orange variant */
+    --radius: 0.3rem; /* Slightly sharper radius */
+
+    /* Lego-themed Sidebar Colors */
+    --sidebar-background: 0 0% 98%; /* Lego White / Very Light Grey */
+    --sidebar-foreground: 0 0% 20%; /* Dark Grey/Black text */
+    --sidebar-primary: 220 85% 60%; /* Lego Blue for active items */
+    --sidebar-primary-foreground: 0 0% 100%; /* White text on primary */
+    --sidebar-accent: 50 100% 55%; /* Lego Yellow for hover */
+    --sidebar-accent-foreground: 0 0% 20%; /* Dark Grey/Black text on hover */
+    --sidebar-border: 0 0% 80%; /* Medium Grey border for sidebar */
+    --sidebar-ring: 220 85% 60%; /* Lego Blue for focus rings */
+  }
+
+  .dark {
+    --background: 220 10% 15%; /* Very Dark Grey */
+    --foreground: 220 10% 85%; /* Light Grey Text */
+    --card: 220 10% 20%; /* Dark Grey Card */
+    --card-foreground: 220 10% 85%; /* Light Grey Text for Cards */
+    --popover: 220 10% 10%; /* Darker Popover */
+    --popover-foreground: 220 10% 85%; /* Light Grey Text for Popovers */
+    --primary: 220 90% 65%; /* Lego Blue (slightly brighter) */
+    --primary-foreground: 0 0% 100%; /* White */
+    --secondary: 50 100% 60%; /* Lego Yellow (slightly brighter) */
+    --secondary-foreground: 0 0% 15%; /* Dark Grey/Black */
+    --muted: 220 10% 25%; /* Dark Muted Grey */
+    --muted-foreground: 220 10% 65%; /* Medium Light Grey Text */
+    --accent: 0 90% 65%; /* Lego Red (slightly brighter) */
+    --accent-foreground: 0 0% 100%; /* White */
+    --destructive: 0 85% 60%; /* Brighter Red */
+    --destructive-foreground: 0 0% 100%; /* White */
+    --border: 220 10% 30%; /* Medium Dark Grey Border */
+    --input: 220 10% 22%; /* Darker Input Background */
+    --ring: 220 90% 65%; /* Lego Blue for focus rings */
+
+    /* Dark Lego-themed Sidebar Colors */
+    --sidebar-background: 220 10% 12%; /* Darkest Grey Sidebar */
+    --sidebar-foreground: 220 10% 80%; /* Light Grey for Sidebar text */
+    --sidebar-primary: 220 90% 65%; /* Lego Blue for active items */
+    --sidebar-primary-foreground: 0 0% 100%; /* White text on primary */
+    --sidebar-accent: 50 100% 60%; /* Lego Yellow for hover */
+    --sidebar-accent-foreground: 0 0% 15%; /* Dark Grey/Black text on hover */
+    --sidebar-border: 220 10% 25%; /* Dark Grey border for sidebar */
+    --sidebar-ring: 220 90% 65%; /* Lego Blue for focus rings */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Print specific styles */
+@media print {
+  body {
+    font-family: Arial, sans-serif; /* Use a more standard font for printing */
+    background-color: #fff !important; /* Ensure white background for printing */
+    color: #000 !important; /* Ensure black text for printing */
+  }
+  .no-print {
+    display: none !important;
+  }
+  #printable-area {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: auto;
+  }
+   body > *:not(#printable-area):not(#printable-area *) {
+    display: none !important; /* More robust way to hide everything else */
+  }
+  .printable-card-content {
+    border: 1px solid #ccc; /* Ensure card border is visible */
+    box-shadow: none; /* Remove shadows for print */
+  }
+}
